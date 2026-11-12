@@ -6,13 +6,23 @@ node_modules/
 dist/
 build/
 *.tsbuildinfo
+dist-ssr/
 
-# Environment variables
+# Environment variables & local secrets
 .env
 .env.local
 .env.*.local
+*.key
+*.pem
+*.crt
+*.csr
+privatekey
+presharedkey
 
-# Logs
+# WireGuard configurations
+*.conf
+
+# Logs & Debug
 logs/
 *.log
 npm-debug.log*
@@ -20,17 +30,31 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Test coverage & Go test binaries
+coverage/
+*.lcov
+*.test
+coverage.out
+
+# Tooling & Framework caches
+.vite/
+.eslintcache
+.turbo/
+
 # OS & Editor
 .DS_Store
 Thumbs.db
+ehthumbs.db
+Desktop.ini
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# Docker volumes & data
+# Docker volumes & local overrides
 postgres_data/
 wireguard_config/
+docker-compose.override.yml
 
 # Go binaries
 *.exe
@@ -38,4 +62,3 @@ wireguard_config/
 *.so
 *.dylib
 bin/
-
