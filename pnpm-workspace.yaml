@@ -1,0 +1,4 @@
+packages:
+  - 'Rain/*'
+  - 'Sobree/*'
+  - 'packages/*'

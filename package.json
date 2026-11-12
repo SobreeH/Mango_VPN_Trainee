@@ -1,0 +1,31 @@
+{
+  "name": "mango-vpn",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Zero-Trust Role-Based WireGuard VPN Management System",
+  "workspaces": [
+    "Rain/*",
+    "Sobree/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "check:env": "powershell -ExecutionPolicy Bypass -File scripts/check-environment.ps1",
+    "dev:api": "npm --workspace=@mango/api run dev",
+    "dev:portal": "npm --workspace=@mango/portal run dev",
+    "build": "npm run --workspaces --if-present build",
+    "lint": "npm run --workspaces --if-present lint",
+    "mock:agent": "node scripts/mock-agent.js",
+    "db:generate": "npm --workspace=@mango/api run prisma:generate",
+    "db:migrate": "npm --workspace=@mango/api run prisma:migrate",
+    "db:seed": "npm --workspace=@mango/rain-admin run seed",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
