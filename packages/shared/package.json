@@ -1,0 +1,22 @@
+{
+  "name": "@mango/shared",
+  "version": "0.1.0",
+  "description": "Shared TypeScript API contracts, DTOs, and interfaces for MANGO VPN",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}
