@@ -11,8 +11,8 @@ MANGO VPN ออกแบบมาเพื่อขจัดความยุ�
 ## 📚 สารบัญคู่มือและเอกสาร
 
 - **[🚀 คู่มือเริ่มต้นด่วน & ตรวจสอบความพร้อมของเครื่องมือ (QUICKSTART.th.md)](file:///e:/Trainee/Mango_VPN_Trainee/QUICKSTART.th.md)**: รายการโปรแกรมที่ต้องติดตั้ง, สคริปต์ตรวจสอบอัตโนมัติ และการจัดสรรพอร์ต
-- **[🌧️ คู่มือการพัฒนาสำหรับ Rain (Junior Dev)](file:///e:/Trainee/Mango_VPN_Trainee/Rain/README.th.md)**: การพัฒนาหน้าเว็บ Portal UI และระบบ Admin CRUD
-- **[⚡ คู่มือการพัฒนาสำหรับ Sobree (Senior Dev)](file:///e:/Trainee/Mango_VPN_Trainee/Sobree/README.th.md)**: การพัฒนาระบบ Management API, Go Windows Service และ Linux VPN Daemon
+- **[🌧️ คู่มือการพัฒนาสำหรับ Rain](file:///e:/Trainee/Mango_VPN_Trainee/Rain/README.th.md)**: การพัฒนาหน้าเว็บ Portal UI และระบบ Admin CRUD
+- **[⚡ คู่มือการพัฒนาสำหรับ Sobree](file:///e:/Trainee/Mango_VPN_Trainee/Sobree/README.th.md)**: การพัฒนาระบบ Management API, Go Windows Service และ Linux VPN Daemon
 
 ---
 
@@ -22,7 +22,7 @@ MANGO VPN ออกแบบมาเพื่อขจัดความยุ�
 
 ```text
 mango-vpn/
-├── Rain/                          # 🌧️ [พื้นที่ทำงานของ Junior Developer: Rain]
+├── Rain/                          # 🌧️ [พื้นที่ทำงานของ Rain]
 │   ├── portal/                    # หน้าเว็บ Portal (React 19 + Vite + Tailwind CSS Dark UI)
 │   │   ├── src/App.tsx            # ดีไซน์ Dark UI, ไฟสถานะ, โมดอล 2FA OTP, ปุ่มเขียว VPN CONNECT
 │   │   ├── package.json           # (@mango/portal)
@@ -33,7 +33,7 @@ mango-vpn/
 │       ├── src/seed.ts            # สคริปต์สร้างข้อมูลจำลอง (admin_user, staff_user, client_user)
 │       └── package.json           # (@mango/rain-admin)
 │
-├── Sobree/                        # ⚡ [พื้นที่ทำงานของ Senior Developer: Sobree]
+├── Sobree/                        # ⚡ [พื้นที่ทำงานของ Sobree]
 │   ├── api/                       # ระบบ Control Plane Management API (Fastify)
 │   │   ├── prisma/schema.prisma   # สกีมาฐานข้อมูล 8 ตารางหลัก
 │   │   ├── src/modules/auth/      # ระบบล็อกอิน, OTP MFA 6 หลัก, JWT
@@ -64,7 +64,7 @@ mango-vpn/
 
 ## 2. การแบ่งหน้าที่และความรับผิดชอบในทีม
 
-| ส่วนงาน | Rain (Junior) 🌧️ | Sobree (Senior) ⚡ |
+| ส่วนงาน | Rain 🌧️ | Sobree ⚡ |
 | :--- | :--- | :--- |
 | **โฟลเดอร์ที่ทำงาน** | ทำงานเฉพาะในโฟลเดอร์ `Rain/` | ทำงานในโฟลเดอร์ `Sobree/` |
 | **หน้าเว็บ Frontend** | `Rain/portal` (ดูแล 100%) | ช่วยรีวิวเชิงสถาปัตยกรรม |

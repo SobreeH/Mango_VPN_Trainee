@@ -1,4 +1,4 @@
-# ⚡ คู่มือการพัฒนาสำหรับ Sobree (Senior Systems & Security Developer)
+# ⚡ คู่มือการพัฒนาสำหรับ Sobree
 
 [English](README.md) | [ภาษาไทย](README.th.md)
 
@@ -65,7 +65,7 @@ npm run db:generate
 # ส่งการเปลี่ยนแปลงไปยังฐานข้อมูล PostgreSQL
 npm run db:migrate
 
-# เติมข้อมูลผู้ใช้และ Role ตัวอย่างโดยใช้สคริปต์ของน้อง Rain
+# เติมข้อมูลผู้ใช้และ Role ตัวอย่างโดยใช้สคริปต์ของ Rain
 npm run db:seed
 ```
 
@@ -145,7 +145,7 @@ table inet mango_vpn {
 
 ---
 
-## 5. ข้อตกลงการประสานงานกับน้อง Rain (Collaboration Contract)
+## 5. ข้อตกลงการประสานงานกับ Rain (Collaboration Contract)
 
 1. **โมดูล Admin ของ Rain**:
    - Rain พัฒนาไฟล์ใน `Rain/admin/src/admin.service.ts` และ `admin.routes.ts`

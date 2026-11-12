@@ -1,4 +1,4 @@
-# ⚡ Sobree's Development Guide (Senior Systems & Security Developer)
+# ⚡ Sobree's Development Guide
 
 [English](README.md) | [ภาษาไทย](README.th.md)
 

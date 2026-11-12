@@ -12,12 +12,12 @@ MANGO VPN eliminates manual `.conf` file management for corporate VPN users thro
 
 - **English**:
   - **[🚀 Quick Start & Environment Readiness Guide](file:///e:/Trainee/Mango_VPN_Trainee/QUICKSTART.md)**: Tool prerequisites, verification scripts, and port mapping.
-  - **[🌧️ Rain's Development Guide (Junior Dev)](file:///e:/Trainee/Mango_VPN_Trainee/Rain/README.md)**: Web Portal UI & Admin CRUD development.
-  - **[⚡ Sobree's Development Guide (Senior Dev)](file:///e:/Trainee/Mango_VPN_Trainee/Sobree/README.md)**: Management API, Go Windows Service, and Linux VPN Daemon.
+  - **[🌧️ Rain's Development Guide](file:///e:/Trainee/Mango_VPN_Trainee/Rain/README.md)**: Web Portal UI & Admin CRUD development.
+  - **[⚡ Sobree's Development Guide](file:///e:/Trainee/Mango_VPN_Trainee/Sobree/README.md)**: Management API, Go Windows Service, and Linux VPN Daemon.
 - **ภาษาไทย**:
   - **[🚀 คู่มือเริ่มต้นด่วน & ตรวจสอบความพร้อมของเครื่องมือ](file:///e:/Trainee/Mango_VPN_Trainee/QUICKSTART.th.md)**
-  - **[🌧️ คู่มือการพัฒนาสำหรับ Rain (Junior Dev)](file:///e:/Trainee/Mango_VPN_Trainee/Rain/README.th.md)**
-  - **[⚡ คู่มือการพัฒนาสำหรับ Sobree (Senior Dev)](file:///e:/Trainee/Mango_VPN_Trainee/Sobree/README.th.md)**
+  - **[🌧️ คู่มือการพัฒนาสำหรับ Rain](file:///e:/Trainee/Mango_VPN_Trainee/Rain/README.th.md)**
+  - **[⚡ คู่มือการพัฒนาสำหรับ Sobree](file:///e:/Trainee/Mango_VPN_Trainee/Sobree/README.th.md)**
 
 ---
 
@@ -27,7 +27,7 @@ To ensure zero git conflicts and complete decoupling of responsibilities, the co
 
 ```text
 mango-vpn/
-├── Rain/                          # 🌧️ [Junior Developer: Rain]
+├── Rain/                          # 🌧️ [Rain]
 │   ├── portal/                    # React 19 + Vite + Tailwind CSS Web Portal UI
 │   │   ├── src/App.tsx            # Dark UI, Status Pills, 2FA OTP, Green VPN CONNECT button
 │   │   ├── package.json           # (@mango/portal)
@@ -38,7 +38,7 @@ mango-vpn/
 │       ├── src/seed.ts            # Database seed script (admin_user, staff_user, client_user)
 │       └── package.json           # (@mango/rain-admin)
 │
-├── Sobree/                        # ⚡ [Senior Developer: Sobree]
+├── Sobree/                        # ⚡ [Sobree]
 │   ├── api/                       # Central Control Plane Management API
 │   │   ├── prisma/schema.prisma   # 8-Table Zero-Trust Prisma Schema
 │   │   ├── src/modules/auth/      # Step 1-4: Login, 6-digit OTP MFA, JWT
@@ -68,7 +68,7 @@ mango-vpn/
 
 ## 2. Decoupled Team Responsibilities
 
-| Responsibility | Rain (Junior) 🌧️ | Sobree (Senior) ⚡ |
+| Responsibility | Rain 🌧️ | Sobree ⚡ |
 | --- | --- | --- |
 | **Workspace Folder** | `Rain/` | `Sobree/` |
 | **Frontend UI** | `Rain/portal` (100% ownership) | Architectural review |
@@ -81,7 +81,7 @@ mango-vpn/
 
 ---
 
-## 3. Workflow for Rain (Junior Developer)
+## 3. Workflow for Rain
 
 Rain works entirely inside the `Rain/` directory without stepping on Sobree's code:
 
@@ -102,7 +102,7 @@ npm run dev:portal
 
 ---
 
-## 4. Workflow for Sobree (Senior Developer)
+## 4. Workflow for Sobree
 
 Sobree works inside the `Sobree/` directory and shared contracts:
 

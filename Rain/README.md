@@ -1,4 +1,4 @@
-# 🌧️ Rain's Development Guide (Junior Developer)
+# 🌧️ Rain's Development Guide
 
 [English](README.md) | [ภาษาไทย](README.th.md)
 
