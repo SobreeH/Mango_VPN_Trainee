@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldAlert, ShieldCheck } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, Shield, LayoutDashboard } from 'lucide-react';
 import {
   LoginResponse,
   AuthTokenResponse,
@@ -7,11 +7,12 @@ import {
   AgentStatusResponse,
 } from '@mango/shared';
 
-// นำเข้า Component ลูกทั้ง 4 ชิ้นที่เราเพิ่งสร้าง
+// นำเข้า Component ลูกทั้งหมด
 import { Header } from './components/Header';
 import { LoginForm } from './components/LoginForm';
 import { OtpModal } from './components/OtpModal';
 import { VpnDashboard } from './components/VpnDashboard';
+import { AdminPanel } from './components/AdminPanel';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 const AGENT_BASE_URL = 'http://127.0.0.1:47821';
@@ -25,6 +26,9 @@ export default function App() {
   const [mfaChallenge, setMfaChallenge] = useState<LoginResponse | null>(null);
   const [otpCode, setOtpCode] = useState('');
   const [authData, setAuthData] = useState<AuthTokenResponse | null>(null);
+
+  // มุมมองปัจจุบันเมื่อล็อกอินแล้ว: 'vpn' (หน้าเชื่อมต่อ) หรือ 'admin' (หน้าหลังบ้าน)
+  const [activeView, setActiveView] = useState<'vpn' | 'admin'>('vpn');
 
   // =========================================================================
   // 2. สถานะระบบและเน็ตเวิร์ก (System & Telemetry State)
@@ -235,11 +239,9 @@ export default function App() {
     setAuthData(null);
     setMfaChallenge(null);
     setOtpCode('');
+    setActiveView('vpn'); // รีเซ็ตมุมมองกลับไปหน้าหลัก
   };
 
-  // =========================================================================
-  // 4. ส่วนเรนเดอร์หน้าจอ (Render JSX) - รวมร่าง Component ทั้งหมด!
-  // =========================================================================
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
       {/* 1. ส่วนหัว: แถบสถานะระบบ */}
@@ -254,7 +256,10 @@ export default function App() {
 
       {/* 2. พื้นที่เนื้อหาหลัก (Main Content) */}
       <main className="flex-1 flex items-center justify-center p-6">
-        <div className="w-full max-w-md">
+        {/* ปรับความกว้างของการ์ด: ถ้าเป็นหน้า Admin ให้กว้างขึ้นเป็น max-w-2xl */}
+        <div className={`w-full transition-all duration-300 ${
+          authData && activeView === 'admin' ? 'max-w-2xl' : 'max-w-md'
+        }`}>
 
           {/* ป้ายแจ้งเตือนข้อผิดพลาด (Error Alert) */}
           {errorMessage && (
@@ -275,7 +280,7 @@ export default function App() {
           {/* การ์ดบรรจุหน้าจอ (Card Container) */}
           <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-2xl backdrop-blur">
             
-            {/* หน้าที่ 1: ฟอร์มล็อกอิน (แสดงเมื่อยังไม่ล็อกอินและยังไม่ได้ขอ OTP) */}
+            {/* หน้าที่ 1: ฟอร์มล็อกอิน */}
             {!authData && !mfaChallenge && (
               <LoginForm
                 username={username}
@@ -287,7 +292,7 @@ export default function App() {
               />
             )}
 
-            {/* หน้าที่ 2: โมดอลกรอก OTP (แสดงเมื่อได้ challenge จาก API แล้ว) */}
+            {/* หน้าที่ 2: โมดอลกรอก OTP */}
             {!authData && mfaChallenge && (
               <OtpModal
                 maskedPhoneNumber={mfaChallenge.maskedPhoneNumber}
@@ -299,20 +304,59 @@ export default function App() {
               />
             )}
 
-            {/* หน้าที่ 3: แดชบอร์ด VPN (แสดงเมื่อยืนยัน OTP สำเร็จแล้ว) */}
+            {/* หน้าที่ 3: แดชบอร์ดเมื่อล็อกอินสำเร็จแล้ว */}
             {authData && (
-              <VpnDashboard
-                user={authData.user}
-                assignedIp={assignedIp}
-                connectionState={connectionState}
-                bytesRx={bytesRx}
-                bytesTx={bytesTx}
-                agentInstalled={agentInstalled}
-                agentVersion={agentVersion}
-                loading={loading}
-                onConnect={handleConnectVpn}
-                onDisconnect={handleDisconnectVpn}
-              />
+              <div className="space-y-4">
+                {/* สวิตช์สลับหน้า (แสดงเฉพาะ Role ADMIN) */}
+                {authData.user.role === 'ADMIN' && (
+                  <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+                    <button
+                      onClick={() => setActiveView('vpn')}
+                      className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5 transition cursor-pointer ${
+                        activeView === 'vpn'
+                          ? 'bg-amber-500 text-slate-950 shadow-md'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <Shield className="w-3.5 h-3.5" />
+                      <span>VPN Client</span>
+                    </button>
+
+                    <button
+                      onClick={() => setActiveView('admin')}
+                      className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5 transition cursor-pointer ${
+                        activeView === 'admin'
+                          ? 'bg-amber-500 text-slate-950 shadow-md'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <LayoutDashboard className="w-3.5 h-3.5" />
+                      <span>Admin Console</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* แสดง View ตามที่เลือก */}
+                {activeView === 'vpn' ? (
+                  <VpnDashboard
+                    user={authData.user}
+                    assignedIp={assignedIp}
+                    connectionState={connectionState}
+                    bytesRx={bytesRx}
+                    bytesTx={bytesTx}
+                    agentInstalled={agentInstalled}
+                    agentVersion={agentVersion}
+                    loading={loading}
+                    onConnect={handleConnectVpn}
+                    onDisconnect={handleDisconnectVpn}
+                  />
+                ) : (
+                  <AdminPanel
+                    accessToken={authData.accessToken}
+                    apiBaseUrl={API_BASE_URL}
+                  />
+                )}
+              </div>
             )}
 
           </div>

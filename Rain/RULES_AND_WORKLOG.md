@@ -141,12 +141,19 @@
      - อัปเดต `LoginForm.tsx` แสดงกรอบแดงและข้อความเตือนเมื่อผู้ใช้กรอกผิด พร้อมเคลียร์ Error อัตโนมัติเมื่อเริ่มพิมพ์แก้ไข
      - อัปเดต `OtpModal.tsx` ตรวจสอบความถูกต้องของ OTP ด้วย Zod ก่อนส่งคำขอไปยังเซิร์ฟเวอร์
      - ตรวจสอบการคอมไพล์ผ่าน TypeScript และ Vite build 100%
+  9. ดำเนินการ Phase 3: สร้างหน้าจอ Admin Management UI (เชื่อมต่อ `Rain/admin`)
+     - สร้าง Component `AdminPanel.tsx` พร้อมระบบ 4 แท็บ: Devices, VPN Sessions, Audit Logs, และ Releases
+     - แสดงตารางข้อมูลแบบ Dark-mode รองรับการดึงข้อมูลผ่าน Bearer Token จาก Backend API
+     - อัปเดต `App.tsx` เพิ่มระบบ View Switcher ให้ Role ADMIN สลับหน้าจอระหว่าง VPN Client และ Admin Console
+     - ปรับความกว้างของการ์ดอัตโนมัติ (ขยายเป็น `max-w-2xl` ในมุมมอง Admin เพื่อให้อ่านตารางง่ายขึ้น)
+     - คอมไพล์เช็คผ่านฉลุย 100%
 - **ไฟล์ที่สร้าง/แก้ไข**:
   - `Rain/RULES_AND_WORKLOG.md` *(บันทึกความคืบหน้า)*
-  - `Rain/portal/package.json` *(ติดตั้ง zod)*
-  - `Rain/portal/src/schemas/auth.schema.ts` *(สร้างใหม่)*
-  - `Rain/portal/src/components/LoginForm.tsx` *(เพิ่ม Zod Validation & UI Alerts)*
-  - `Rain/portal/src/components/OtpModal.tsx` *(เพิ่ม Zod Validation & UI Alerts)*
+  - `Rain/portal/src/components/AdminPanel.tsx` *(สร้างใหม่)*
+  - `Rain/portal/src/App.tsx` *(เพิ่ม View Switcher สำหรับ Role ADMIN)*
+  - `Rain/portal/package.json`
+  - `Rain/portal/src/schemas/auth.schema.ts`
+  - `Rain/portal/src/components/LoginForm.tsx`
+  - `Rain/portal/src/components/OtpModal.tsx`
   - `Rain/portal/src/components/Header.tsx`
   - `Rain/portal/src/components/VpnDashboard.tsx`
-  - `Rain/portal/src/App.tsx`
