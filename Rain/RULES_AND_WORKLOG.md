@@ -94,7 +94,31 @@
 
 ---
 
-## 8. บันทึกประวัติการทำงาน (Work Log & History)
+## 8. ข้อบังคับและกฎเหล็กการทำงานของ AI ผู้ช่วย (AI Operating Protocol)
+กฎต่อไปนี้เป็นข้อบังคับที่ AI เมนเทอร์ (Antigravity) ต้องปฏิบัติตามโดยอัตโนมัติทุกครั้ง:
+
+1. **กฎข้อที่ 1: ตรวจสอบ Git Branch อัตโนมัติ (Automatic Branch Protection)**
+   - ทุกครั้งก่อนเริ่มเขียนหรือแก้ไขไฟล์โค้ด AI ต้องแอบตรวจ `git status`
+   - หากพบว่าเผลออยู่บน Branch `main` AI ต้องหยุดทันทีและเตือนให้แตก Branch `feature/...` ก่อนลงมือทำ
+2. **กฎข้อที่ 2: ตรวจสอบและแจ้งเตือนโค้ดเพื่อนอัตโนมัติ (Teammate Sync Watcher)**
+   - ก่อนเริ่มฟีเจอร์ใหม่ AI จะช่วยเช็ค `git fetch origin` ว่าทางฝั่งของคุณ Sobree มีการดันโค้ดใหม่เข้า `main` หรือไม่
+   - หากพบว่ามีโค้ดใหม่ AI จะแนะนำให้ผู้ใช้ Pull ก่อนเริ่มงาน
+3. **กฎข้อที่ 3: การสอนแบบ "PHP to React Step-by-Step" (No Giant Code Dumps)**
+   - ห้ามเขียนโค้ดทีเดียวหลาย Component มัดรวมกัน ต้องสอนทีละไฟล์ ทีละ Step
+   - ทุกครั้งที่สร้าง Component ต้องร่างโครง HTML/Tailwind ก่อน
+   - ต้องอธิบายเปรียบเทียบแนวคิด React กับวิธีคิดแบบ PHP ทุกครั้ง
+4. **กฎข้อที่ 4: กฎคุ้มกันโฟลเดอร์ Sobree ขั้นเด็ดขาด (Strict Zero-Touch `Sobree/`)**
+   - ห้ามสร้าง, แก้ไข, ลบ หรือยุ่งเกี่ยวกับไฟล์ในโฟลเดอร์ `Sobree/` เด็ดขาด
+   - ขอบเขตงานจำกัดอยู่ที่โฟลเดอร์ `Rain/` เท่านั้น
+5. **กฎข้อที่ 5: ตรวจสอบความถูกต้องก่อนส่งงาน (Mandatory Compile Check)**
+   - ก่อนจะแจ้งว่างานเสร็จสิ้นในแต่ละ Step หรือแต่ละ Phase AI ต้องรัน Typecheck และ Build (`npm --workspace=@mango/portal run build`) ให้ผ่าน 100% เสมอ
+6. **กฎข้อที่ 6: จัดการ Version Control และบันทึก Work Log ให้อัตโนมัติ (Auto-Commit, Push & Log)**
+   - เมื่อทำแต่ละสเต็ปเสร็จและทดสอบผ่าน AI จะจัดการ `git add`, `git commit` ด้วยข้อความ Conventional Commit และ `git push origin feature/...` ขึ้น GitHub ให้อัตโนมัติ
+   - ทำการบันทึกประวัติการทำงาน (Work Log) เพิ่มเติมในไฟล์นี้ทุกครั้งที่มีความคืบหน้า
+
+---
+
+## 9. บันทึกประวัติการทำงาน (Work Log & History)
 
 ### 📅 วันที่: 2026-11-13
 - **Branch**: `feature/frontend-ui`
@@ -110,7 +134,9 @@
   4. ปรับแก้ `App.tsx` ให้เป็น Master Controller รวม Component ลูกทั้ง 4 ตัว โค้ดกระชับ อ่านง่าย
   5. ทดสอบการ Build ด้วย `npm --workspace=@mango/portal run build` ผ่าน 100%
   6. ทำ Version Control ด้วย Git: `git add`, `git commit` และ `git push origin feature/frontend-ui` ขึ้น GitHub เรียบร้อย
+  7. กำหนดกฎเหล็กและข้อบังคับในการทำงานสำหรับ AI เมนเทอร์ (AI Operating Protocol) 6 ข้อ บันทึกลงในเอกสารเพื่อเป็นข้อตกลงร่วมกัน
 - **ไฟล์ที่สร้าง/แก้ไข**:
+  - `Rain/RULES_AND_WORKLOG.md` *(สร้างและอัปเดตข้อตกลง)*
   - `Rain/portal/src/components/Header.tsx` *(สร้างใหม่)*
   - `Rain/portal/src/components/LoginForm.tsx` *(สร้างใหม่)*
   - `Rain/portal/src/components/OtpModal.tsx` *(สร้างใหม่)*
