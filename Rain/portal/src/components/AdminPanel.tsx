@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   Laptop,
   History,
@@ -15,71 +16,124 @@ import {
 } from '@mango/shared';
 
 // =========================================================================
-// 1. กำหนด Props Interface
+// 1. Props Interface
 // =========================================================================
 interface AdminPanelProps {
-  accessToken: string; // Token สำหรับส่งไปยืนยันสิทธิ์ใน Header
-  apiBaseUrl: string;  // เช่น http://localhost:4000
+  accessToken: string;
+  apiBaseUrl: string;
 }
 
 type AdminTab = 'devices' | 'sessions' | 'logs' | 'versions';
 
 // =========================================================================
-// 2. Component AdminPanel: แผงควบคุมระบบหลังบ้านสำหรับ Role ADMIN
+// 2. Component AdminPanel ขับเคลื่อนด้วย TanStack Query
 // =========================================================================
 export const AdminPanel: React.FC<AdminPanelProps> = ({ accessToken, apiBaseUrl }) => {
-  // แท็บที่กำลังเลือกอยู่ (เริ่มต้นที่ 'devices')
   const [activeTab, setActiveTab] = useState<AdminTab>('devices');
 
-  // ข้อมูลจาก API แต่ละ Endpoint
-  const [devices, setDevices] = useState<DeviceDto[]>([]);
-  const [sessions, setSessions] = useState<VpnSessionDto[]>([]);
-  const [auditLogs, setAuditLogs] = useState<AuditLogDto[]>([]);
-  const [agentVersions, setAgentVersions] = useState<AgentVersionDto[]>([]);
-
-  // สถานะการโหลดและข้อผิดพลาด
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // ฟังก์ชันดึงข้อมูลตามแท็บที่ผู้ใช้เปิดดู
-  const fetchData = async () => {
-    setLoading(true);
-    setError(null);
-
-    const headers = {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-    };
-
-    try {
-      if (activeTab === 'devices') {
-        const res = await fetch(`${apiBaseUrl}/api/devices`, { headers });
-        const json = await res.json();
-        if (res.ok && json.success) setDevices(json.data || []);
-      } else if (activeTab === 'sessions') {
-        const res = await fetch(`${apiBaseUrl}/api/sessions`, { headers });
-        const json = await res.json();
-        if (res.ok && json.success) setSessions(json.data || []);
-      } else if (activeTab === 'logs') {
-        const res = await fetch(`${apiBaseUrl}/api/audit-logs`, { headers });
-        const json = await res.json();
-        if (res.ok && json.success) setAuditLogs(json.data || []);
-      } else if (activeTab === 'versions') {
-        const res = await fetch(`${apiBaseUrl}/api/agent-versions`, { headers });
-        const json = await res.json();
-        if (res.ok && json.success) setAgentVersions(json.data || []);
-      }
-    } catch (err: any) {
-      setError(err.message || 'ไม่สามารถดึงข้อมูลจาก API ได้');
-    } finally {
-      setLoading(false);
-    }
+  const headers = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${accessToken}`,
   };
 
-  // เรียก fetchData ทุกครั้งที่สลับแท็บ
-  useEffect(() => {
-    fetchData();
-  }, [activeTab]);
+  // 1. Query: รายการอุปกรณ์ (Devices) พร้อม In-memory Caching
+  const {
+    data: devices = [],
+    isLoading: isDevicesLoading,
+    isFetching: isDevicesFetching,
+    error: devicesError,
+    refetch: refetchDevices,
+  } = useQuery({
+    queryKey: ['admin', 'devices'],
+    queryFn: async (): Promise<DeviceDto[]> => {
+      const res = await fetch(`${apiBaseUrl}/api/devices`, { headers });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error?.message || 'ไม่สามารถดึงข้อมูลอุปกรณ์ได้');
+      return json.data || [];
+    },
+    enabled: activeTab === 'devices',
+  });
+
+  // 2. Query: ประวัติ VPN Sessions
+  const {
+    data: sessions = [],
+    isLoading: isSessionsLoading,
+    isFetching: isSessionsFetching,
+    error: sessionsError,
+    refetch: refetchSessions,
+  } = useQuery({
+    queryKey: ['admin', 'sessions'],
+    queryFn: async (): Promise<VpnSessionDto[]> => {
+      const res = await fetch(`${apiBaseUrl}/api/sessions`, { headers });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error?.message || 'ไม่สามารถดึงประวัติ Session ได้');
+      return json.data || [];
+    },
+    enabled: activeTab === 'sessions',
+  });
+
+  // 3. Query: บันทึกความปลอดภัย (Audit Logs)
+  const {
+    data: auditLogs = [],
+    isLoading: isLogsLoading,
+    isFetching: isLogsFetching,
+    error: logsError,
+    refetch: refetchLogs,
+  } = useQuery({
+    queryKey: ['admin', 'audit-logs'],
+    queryFn: async (): Promise<AuditLogDto[]> => {
+      const res = await fetch(`${apiBaseUrl}/api/audit-logs`, { headers });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error?.message || 'ไม่สามารถดึงบันทึก Audit Logs ได้');
+      return json.data || [];
+    },
+    enabled: activeTab === 'logs',
+  });
+
+  // 4. Query: เวอร์ชันโปรแกรม Agent (Releases)
+  const {
+    data: agentVersions = [],
+    isLoading: isVersionsLoading,
+    isFetching: isVersionsFetching,
+    error: versionsError,
+    refetch: refetchVersions,
+  } = useQuery({
+    queryKey: ['admin', 'agent-versions'],
+    queryFn: async (): Promise<AgentVersionDto[]> => {
+      const res = await fetch(`${apiBaseUrl}/api/agent-versions`, { headers });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error?.message || 'ไม่สามารถดึงเวอร์ชัน Agent ได้');
+      return json.data || [];
+    },
+    enabled: activeTab === 'versions',
+  });
+
+  // รวมสถานะตามแท็บปัจจุบัน
+  const currentLoading =
+    (activeTab === 'devices' && isDevicesLoading) ||
+    (activeTab === 'sessions' && isSessionsLoading) ||
+    (activeTab === 'logs' && isLogsLoading) ||
+    (activeTab === 'versions' && isVersionsLoading);
+
+  const currentFetching =
+    (activeTab === 'devices' && isDevicesFetching) ||
+    (activeTab === 'sessions' && isSessionsFetching) ||
+    (activeTab === 'logs' && isLogsFetching) ||
+    (activeTab === 'versions' && isVersionsFetching);
+
+  const currentError =
+    (activeTab === 'devices' && devicesError?.message) ||
+    (activeTab === 'sessions' && sessionsError?.message) ||
+    (activeTab === 'logs' && logsError?.message) ||
+    (activeTab === 'versions' && versionsError?.message);
+
+  // ฟังก์ชันกดรีเฟรชข้อมูลของแท็บปัจจุบัน
+  const handleRefresh = () => {
+    if (activeTab === 'devices') refetchDevices();
+    else if (activeTab === 'sessions') refetchSessions();
+    else if (activeTab === 'logs') refetchLogs();
+    else if (activeTab === 'versions') refetchVersions();
+  };
 
   return (
     <div className="space-y-4">
@@ -135,35 +189,35 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ accessToken, apiBaseUrl 
           </button>
         </div>
 
-        {/* ปุ่มรีเฟรชข้อมูล */}
+        {/* ปุ่มรีเฟรชข้อมูล (หมุนเมื่อกำลังแอบดึง Background Fetching) */}
         <button
-          onClick={fetchData}
-          disabled={loading}
+          onClick={handleRefresh}
+          disabled={currentLoading}
           className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition cursor-pointer disabled:opacity-50"
           title="รีเฟรชข้อมูล"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-amber-400' : ''}`} />
+          <RefreshCw className={`w-3.5 h-3.5 ${currentFetching ? 'animate-spin text-amber-400' : ''}`} />
         </button>
       </div>
 
       {/* 2. แสดง Error ถ้ามี */}
-      {error && (
+      {currentError && (
         <div className="p-3 rounded-lg bg-rose-950/40 border border-rose-800/60 text-rose-300 text-xs flex items-center space-x-2">
           <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{error}</span>
+          <span>{currentError}</span>
         </div>
       )}
 
       {/* 3. ตารางข้อมูลตามแท็บที่เลือก */}
       <div className="bg-slate-950/80 rounded-xl border border-slate-800 overflow-hidden min-h-[220px]">
-        {loading ? (
+        {currentLoading ? (
           <div className="flex flex-col items-center justify-center h-48 space-y-2 text-slate-500 text-xs">
             <RefreshCw className="w-5 h-5 animate-spin text-amber-400" />
-            <span>กำลังโหลดข้อมูล...</span>
+            <span>กำลังโหลดข้อมูลด้วย TanStack Query...</span>
           </div>
         ) : (
           <>
-            {/* TAB 1: รายการอุปกรณ์ (Devices) */}
+            {/* TAB 1: Devices */}
             {activeTab === 'devices' && (
               devices.length === 0 ? (
                 <div className="text-center py-12 text-slate-500 text-xs">ยังไม่มีข้อมูลอุปกรณ์</div>
@@ -195,7 +249,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ accessToken, apiBaseUrl 
               )
             )}
 
-            {/* TAB 2: ประวัติ VPN Sessions */}
+            {/* TAB 2: Sessions */}
             {activeTab === 'sessions' && (
               sessions.length === 0 ? (
                 <div className="text-center py-12 text-slate-500 text-xs">ยังไม่มีประวัติการเชื่อมต่อ</div>
@@ -240,7 +294,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ accessToken, apiBaseUrl 
               )
             )}
 
-            {/* TAB 3: บันทึกความปลอดภัย (Audit Logs) */}
+            {/* TAB 3: Audit Logs */}
             {activeTab === 'logs' && (
               auditLogs.length === 0 ? (
                 <div className="text-center py-12 text-slate-500 text-xs">ยังไม่มีบันทึก Audit Log</div>
@@ -270,7 +324,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ accessToken, apiBaseUrl 
               )
             )}
 
-            {/* TAB 4: ข้อมูลเวอร์ชันโปรแกรม Agent (Releases) */}
+            {/* TAB 4: Agent Releases */}
             {activeTab === 'versions' && (
               agentVersions.length === 0 ? (
                 <div className="text-center py-12 text-slate-500 text-xs">ไม่มีข้อมูลเวอร์ชัน Agent</div>

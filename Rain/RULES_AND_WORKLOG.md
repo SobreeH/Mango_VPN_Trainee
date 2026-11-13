@@ -147,11 +147,18 @@
      - อัปเดต `App.tsx` เพิ่มระบบ View Switcher ให้ Role ADMIN สลับหน้าจอระหว่าง VPN Client และ Admin Console
      - ปรับความกว้างของการ์ดอัตโนมัติ (ขยายเป็น `max-w-2xl` ในมุมมอง Admin เพื่อให้อ่านตารางง่ายขึ้น)
      - คอมไพล์เช็คผ่านฉลุย 100%
+  10. ดำเนินการ Phase 4: นำ TanStack Query มาจัดการ Data Fetching & Caching
+     - ติดตั้งแพ็กเกจ `@tanstack/react-query` ใน `@mango/portal`
+     - ตั้งค่า `QueryClientProvider` ใน `main.tsx` กำหนดค่า `staleTime: 30s` สำหรับ In-memory Caching
+     - รีแฟกเตอร์ `AdminPanel.tsx` เปลี่ยนมาใช้ `useQuery` แยก 4 Queries (`devices`, `sessions`, `audit-logs`, `agent-versions`)
+     - รองรับการโหลดแบบ Instant Cache (สลับแท็บกลับมาข้อมูลแสดงทันที 0 วินาที) และมี Background Fetching อัปเดตข้อมูลอัตโนมัติ
+     - คอมไพล์เช็คผ่านฉลุย 100%
 - **ไฟล์ที่สร้าง/แก้ไข**:
   - `Rain/RULES_AND_WORKLOG.md` *(บันทึกความคืบหน้า)*
-  - `Rain/portal/src/components/AdminPanel.tsx` *(สร้างใหม่)*
-  - `Rain/portal/src/App.tsx` *(เพิ่ม View Switcher สำหรับ Role ADMIN)*
-  - `Rain/portal/package.json`
+  - `Rain/portal/package.json` *(ติดตั้ง @tanstack/react-query)*
+  - `Rain/portal/src/main.tsx` *(ตั้งค่า QueryClientProvider)*
+  - `Rain/portal/src/components/AdminPanel.tsx` *(รีแฟกเตอร์ด้วย useQuery)*
+  - `Rain/portal/src/App.tsx`
   - `Rain/portal/src/schemas/auth.schema.ts`
   - `Rain/portal/src/components/LoginForm.tsx`
   - `Rain/portal/src/components/OtpModal.tsx`
