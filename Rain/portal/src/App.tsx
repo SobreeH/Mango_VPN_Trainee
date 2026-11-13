@@ -1,14 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  ShieldCheck,
-  ShieldAlert,
-  Lock,
-  User as UserIcon,
-  Activity,
-  ArrowRight,
-  LogOut,
-  RefreshCw,
-} from 'lucide-react';
+import { ShieldAlert, ShieldCheck, Shield, LayoutDashboard } from 'lucide-react';
 import {
   LoginResponse,
   AuthTokenResponse,
@@ -16,18 +7,32 @@ import {
   AgentStatusResponse,
 } from '@mango/shared';
 
+// นำเข้า Component ลูกทั้งหมด
+import { Header } from './components/Header';
+import { LoginForm } from './components/LoginForm';
+import { OtpModal } from './components/OtpModal';
+import { VpnDashboard } from './components/VpnDashboard';
+import { AdminPanel } from './components/AdminPanel';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 const AGENT_BASE_URL = 'http://127.0.0.1:47821';
 
 export default function App() {
-  // Authentication State
+  // =========================================================================
+  // 1. สถานะการล็อกอินและตัวตน (Authentication State)
+  // =========================================================================
   const [username, setUsername] = useState('admin_user');
   const [password, setPassword] = useState('MangoVPN2026!');
   const [mfaChallenge, setMfaChallenge] = useState<LoginResponse | null>(null);
   const [otpCode, setOtpCode] = useState('');
   const [authData, setAuthData] = useState<AuthTokenResponse | null>(null);
 
-  // Status & Telemetry
+  // มุมมองปัจจุบันเมื่อล็อกอินแล้ว: 'vpn' (หน้าเชื่อมต่อ) หรือ 'admin' (หน้าหลังบ้าน)
+  const [activeView, setActiveView] = useState<'vpn' | 'admin'>('vpn');
+
+  // =========================================================================
+  // 2. สถานะระบบและเน็ตเวิร์ก (System & Telemetry State)
+  // =========================================================================
   const [portalOnline, setPortalOnline] = useState<boolean>(true);
   const [agentInstalled, setAgentInstalled] = useState<boolean>(false);
   const [agentVersion, setAgentVersion] = useState<string>('');
@@ -36,12 +41,14 @@ export default function App() {
   const [bytesRx, setBytesRx] = useState<number>(0);
   const [bytesTx, setBytesTx] = useState<number>(0);
 
-  // UI state
+  // =========================================================================
+  // 3. สถานะข้อความแจ้งเตือน (UI Feedback State)
+  // =========================================================================
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
-  // Poll backend health
+  // ตรวจสอบความพร้อมของ Backend API (ทุก 5 วินาที)
   useEffect(() => {
     const checkApiHealth = async () => {
       try {
@@ -56,7 +63,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // 1. Healthcheck Poller for Local Agent (127.0.0.1:47821)
+  // ตรวจสอบสถานะ Windows Agent ในเครื่อง 127.0.0.1:47821 (ทุก 3 วินาที)
   useEffect(() => {
     const checkAgentHealth = async () => {
       try {
@@ -84,7 +91,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // 2. Telemetry Poller when Connected
+  // ดึงปริมาณข้อมูล RX/TX แบบเรียลไทม์เมื่อต่อ VPN สำเร็จ (ทุก 1.5 วินาที)
   useEffect(() => {
     if (connectionState !== 'connected') return;
 
@@ -109,7 +116,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [connectionState]);
 
-  // 3. Handle Login (Step 1 -> 2)
+  // ฟังก์ชันล็อกอิน Step 1 -> Step 2
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -137,7 +144,7 @@ export default function App() {
     }
   };
 
-  // 4. Handle Verify OTP (Step 3 -> 4)
+  // ฟังก์ชันยืนยัน OTP Step 3 -> Step 4
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!mfaChallenge) return;
@@ -169,11 +176,11 @@ export default function App() {
     }
   };
 
-  // 5. Handle VPN Connect (Step 5)
+  // ฟังก์ชันสั่งเชื่อมต่อ VPN Step 5
   const handleConnectVpn = async () => {
     if (!authData) return;
     if (!agentInstalled) {
-      setErrorMessage('Local Windows Agent service not detected on 127.0.0.1:47821. Please run mock-agent.js or install the agent.');
+      setErrorMessage('Local Windows Agent service not detected on 127.0.0.1:47821. Please run mock-agent.js');
       return;
     }
 
@@ -182,7 +189,6 @@ export default function App() {
     setErrorMessage(null);
 
     try {
-      // Browser commands local Windows Agent over loopback PNA
       const res = await fetch(`${AGENT_BASE_URL}/connect`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -210,7 +216,7 @@ export default function App() {
     }
   };
 
-  // 6. Handle VPN Disconnect
+  // ฟังก์ชันสั่งตัดการเชื่อมต่อ VPN
   const handleDisconnectVpn = async () => {
     setLoading(true);
     try {
@@ -225,6 +231,7 @@ export default function App() {
     }
   };
 
+  // ฟังก์ชันออกจากระบบ (Sign Out)
   const handleSignOut = () => {
     if (connectionState === 'connected') {
       handleDisconnectVpn();
@@ -232,72 +239,29 @@ export default function App() {
     setAuthData(null);
     setMfaChallenge(null);
     setOtpCode('');
+    setActiveView('vpn'); // รีเซ็ตมุมมองกลับไปหน้าหลัก
   };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* Top Navigation Bar */}
-      <header className="border-b border-slate-800 bg-slate-900/60 backdrop-blur px-6 py-4 flex items-center justify-between sticky top-0 z-50">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-600 flex items-center justify-center text-xl shadow-lg shadow-amber-500/20">
-            🥭
-          </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <h1 className="font-bold text-lg tracking-wide text-white">MANGO VPN</h1>
-              <span className="text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-mono border border-amber-500/20">
-                Zero-Trust v0.1
-              </span>
-            </div>
-            <p className="text-xs text-slate-400">Enterprise WireGuard Remote Access</p>
-          </div>
-        </div>
+      {/* 1. ส่วนหัว: แถบสถานะระบบ */}
+      <Header
+        portalOnline={portalOnline}
+        agentInstalled={agentInstalled}
+        agentVersion={agentVersion}
+        connectionState={connectionState}
+        isLoggedIn={!!authData}
+        onSignOut={handleSignOut}
+      />
 
-        {/* Global Status Pills */}
-        <div className="flex items-center space-x-3 text-xs font-medium">
-          <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-slate-800 border border-slate-700">
-            <span className={`w-2 h-2 rounded-full ${portalOnline ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`}></span>
-            <span className="text-slate-300">{portalOnline ? 'Portal Online' : 'API Offline'}</span>
-          </div>
-
-          <div className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-full border ${
-            agentInstalled
-              ? 'bg-emerald-950/40 border-emerald-700/60 text-emerald-300'
-              : 'bg-rose-950/40 border-rose-800/60 text-rose-300'
-          }`}>
-            <span className={`w-2 h-2 rounded-full ${agentInstalled ? 'bg-emerald-400' : 'bg-rose-500'}`}></span>
-            <span>Agent: {agentInstalled ? `Installed (${agentVersion})` : 'Missing (127.0.0.1:47821)'}</span>
-          </div>
-
-          <div className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-full border ${
-            connectionState === 'connected'
-              ? 'bg-emerald-900/40 border-emerald-500 text-emerald-200'
-              : connectionState === 'connecting'
-              ? 'bg-amber-900/40 border-amber-500 text-amber-200 animate-pulse'
-              : 'bg-slate-800 border-slate-700 text-slate-400'
-          }`}>
-            <Activity className="w-3.5 h-3.5" />
-            <span className="capitalize">{connectionState}</span>
-          </div>
-
-          {authData && (
-            <button
-              onClick={handleSignOut}
-              className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
-              title="Sign Out"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Logout</span>
-            </button>
-          )}
-        </div>
-      </header>
-
-      {/* Main Content Area */}
+      {/* 2. พื้นที่เนื้อหาหลัก (Main Content) */}
       <main className="flex-1 flex items-center justify-center p-6">
-        <div className="w-full max-w-md">
+        {/* ปรับความกว้างของการ์ด: ถ้าเป็นหน้า Admin ให้กว้างขึ้นเป็น max-w-2xl */}
+        <div className={`w-full transition-all duration-300 ${
+          authData && activeView === 'admin' ? 'max-w-2xl' : 'max-w-md'
+        }`}>
 
-          {/* Feedback Messages */}
+          {/* ป้ายแจ้งเตือนข้อผิดพลาด (Error Alert) */}
           {errorMessage && (
             <div className="mb-4 p-4 rounded-xl bg-rose-950/60 border border-rose-800 text-rose-200 text-sm flex items-start space-x-2">
               <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
@@ -305,6 +269,7 @@ export default function App() {
             </div>
           )}
 
+          {/* ป้ายแจ้งข้อมูลความสำเร็จ (Success / Info Alert) */}
           {infoMessage && (
             <div className="mb-4 p-4 rounded-xl bg-amber-950/40 border border-amber-800 text-amber-200 text-sm flex items-start space-x-2">
               <ShieldCheck className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
@@ -312,223 +277,87 @@ export default function App() {
             </div>
           )}
 
-          {/* Card Container */}
+          {/* การ์ดบรรจุหน้าจอ (Card Container) */}
           <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-2xl backdrop-blur">
-
-            {/* SCREEN 1: User / Password Sign In */}
+            
+            {/* หน้าที่ 1: ฟอร์มล็อกอิน */}
             {!authData && !mfaChallenge && (
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div>
-                  <h2 className="text-xl font-bold text-white tracking-tight">Sign in to VPN</h2>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Enter corporate credentials to authenticate with MANGO VPN gateway.
-                  </p>
-                </div>
-
-                <div className="space-y-3 pt-2">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">Username</label>
-                    <div className="relative">
-                      <UserIcon className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
-                      <input
-                        type="text"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        placeholder="your.username"
-                        required
-                        className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">Password</label>
-                    <div className="relative">
-                      <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
-                      <input
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="••••••••••••"
-                        required
-                        className="w-full pl-9 pr-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-2">
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-bold rounded-lg text-sm transition shadow-lg shadow-amber-500/20 flex items-center justify-center space-x-2 disabled:opacity-50"
-                  >
-                    {loading ? (
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <>
-                        <span>Continue to MFA</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                <div className="p-3 bg-slate-950/60 rounded-lg border border-slate-800 text-[11px] text-slate-400 space-y-1">
-                  <span className="font-semibold text-slate-300 block">Default Demo Credentials:</span>
-                  <div>• Admin: <code className="text-amber-400">admin_user</code> / <code className="text-amber-400">MangoVPN2026!</code></div>
-                  <div>• Staff: <code className="text-amber-400">staff_user</code> / <code className="text-amber-400">MangoVPN2026!</code></div>
-                  <div>• Client: <code className="text-amber-400">client_user</code> / <code className="text-amber-400">MangoVPN2026!</code></div>
-                </div>
-              </form>
+              <LoginForm
+                username={username}
+                setUsername={setUsername}
+                password={password}
+                setPassword={setPassword}
+                loading={loading}
+                onSubmit={handleLogin}
+              />
             )}
 
-            {/* SCREEN 2: 2-Factor OTP Verification Modal */}
+            {/* หน้าที่ 2: โมดอลกรอก OTP */}
             {!authData && mfaChallenge && (
-              <form onSubmit={handleVerifyOtp} className="space-y-4">
-                <div>
-                  <h2 className="text-xl font-bold text-white tracking-tight">Two-Factor Authentication</h2>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Enter the 6-digit verification code sent to <span className="text-amber-400 font-mono">{mfaChallenge.maskedPhoneNumber}</span>.
-                  </p>
-                </div>
-
-                <div className="py-2">
-                  <label className="block text-xs font-medium text-slate-300 mb-2 text-center">
-                    Verification Code
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={6}
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                    placeholder="123456"
-                    autoFocus
-                    required
-                    className="w-full text-center tracking-[0.5em] text-2xl font-mono py-3 bg-slate-950 border border-slate-700 rounded-lg text-amber-400 placeholder-slate-700 focus:outline-none focus:border-amber-500"
-                  />
-                  <p className="text-[11px] text-slate-500 text-center mt-2">
-                    (In dev mode, check backend API terminal logs for generated OTP)
-                  </p>
-                </div>
-
-                <div className="flex space-x-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setMfaChallenge(null)}
-                    className="w-1/3 py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-lg transition"
-                  >
-                    Back
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={loading || otpCode.length < 6}
-                    className="w-2/3 py-2 px-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-lg text-xs transition disabled:opacity-50"
-                  >
-                    {loading ? 'Verifying...' : 'Verify OTP'}
-                  </button>
-                </div>
-              </form>
+              <OtpModal
+                maskedPhoneNumber={mfaChallenge.maskedPhoneNumber}
+                otpCode={otpCode}
+                setOtpCode={setOtpCode}
+                loading={loading}
+                onVerify={handleVerifyOtp}
+                onBack={() => setMfaChallenge(null)}
+              />
             )}
 
-            {/* SCREEN 3: Authenticated State & VPN Control */}
+            {/* หน้าที่ 3: แดชบอร์ดเมื่อล็อกอินสำเร็จแล้ว */}
             {authData && (
-              <div className="space-y-5">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                  <div>
-                    <h3 className="font-semibold text-white">{authData.user.username}</h3>
-                    <span className="text-xs text-slate-400">Role: <span className="text-amber-400 font-mono">{authData.user.role}</span></span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs px-2 py-1 rounded bg-slate-800 text-slate-300 font-mono">
-                      {authData.user.phoneNumber}
-                    </span>
-                  </div>
-                </div>
+              <div className="space-y-4">
+                {/* สวิตช์สลับหน้า (แสดงเฉพาะ Role ADMIN) */}
+                {authData.user.role === 'ADMIN' && (
+                  <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+                    <button
+                      onClick={() => setActiveView('vpn')}
+                      className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5 transition cursor-pointer ${
+                        activeView === 'vpn'
+                          ? 'bg-amber-500 text-slate-950 shadow-md'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <Shield className="w-3.5 h-3.5" />
+                      <span>VPN Client</span>
+                    </button>
 
-                {/* Connection Status Card */}
-                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-400">Assigned VPN IP</span>
-                    <span className="font-mono text-emerald-400 font-bold">
-                      {assignedIp || 'Not Assigned'}
-                    </span>
+                    <button
+                      onClick={() => setActiveView('admin')}
+                      className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5 transition cursor-pointer ${
+                        activeView === 'admin'
+                          ? 'bg-amber-500 text-slate-950 shadow-md'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <LayoutDashboard className="w-3.5 h-3.5" />
+                      <span>Admin Console</span>
+                    </button>
                   </div>
-
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-400">Endpoint</span>
-                    <span className="font-mono text-slate-300">127.0.0.1:51820 (WireGuard)</span>
-                  </div>
-
-                  {connectionState === 'connected' && (
-                    <div className="pt-2 border-t border-slate-800 grid grid-cols-2 gap-2 text-[11px] text-slate-400 font-mono">
-                      <div>RX: {(bytesRx / 1024).toFixed(1)} KB</div>
-                      <div className="text-right">TX: {(bytesTx / 1024).toFixed(1)} KB</div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Big Green VPN Connect Button */}
-                {connectionState !== 'connected' ? (
-                  <button
-                    onClick={handleConnectVpn}
-                    disabled={loading || !agentInstalled}
-                    className="w-full py-4 px-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black tracking-wider uppercase rounded-xl transition shadow-xl shadow-emerald-500/20 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed text-base"
-                  >
-                    {loading ? (
-                      <RefreshCw className="w-5 h-5 animate-spin" />
-                    ) : (
-                      <>
-                        <ShieldCheck className="w-5 h-5" />
-                        <span>VPN CONNECT</span>
-                      </>
-                    )}
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleDisconnectVpn}
-                    disabled={loading}
-                    className="w-full py-3 px-4 bg-rose-600 hover:bg-rose-500 text-white font-bold tracking-wide uppercase rounded-xl transition shadow-lg shadow-rose-600/20 flex items-center justify-center space-x-2 text-sm"
-                  >
-                    <ShieldAlert className="w-4 h-4" />
-                    <span>DISCONNECT VPN</span>
-                  </button>
                 )}
 
-                {!agentInstalled && (
-                  <div className="p-3 bg-amber-950/30 border border-amber-800/60 rounded-lg text-xs text-amber-300 space-y-1">
-                    <div className="font-semibold flex items-center space-x-1">
-                      <span>⚠️ Client Agent Not Running</span>
-                    </div>
-                    <p className="text-[11px] text-slate-400">
-                      Run the mock agent simulator in your terminal:
-                    </p>
-                    <code className="block bg-slate-950 p-1.5 rounded text-amber-400 font-mono text-[11px]">
-                      node scripts/mock-agent.js
-                    </code>
-                  </div>
+                {/* แสดง View ตามที่เลือก */}
+                {activeView === 'vpn' ? (
+                  <VpnDashboard
+                    user={authData.user}
+                    assignedIp={assignedIp}
+                    connectionState={connectionState}
+                    bytesRx={bytesRx}
+                    bytesTx={bytesTx}
+                    agentInstalled={agentInstalled}
+                    agentVersion={agentVersion}
+                    loading={loading}
+                    onConnect={handleConnectVpn}
+                    onDisconnect={handleDisconnectVpn}
+                  />
+                ) : (
+                  <AdminPanel
+                    accessToken={authData.accessToken}
+                    apiBaseUrl={API_BASE_URL}
+                  />
                 )}
               </div>
             )}
-
-            {/* Status Indicators Footer */}
-            <div className="mt-6 pt-4 border-t border-slate-800/80 text-xs text-slate-400 space-y-1.5">
-              <div className="font-semibold text-slate-300 mb-1">Status Indicators:</div>
-              <div className="flex justify-between items-center">
-                <span>Agent Status:</span>
-                <span className={`font-mono ${agentInstalled ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {agentInstalled ? `Installed [${agentVersion}]` : 'Not Detected'}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span>Connection:</span>
-                <span className={`font-mono capitalize ${
-                  connectionState === 'connected' ? 'text-emerald-400 font-semibold' : 'text-slate-400'
-                }`}>
-                  [{connectionState}]
-                </span>
-              </div>
-            </div>
 
           </div>
         </div>
