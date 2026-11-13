@@ -135,10 +135,18 @@
   5. ทดสอบการ Build ด้วย `npm --workspace=@mango/portal run build` ผ่าน 100%
   6. ทำ Version Control ด้วย Git: `git add`, `git commit` และ `git push origin feature/frontend-ui` ขึ้น GitHub เรียบร้อย
   7. กำหนดกฎเหล็กและข้อบังคับในการทำงานสำหรับ AI เมนเทอร์ (AI Operating Protocol) 6 ข้อ บันทึกลงในเอกสารเพื่อเป็นข้อตกลงร่วมกัน
+  8. ดำเนินการ Phase 2: เพิ่มระบบ Form Validation ด้วย Zod
+     - ติดตั้งแพ็กเกจ `zod` ใน `@mango/portal`
+     - สร้าง Schema ใน `Rain/portal/src/schemas/auth.schema.ts` สำหรับตรวจสอบ Username, Password และ OTP 6 หลัก
+     - อัปเดต `LoginForm.tsx` แสดงกรอบแดงและข้อความเตือนเมื่อผู้ใช้กรอกผิด พร้อมเคลียร์ Error อัตโนมัติเมื่อเริ่มพิมพ์แก้ไข
+     - อัปเดต `OtpModal.tsx` ตรวจสอบความถูกต้องของ OTP ด้วย Zod ก่อนส่งคำขอไปยังเซิร์ฟเวอร์
+     - ตรวจสอบการคอมไพล์ผ่าน TypeScript และ Vite build 100%
 - **ไฟล์ที่สร้าง/แก้ไข**:
-  - `Rain/RULES_AND_WORKLOG.md` *(สร้างและอัปเดตข้อตกลง)*
-  - `Rain/portal/src/components/Header.tsx` *(สร้างใหม่)*
-  - `Rain/portal/src/components/LoginForm.tsx` *(สร้างใหม่)*
-  - `Rain/portal/src/components/OtpModal.tsx` *(สร้างใหม่)*
-  - `Rain/portal/src/components/VpnDashboard.tsx` *(สร้างใหม่)*
-  - `Rain/portal/src/App.tsx` *(แก้ไขโครงสร้าง)*
+  - `Rain/RULES_AND_WORKLOG.md` *(บันทึกความคืบหน้า)*
+  - `Rain/portal/package.json` *(ติดตั้ง zod)*
+  - `Rain/portal/src/schemas/auth.schema.ts` *(สร้างใหม่)*
+  - `Rain/portal/src/components/LoginForm.tsx` *(เพิ่ม Zod Validation & UI Alerts)*
+  - `Rain/portal/src/components/OtpModal.tsx` *(เพิ่ม Zod Validation & UI Alerts)*
+  - `Rain/portal/src/components/Header.tsx`
+  - `Rain/portal/src/components/VpnDashboard.tsx`
+  - `Rain/portal/src/App.tsx`

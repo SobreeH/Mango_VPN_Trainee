@@ -1,20 +1,21 @@
-import React from 'react';
-import { RefreshCw } from 'lucide-react';
+import React, { useState } from 'react';
+import { RefreshCw, AlertCircle } from 'lucide-react';
+import { otpSchema } from '../schemas/auth.schema';
 
 // =========================================================================
-// 1. Props Interface: กำหนดค่าที่โมดอล OTP ต้องการ
+// 1. Props Interface
 // =========================================================================
 interface OtpModalProps {
-  maskedPhoneNumber: string;                    // เบอร์โทรศัพท์ที่ถูกเซนเซอร์ เช่น "+1555****567"
-  otpCode: string;                              // ค่ารหัส OTP 6 หลักที่พิมพ์
-  setOtpCode: (value: string) => void;          // ฟังก์ชันอัปเดตรหัส OTP
-  loading: boolean;                             // สถานะกำลังติดต่อ API
-  onVerify: (e: React.FormEvent) => void;       // ฟังก์ชันกดยืนยัน OTP
-  onBack: () => void;                           // ฟังก์ชันกดย้อนกลับไปหน้าล็อกอิน
+  maskedPhoneNumber: string;
+  otpCode: string;
+  setOtpCode: (value: string) => void;
+  loading: boolean;
+  onVerify: (e: React.FormEvent) => void;
+  onBack: () => void;
 }
 
 // =========================================================================
-// 2. Component OtpModal: หน้าต่างยืนยันรหัส 2FA OTP
+// 2. Component OtpModal พร้อมระบบตรวจสอบด้วย Zod
 // =========================================================================
 export const OtpModal: React.FC<OtpModalProps> = ({
   maskedPhoneNumber,
@@ -24,8 +25,29 @@ export const OtpModal: React.FC<OtpModalProps> = ({
   onVerify,
   onBack,
 }) => {
+  // สถานะเก็บข้อความผิดพลาดของ OTP
+  const [error, setError] = useState<string | null>(null);
+
+  // ฟังก์ชันตรวจสอบก่อนส่ง OTP ไปยืนยัน
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // 1. ตรวจสอบด้วย Zod Schema
+    const validationResult = otpSchema.safeParse({ otpCode });
+
+    // 2. ถ้าไม่ถูกต้อง (เช่น ยาวไม่ถึง 6 ตัว)
+    if (!validationResult.success) {
+      setError(validationResult.error.issues[0]?.message || 'รหัส OTP ไม่ถูกต้อง');
+      return;
+    }
+
+    // 3. ถ้าถูกต้อง: เคลียร์ Error แล้วเรียก onVerify
+    setError(null);
+    onVerify(e);
+  };
+
   return (
-    <form onSubmit={onVerify} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4" noValidate>
       {/* หัวข้อโมดอล */}
       <div>
         <h2 className="text-xl font-bold text-white tracking-tight">
@@ -48,21 +70,36 @@ export const OtpModal: React.FC<OtpModalProps> = ({
           type="text"
           maxLength={6}
           value={otpCode}
-          /* ดักจับเฉพาะตัวเลข 0-9 เท่านั้น ตัดตัวอักษรอื่นทิ้งทันที */
-          onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+          onChange={(e) => {
+            // กรองเฉพาะตัวเลข
+            setOtpCode(e.target.value.replace(/\D/g, ''));
+            // ลบ Error ทันทีเมื่อผู้ใช้พิมพ์แก้ไข
+            if (error) setError(null);
+          }}
           placeholder="123456"
           autoFocus
-          required
-          className="w-full text-center tracking-[0.5em] text-2xl font-mono py-3 bg-slate-950 border border-slate-700 rounded-lg text-amber-400 placeholder-slate-700 focus:outline-none focus:border-amber-500 transition shadow-inner"
+          className={`w-full text-center tracking-[0.5em] text-2xl font-mono py-3 bg-slate-950 border rounded-lg text-amber-400 placeholder-slate-700 focus:outline-none transition shadow-inner ${
+            error
+              ? 'border-rose-500 focus:border-rose-500' // กรอบแดงเมื่อมี Error
+              : 'border-slate-700 focus:border-amber-500'
+          }`}
         />
-        <p className="text-[11px] text-slate-500 text-center mt-2">
-          (In dev mode, check backend API terminal logs for generated OTP)
-        </p>
+
+        {/* ข้อความ Error สีแดงใต้ช่องกรอก */}
+        {error ? (
+          <p className="text-xs text-rose-400 mt-2 flex items-center justify-center space-x-1 animate-fadeIn">
+            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+            <span>{error}</span>
+          </p>
+        ) : (
+          <p className="text-[11px] text-slate-500 text-center mt-2">
+            (In dev mode, check backend API terminal logs for generated OTP)
+          </p>
+        )}
       </div>
 
-      {/* ปุ่มกด 2 ปุ่ม: ย้อนกลับ (Back) และ ยืนยัน (Verify OTP) */}
+      {/* ปุ่มกด 2 ปุ่ม: Back และ Verify */}
       <div className="flex space-x-3 pt-2">
-        {/* ปุ่ม Back */}
         <button
           type="button"
           onClick={onBack}
@@ -71,10 +108,8 @@ export const OtpModal: React.FC<OtpModalProps> = ({
           Back
         </button>
 
-        {/* ปุ่ม Verify OTP */}
         <button
           type="submit"
-          /* ปิดปุ่มถ้ากำลังโหลด หรือพิมพ์ยังไม่ครบ 6 ตัว */
           disabled={loading || otpCode.length < 6}
           className="w-2/3 py-2 px-4 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-lg text-xs transition disabled:opacity-50 flex items-center justify-center space-x-1 cursor-pointer disabled:cursor-not-allowed shadow-md shadow-amber-500/20"
         >
