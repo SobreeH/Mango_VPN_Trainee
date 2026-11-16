@@ -164,3 +164,24 @@
   - `Rain/portal/src/components/OtpModal.tsx`
   - `Rain/portal/src/components/Header.tsx`
   - `Rain/portal/src/components/VpnDashboard.tsx`
+
+---
+
+### 📅 วันที่: 2026-11-16 (เช้า - บ่าย)
+- **Branch**: `feature/ui`
+- **สิ่งที่ทำ**:
+  1. **ช่วงเช้า**:
+     - สร้าง Mock Auth & Offline Fallback ให้ `App.tsx` และ `AdminPanel.tsx` รองรับการทดสอบหน้าเว็บได้ครบทุก Role แม้ไม่มี Docker / PostgreSQL
+     - แก้ไขปัญหา Trim Whitespace ใน Zod Validation Schema และฟอร์ม ทำให้รองรับการ Copy-paste รหัสผ่านและ Username โดยไม่ติด Error
+     - ทดสอบระบบ Role-Based Dashboard ผ่านฉลุยทั้ง 3 บทบาท (`admin_user`, `staff_user`, `client_user`)
+  2. **ช่วงบ่าย (UI/UX Polish)**:
+     - สร้าง Component `Toast.tsx` ระบบแจ้งเตือนลอยมุมขวาบน รองรับ 3 สถานะ (`success`, `error`, `info`) มีระบบ Auto-dismiss อัตโนมัติหลัง 3.5 วินาที พร้อมปุ่มปิดกากบาท
+     - ปรับปรุง `VpnDashboard.tsx` เพิ่มปุ่ม Quick Copy สำหรับคัดลอก Assigned VPN IP และ Endpoint พร้อมไอคอน Checkmark แสดงผล 2 วินาที และยิงแจ้งเตือนผ่าน Toast
+     - เพิ่มไอคอนสถานะการรับ-ส่งข้อมูล (RX/TX Download/Upload) ใน Telemetry Box
+     - ประกอบ `Toast` และฟังก์ชัน `showToast` เข้ากับ `App.tsx` เชื่อมต่อแจ้งเตือนเมื่อ Login, Logout และคัดลอก IP/Endpoint
+     - ทดสอบการคอมไพล์ด้วย TypeScript และ Vite Build ผ่าน 100% ไม่มีข้อผิดพลาด
+- **ไฟล์ที่สร้าง/แก้ไข**:
+  - `Rain/portal/src/components/Toast.tsx` *(สร้างใหม่)*
+  - `Rain/portal/src/components/VpnDashboard.tsx` *(เพิ่มปุ่ม Quick Copy & Telemetry Icons)*
+  - `Rain/portal/src/App.tsx` *(เชื่อมต่อ Toast และระบบแจ้งเตือน)*
+  - `Rain/RULES_AND_WORKLOG.md` *(อัปเดตบันทึกประจำวัน)*

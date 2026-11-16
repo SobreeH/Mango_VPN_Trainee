@@ -1,9 +1,17 @@
-import React from 'react';
-import { ShieldCheck, ShieldAlert, RefreshCw } from 'lucide-react';
+import React, { useState } from 'react';
+import {
+  ShieldCheck,
+  ShieldAlert,
+  RefreshCw,
+  Copy,
+  Check,
+  ArrowDownCircle,
+  ArrowUpCircle,
+} from 'lucide-react';
 import { RoleName } from '@mango/shared';
 
 // =========================================================================
-// 1. Props Interface: ข้อมูลและฟังก์ชันที่ VpnDashboard ต้องการ
+// 1. Props Interface
 // =========================================================================
 interface VpnDashboardProps {
   user: {
@@ -11,19 +19,20 @@ interface VpnDashboardProps {
     role: RoleName;
     phoneNumber: string;
   };
-  assignedIp: string | null;                                    // IP ที่ได้รับ เช่น "10.13.13.45/32"
-  connectionState: 'disconnected' | 'connecting' | 'connected'; // สถานะเชื่อมต่อ
-  bytesRx: number;                                             // ปริมาณดาวน์โหลด (Bytes Received)
-  bytesTx: number;                                             // ปริมาณอัปโหลด (Bytes Transmitted)
-  agentInstalled: boolean;                                     // เปิด mock-agent.js อยู่หรือไม่
-  agentVersion: string;                                        // เช่น "1.0.0-mock"
-  loading: boolean;                                            // กำลังรันคำสั่งอยู่หรือไม่
-  onConnect: () => void;                                       // ฟังก์ชันสั่งเชื่อมต่อ VPN
-  onDisconnect: () => void;                                    // ฟังก์ชันสั่งตัดการเชื่อมต่อ VPN
+  assignedIp: string | null;
+  connectionState: 'disconnected' | 'connecting' | 'connected';
+  bytesRx: number;
+  bytesTx: number;
+  agentInstalled: boolean;
+  agentVersion: string;
+  loading: boolean;
+  onConnect: () => void;
+  onDisconnect: () => void;
+  onNotify?: (message: string, type?: 'success' | 'error' | 'info') => void; // ฟังก์ชันยิง Toast
 }
 
 // =========================================================================
-// 2. Component VpnDashboard: หน้าจอควบคุม VPN
+// 2. Component VpnDashboard พร้อมปุ่ม Quick Copy และไอคอน Telemetry
 // =========================================================================
 export const VpnDashboard: React.FC<VpnDashboardProps> = ({
   user,
@@ -36,7 +45,27 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
   loading,
   onConnect,
   onDisconnect,
+  onNotify,
 }) => {
+  // จำว่ากำลังกดคัดลอกช่องไหนอยู่ ('ip' | 'endpoint' | null) เพื่อสลับเป็นไอคอนติ๊กถูก
+  const [copiedField, setCopiedField] = useState<'ip' | 'endpoint' | null>(null);
+
+  // ฟังก์ชันก๊อปปี้ข้อความลงคลิปบอร์ด
+  const handleCopy = async (text: string, field: 'ip' | 'endpoint', label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      onNotify?.(`คัดลอก ${label} (${text}) เรียบร้อยแล้ว`, 'success');
+
+      // สลับกลับเป็นไอคอนเดิมหลังผ่านไป 2 วินาที
+      setTimeout(() => {
+        setCopiedField(null);
+      }, 2000);
+    } catch {
+      onNotify?.('ไม่สามารถคัดลอกข้อความได้', 'error');
+    }
+  };
+
   return (
     <div className="space-y-5">
       {/* ส่วนบน: ข้อมูลผู้ใช้และ Role */}
@@ -56,32 +85,69 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
 
       {/* การ์ดแสดงสถานะเครือข่าย (Network Status Card) */}
       <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-        {/* แถวที่ 1: VPN IP */}
+        
+        {/* แถวที่ 1: Assigned VPN IP พร้อมปุ่ม Copy */}
         <div className="flex items-center justify-between text-xs">
           <span className="text-slate-400">Assigned VPN IP</span>
-          <span className="font-mono text-emerald-400 font-bold">
-            {assignedIp || 'Not Assigned'}
-          </span>
+          <div className="flex items-center space-x-1.5">
+            <span className="font-mono text-emerald-400 font-bold">
+              {assignedIp || 'Not Assigned'}
+            </span>
+            {assignedIp && (
+              <button
+                onClick={() => handleCopy(assignedIp, 'ip', 'VPN IP')}
+                className="p-1 text-slate-500 hover:text-emerald-400 rounded hover:bg-slate-900 transition cursor-pointer"
+                title="คัดลอก IP"
+              >
+                {copiedField === 'ip' ? (
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5" />
+                )}
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* แถวที่ 2: Endpoint */}
+        {/* แถวที่ 2: Endpoint พร้อมปุ่ม Copy */}
         <div className="flex items-center justify-between text-xs">
           <span className="text-slate-400">Endpoint</span>
-          <span className="font-mono text-slate-300">127.0.0.1:51820 (WireGuard)</span>
+          <div className="flex items-center space-x-1.5">
+            <span className="font-mono text-slate-300">127.0.0.1:51820</span>
+            <button
+              onClick={() => handleCopy('127.0.0.1:51820', 'endpoint', 'Endpoint')}
+              className="p-1 text-slate-500 hover:text-amber-400 rounded hover:bg-slate-900 transition cursor-pointer"
+              title="คัดลอก Endpoint"
+            >
+              {copiedField === 'endpoint' ? (
+                <Check className="w-3.5 h-3.5 text-emerald-400" />
+              ) : (
+                <Copy className="w-3.5 h-3.5" />
+              )}
+            </button>
+          </div>
         </div>
 
-        {/* แถวที่ 3: สถิติปริมาณเน็ต RX/TX (แสดงเฉพาะเมื่อเชื่อมต่อสำเร็จแล้ว) */}
+        {/* แถวที่ 3: สถิติปริมาณเน็ต RX/TX พร้อมไอคอนลูกศรทิศทาง */}
         {connectionState === 'connected' && (
-          <div className="pt-2 border-t border-slate-800 grid grid-cols-2 gap-2 text-[11px] text-slate-400 font-mono">
-            <div>RX: {(bytesRx / 1024).toFixed(1)} KB</div>
-            <div className="text-right">TX: {(bytesTx / 1024).toFixed(1)} KB</div>
+          <div className="pt-2 border-t border-slate-800 grid grid-cols-2 gap-2 text-[11px] font-mono">
+            {/* ดาวน์โหลด (RX) */}
+            <div className="flex items-center space-x-1.5 text-emerald-400">
+              <ArrowDownCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span>RX: {(bytesRx / 1024).toFixed(1)} KB</span>
+            </div>
+
+            {/* อัปโหลด (TX) */}
+            <div className="flex items-center justify-end space-x-1.5 text-sky-400">
+              <ArrowUpCircle className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+              <span>TX: {(bytesTx / 1024).toFixed(1)} KB</span>
+            </div>
           </div>
         )}
       </div>
 
       {/* ปุ่มสั่งงานหลัก: สลับระหว่าง VPN CONNECT (เขียว) และ DISCONNECT (แดง) */}
       {connectionState !== 'connected' ? (
-        /* ปุ่มสีเขียว: สั่งเชื่อมต่อ VPN */
         <button
           onClick={onConnect}
           disabled={loading || !agentInstalled}
@@ -97,7 +163,6 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
           )}
         </button>
       ) : (
-        /* ปุ่มสีแดง: สั่งตัดการเชื่อมต่อ */
         <button
           onClick={onDisconnect}
           disabled={loading}
@@ -108,7 +173,7 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
         </button>
       )}
 
-      {/* คำเตือนสีส้ม: แสดงเมื่อยังไม่ได้เปิด mock-agent.js */}
+      {/* คำเตือนเมื่อยังไม่ได้รัน mock-agent.js */}
       {!agentInstalled && (
         <div className="p-3 bg-amber-950/30 border border-amber-800/60 rounded-lg text-xs text-amber-300 space-y-1">
           <div className="font-semibold flex items-center space-x-1">

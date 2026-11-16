@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldAlert, ShieldCheck, Shield, LayoutDashboard } from 'lucide-react';
+import { Shield, LayoutDashboard } from 'lucide-react';
 import {
   LoginResponse,
   AuthTokenResponse,
@@ -14,6 +14,7 @@ import { LoginForm } from './components/LoginForm';
 import { OtpModal } from './components/OtpModal';
 import { VpnDashboard } from './components/VpnDashboard';
 import { AdminPanel } from './components/AdminPanel';
+import { Toast, ToastType } from './components/Toast';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 const AGENT_BASE_URL = 'http://127.0.0.1:47821';
@@ -50,11 +51,15 @@ export default function App() {
   const [bytesTx, setBytesTx] = useState<number>(0);
 
   // =========================================================================
-  // 3. สถานะข้อความแจ้งเตือน (UI Feedback State)
+  // 3. สถานะข้อความแจ้งเตือน (Toast Notification State)
   // =========================================================================
   const [loading, setLoading] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+
+  // ฟังก์ชันยิง Toast แจ้งเตือนมุมขวาบน
+  const showToast = (message: string, type: ToastType = 'info') => {
+    setToast({ message, type });
+  };
 
   // ตรวจสอบความพร้อมของ Backend API (ทุก 5 วินาที)
   useEffect(() => {
@@ -124,16 +129,13 @@ export default function App() {
     return () => clearInterval(interval);
   }, [connectionState]);
 
-  // ฟังก์ชันล็อกอิน Step 1 -> Step 2 (พร้อม Dev Mock Fallback)
+  // ฟังก์ชันล็อกอิน Step 1 -> Step 2
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setErrorMessage(null);
-    setInfoMessage(null);
 
     try {
       const cleanUsername = username.trim();
-      // 1. ลองพยายามติดต่อ Backend API จริงก่อน
       const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -143,12 +145,12 @@ export default function App() {
       const json = await res.json();
       if (res.ok && json.success) {
         setMfaChallenge(json.data);
-        setInfoMessage(`Verification code sent to ${json.data.maskedPhoneNumber}`);
+        showToast(`ส่งรหัสยืนยัน OTP ไปที่ ${json.data.maskedPhoneNumber}`, 'info');
         return;
       }
       throw new Error(json.error?.message || 'Invalid credentials');
     } catch {
-      // 2. Dev Mock Fallback: ถ้า API หลังบ้านออฟไลน์ ตรวจสอบกับบัญชี Demo ทันที!
+      // Dev Mock Fallback: ถ้า API หลังบ้านออฟไลน์
       const cleanUsername = username.trim();
       const demoAccount = DEMO_ACCOUNTS[cleanUsername];
       if (demoAccount && password === 'MangoVPN2026!') {
@@ -157,26 +159,25 @@ export default function App() {
           challengeId: 'mock-challenge-dev',
           maskedPhoneNumber: '+1555****567',
           expiresInSeconds: 300,
-          message: 'Dev Mock Mode: เข้าสู่ระบบจำลองสำเร็จ (กรอกเลข 123456 ในหน้าถัดไป)',
+          message: 'Dev Mock Mode',
         });
-        setInfoMessage('💡 โหมดจำลอง (Dev Mode): ใช้ OTP เลข 123456 ได้เลยครับ');
+        showToast('โหมดจำลอง (Dev Mode): ใช้ OTP เลข 123456 ได้เลยครับ', 'info');
       } else {
-        setErrorMessage('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง (ลองใช้: admin_user / MangoVPN2026!)');
+        showToast('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง (ลองใช้: admin_user / MangoVPN2026!)', 'error');
       }
     } finally {
       setLoading(false);
     }
   };
 
-  // ฟังก์ชันยืนยัน OTP Step 3 -> Step 4 (พร้อม Dev Mock Fallback)
+  // ฟังก์ชันยืนยัน OTP Step 3 -> Step 4
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!mfaChallenge) return;
     setLoading(true);
-    setErrorMessage(null);
 
     try {
-      // ถ้าเป็นโหมด Dev Mock
+      // Dev Mock Mode
       if (mfaChallenge.challengeId === 'mock-challenge-dev') {
         const cleanUsername = username.trim();
         const demoAccount = DEMO_ACCOUNTS[cleanUsername] || { role: 'ADMIN', phone: '+15551234567' };
@@ -193,11 +194,11 @@ export default function App() {
           },
         });
         setMfaChallenge(null);
-        setInfoMessage(`เข้าสู่ระบบสำเร็จในฐานะ ${cleanUsername} (${demoAccount.role})`);
+        showToast(`เข้าสู่ระบบสำเร็จ ยินดีต้อนรับ ${cleanUsername} (${demoAccount.role})`, 'success');
         return;
       }
 
-      // ถ้าเป็น API จริง
+      // API จริง
       const res = await fetch(`${API_BASE_URL}/api/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -214,9 +215,9 @@ export default function App() {
 
       setAuthData(json.data);
       setMfaChallenge(null);
-      setInfoMessage(`Authenticated as ${json.data.user.username} (${json.data.user.role})`);
+      showToast(`เข้าสู่ระบบสำเร็จในฐานะ ${json.data.user.username} (${json.data.user.role})`, 'success');
     } catch (err: any) {
-      setErrorMessage(err.message || 'OTP verification failed');
+      showToast(err.message || 'การยืนยันรหัส OTP ล้มเหลว', 'error');
     } finally {
       setLoading(false);
     }
@@ -226,13 +227,12 @@ export default function App() {
   const handleConnectVpn = async () => {
     if (!authData) return;
     if (!agentInstalled) {
-      setErrorMessage('Local Windows Agent service not detected on 127.0.0.1:47821. Please run: npm run mock:agent');
+      showToast('ไม่พบเซอร์วิส Agent บนเครื่อง 127.0.0.1:47821 (กรุณารัน: npm run mock:agent)', 'error');
       return;
     }
 
     setConnectionState('connecting');
     setLoading(true);
-    setErrorMessage(null);
 
     try {
       const res = await fetch(`${AGENT_BASE_URL}/connect`, {
@@ -253,10 +253,10 @@ export default function App() {
       if (json.assignedIp) {
         setAssignedIp(json.assignedIp);
       }
-      setInfoMessage('Secure WireGuard tunnel established!');
+      showToast('เชื่อมต่อ WireGuard Tunnel เรียบร้อยแล้ว!', 'success');
     } catch (err: any) {
       setConnectionState('disconnected');
-      setErrorMessage(err.message || 'Failed to trigger agent connection');
+      showToast(err.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ VPN', 'error');
     } finally {
       setLoading(false);
     }
@@ -269,9 +269,9 @@ export default function App() {
       await fetch(`${AGENT_BASE_URL}/disconnect`, { method: 'POST' });
       setConnectionState('disconnected');
       setAssignedIp(null);
-      setInfoMessage('WireGuard tunnel disconnected');
+      showToast('ตัดการเชื่อมต่อ WireGuard VPN เรียบร้อยแล้ว', 'info');
     } catch {
-      setErrorMessage('Failed to cleanly disconnect agent');
+      showToast('ไม่สามารถตัดการเชื่อมต่อได้อย่างสมบูรณ์', 'error');
     } finally {
       setLoading(false);
     }
@@ -286,10 +286,20 @@ export default function App() {
     setMfaChallenge(null);
     setOtpCode('');
     setActiveView('vpn');
+    showToast('ออกจากระบบเรียบร้อยแล้ว', 'info');
   };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+      {/* ป๊อปอัปแจ้งเตือน Toast มุมบนขวา */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+
       {/* 1. ส่วนหัว: แถบสถานะระบบ */}
       <Header
         portalOnline={portalOnline}
@@ -305,22 +315,6 @@ export default function App() {
         <div className={`w-full transition-all duration-300 ${
           authData && activeView === 'admin' ? 'max-w-2xl' : 'max-w-md'
         }`}>
-
-          {/* ป้ายแจ้งเตือนข้อผิดพลาด (Error Alert) */}
-          {errorMessage && (
-            <div className="mb-4 p-4 rounded-xl bg-rose-950/60 border border-rose-800 text-rose-200 text-sm flex items-start space-x-2">
-              <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
-              <span>{errorMessage}</span>
-            </div>
-          )}
-
-          {/* ป้ายแจ้งข้อมูลความสำเร็จ (Success / Info Alert) */}
-          {infoMessage && (
-            <div className="mb-4 p-4 rounded-xl bg-amber-950/40 border border-amber-800 text-amber-200 text-sm flex items-start space-x-2">
-              <ShieldCheck className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-              <span>{infoMessage}</span>
-            </div>
-          )}
 
           {/* การ์ดบรรจุหน้าจอ (Card Container) */}
           <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-2xl backdrop-blur">
@@ -394,6 +388,7 @@ export default function App() {
                     loading={loading}
                     onConnect={handleConnectVpn}
                     onDisconnect={handleDisconnectVpn}
+                    onNotify={showToast}
                   />
                 ) : (
                   <AdminPanel
