@@ -1,15 +1,10 @@
 import React, { useState } from 'react';
 import {
-  User as UserIcon,
-  Lock,
-  ArrowRight,
+  Shield,
   RefreshCw,
   AlertCircle,
-  Eye,
-  EyeOff,
-  Shield,
-  UserCheck,
   Crown,
+  UserCheck,
 } from 'lucide-react';
 import { loginSchema } from '../schemas/auth.schema';
 
@@ -26,7 +21,7 @@ interface LoginFormProps {
 }
 
 // =========================================================================
-// 2. Component LoginForm พร้อมระบบ 1-Click Role Fill และ Show/Hide Password
+// 2. Component LoginForm (ออกแบบถอดแบบเป๊ะๆ ตาม Mobile App UI)
 // =========================================================================
 export const LoginForm: React.FC<LoginFormProps> = ({
   username,
@@ -36,27 +31,22 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   loading,
   onSubmit,
 }) => {
-  // เก็บข้อความ Error ของแต่ละช่อง
   const [errors, setErrors] = useState<{ username?: string; password?: string }>({});
-  // สถานะเปิด/ปิดตาดูรหัสผ่าน
   const [showPassword, setShowPassword] = useState(false);
 
-  // ฟังก์ชันเลือกบัญชี Demo แบบคลิกเดียว (1-Click Fill)
+  // ฟังก์ชันเลือกบัญชี Demo 1-Click
   const handleSelectDemo = (demoUser: string) => {
     setUsername(demoUser);
     setPassword('MangoVPN2026!');
     setErrors({});
   };
 
-  // ฟังก์ชันดักจับตอนกดปุ่ม Submit เพื่อตรวจฟอร์มด้วย Zod ก่อนส่งต่อ
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 1. ใช้ Zod ตรวจสอบข้อมูลในฟอร์ม (ตัดช่องว่างหน้าหลังออกด้วย trim())
     const trimmedUsername = username.trim();
     const validationResult = loginSchema.safeParse({ username: trimmedUsername, password });
 
-    // 2. ถ้าไม่ผ่านเกณฑ์
     if (!validationResult.success) {
       const fieldErrors: { username?: string; password?: string } = {};
 
@@ -71,80 +61,94 @@ export const LoginForm: React.FC<LoginFormProps> = ({
       return;
     }
 
-    // 3. ถ้าผ่านเกณฑ์ฉลุย
     setErrors({});
     onSubmit(e);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-      {/* หัวข้อฟอร์ม */}
-      <div>
-        <h2 className="text-xl font-bold text-white tracking-tight">Sign in to MANGO VPN</h2>
-        <p className="text-xs text-slate-400 mt-1">
-          Zero-Trust Remote Access Control Gateway
-        </p>
-      </div>
-
-      {/* ปุ่ม 1-Click เลือกบทบาททดสอบ (Quick Select Role) */}
-      <div className="pt-1">
-        <label className="block text-[11px] font-medium text-slate-400 mb-1.5">
-          Quick Demo Accounts (1-Click Fill):
-        </label>
-        <div className="grid grid-cols-3 gap-2">
-          {/* ปุ่ม Admin */}
-          <button
-            type="button"
-            onClick={() => handleSelectDemo('admin_user')}
-            className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 border transition cursor-pointer ${
-              username === 'admin_user'
-                ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm'
-                : 'bg-slate-950/70 text-slate-400 border-slate-800 hover:text-slate-200 hover:bg-slate-900'
-            }`}
-          >
-            <Crown className="w-3.5 h-3.5 text-amber-400" />
-            <span>Admin</span>
-          </button>
-
-          {/* ปุ่ม Staff */}
-          <button
-            type="button"
-            onClick={() => handleSelectDemo('staff_user')}
-            className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 border transition cursor-pointer ${
-              username === 'staff_user'
-                ? 'bg-sky-500/20 text-sky-300 border-sky-500/50 shadow-sm'
-                : 'bg-slate-950/70 text-slate-400 border-slate-800 hover:text-slate-200 hover:bg-slate-900'
-            }`}
-          >
-            <Shield className="w-3.5 h-3.5 text-sky-400" />
-            <span>Staff</span>
-          </button>
-
-          {/* ปุ่ม Client */}
-          <button
-            type="button"
-            onClick={() => handleSelectDemo('client_user')}
-            className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 border transition cursor-pointer ${
-              username === 'client_user'
-                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-sm'
-                : 'bg-slate-950/70 text-slate-400 border-slate-800 hover:text-slate-200 hover:bg-slate-900'
-            }`}
-          >
-            <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Client</span>
-          </button>
+    <div className="w-full flex flex-col justify-between min-h-[560px] select-none">
+      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+        {/* 1. ส่วนหัว: โลโก้ MANGO VPN */}
+        <div className="flex items-center space-x-3 mb-6">
+          <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-600/30">
+            <Shield className="w-5 h-5 fill-white/20" />
+          </div>
+          <span className="text-lg font-bold text-white tracking-wider">
+            MANGO VPN
+          </span>
         </div>
-      </div>
 
-      {/* ช่องกรอกข้อมูล (Inputs) */}
-      <div className="space-y-3 pt-1">
-        {/* ช่องที่ 1: Username */}
-        <div>
-          <label className="block text-xs font-medium text-slate-300 mb-1">
-            Username
-          </label>
-          <div className="relative">
-            <UserIcon className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+        {/* 2. หัวข้อฟอร์ม และ Step Progress Bar (ขั้นตอนที่ 1 จาก 3) */}
+        <div className="space-y-1.5">
+          <div className="text-[10px] font-mono tracking-widest text-emerald-400 font-semibold uppercase">
+            SECURE CHANNEL · TLS 1.3
+          </div>
+          <h1 className="text-2xl font-bold text-white tracking-tight">
+            เข้าสู่ระบบ VPN
+          </h1>
+          <p className="text-xs text-slate-400">
+            ขั้นตอนที่ 1 จาก 3 · กรอกข้อมูลเพื่อเข้าใช้งาน
+          </p>
+
+          {/* แถบความคืบหน้า 3 ท่อน (Step Indicator) */}
+          <div className="flex space-x-2 pt-2">
+            <div className="h-1 bg-emerald-500 rounded-full flex-1" />
+            <div className="h-1 bg-slate-800/80 rounded-full flex-1" />
+            <div className="h-1 bg-slate-800/80 rounded-full flex-1" />
+          </div>
+        </div>
+
+        {/* 3. ปุ่มลัดทดสอบ Demo Accounts (1-Click Fill) */}
+        <div className="pt-1">
+          <div className="grid grid-cols-3 gap-1.5">
+            <button
+              type="button"
+              onClick={() => handleSelectDemo('admin_user')}
+              className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 border transition cursor-pointer ${
+                username === 'admin_user'
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm'
+                  : 'bg-slate-900/60 text-slate-400 border-slate-800 hover:text-slate-200'
+              }`}
+            >
+              <Crown className="w-3 h-3 text-amber-400" />
+              <span>Admin</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSelectDemo('staff_user')}
+              className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 border transition cursor-pointer ${
+                username === 'staff_user'
+                  ? 'bg-sky-500/20 text-sky-300 border-sky-500/50 shadow-sm'
+                  : 'bg-slate-900/60 text-slate-400 border-slate-800 hover:text-slate-200'
+              }`}
+            >
+              <Shield className="w-3 h-3 text-sky-400" />
+              <span>Staff</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSelectDemo('client_user')}
+              className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 border transition cursor-pointer ${
+                username === 'client_user'
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-sm'
+                  : 'bg-slate-900/60 text-slate-400 border-slate-800 hover:text-slate-200'
+              }`}
+            >
+              <UserCheck className="w-3 h-3 text-emerald-400" />
+              <span>Client</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 4. ช่องกรอกข้อมูล (Inputs) */}
+        <div className="space-y-4 pt-1">
+          {/* ช่องที่ 1: ชื่อผู้ใช้ */}
+          <div>
+            <label className="block text-xs font-medium text-slate-200 mb-1.5">
+              ชื่อผู้ใช้
+            </label>
             <input
               type="text"
               value={username}
@@ -152,92 +156,100 @@ export const LoginForm: React.FC<LoginFormProps> = ({
                 setUsername(e.target.value);
                 if (errors.username) setErrors((prev) => ({ ...prev, username: undefined }));
               }}
-              placeholder="e.g. staff_user"
-              className={`w-full pl-9 pr-3 py-2 bg-slate-950 border rounded-lg text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition ${
+              placeholder="เช่น somchai.k"
+              className={`w-full px-3.5 py-3 bg-[#070e0a] border rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none transition ${
                 errors.username
                   ? 'border-rose-500 focus:border-rose-500'
-                  : 'border-slate-800 focus:border-amber-500'
+                  : 'border-slate-800 focus:border-emerald-500'
               }`}
             />
+            {errors.username && (
+              <p className="text-xs text-rose-400 mt-1 flex items-center space-x-1">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{errors.username}</span>
+              </p>
+            )}
           </div>
-          {errors.username && (
-            <p className="text-xs text-rose-400 mt-1 flex items-center space-x-1">
-              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-              <span>{errors.username}</span>
-            </p>
-          )}
-        </div>
 
-        {/* ช่องที่ 2: Password พร้อมปุ่ม Show/Hide Password */}
-        <div>
-          <label className="block text-xs font-medium text-slate-300 mb-1">
-            Password
-          </label>
-          <div className="relative">
-            <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
-            <input
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
-              }}
-              placeholder="••••••••••••"
-              className={`w-full pl-9 pr-10 py-2 bg-slate-950 border rounded-lg text-sm text-slate-100 placeholder-slate-600 focus:outline-none transition font-mono ${
-                errors.password
-                  ? 'border-rose-500 focus:border-rose-500'
-                  : 'border-slate-800 focus:border-amber-500'
-              }`}
-            />
-            {/* ปุ่มคลิกเปิด/ปิดตาดูรหัสผ่าน */}
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-2.5 text-slate-500 hover:text-slate-300 transition cursor-pointer p-0.5 rounded"
-              title={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
-            >
-              {showPassword ? (
-                <EyeOff className="w-4 h-4 text-amber-400" />
+          {/* ช่องที่ 2: รหัสผ่าน */}
+          <div>
+            <label className="block text-xs font-medium text-slate-200 mb-1.5">
+              รหัสผ่าน
+            </label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
+                }}
+                placeholder="••••••••••"
+                className={`w-full pl-3.5 pr-14 py-3 bg-[#070e0a] border rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none transition font-mono ${
+                  errors.password
+                    ? 'border-rose-500 focus:border-rose-500'
+                    : 'border-slate-800 focus:border-emerald-500'
+                }`}
+              />
+              {/* ปุ่มคลิก แสดง / ซ่อน ตัวหนังสือสีเขียว */}
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3.5 top-3.5 text-xs font-medium text-emerald-400 hover:text-emerald-300 transition cursor-pointer select-none"
+              >
+                {showPassword ? 'ซ่อน' : 'แสดง'}
+              </button>
+            </div>
+
+            {/* ข้อความกำกับใต้ช่องรหัสผ่าน */}
+            <div className="flex justify-between items-center mt-1">
+              {errors.password ? (
+                <p className="text-xs text-rose-400 flex items-center space-x-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{errors.password}</span>
+                </p>
               ) : (
-                <Eye className="w-4 h-4" />
+                <span className="text-[11px] text-slate-400">อย่างน้อย 8 ตัวอักษร</span>
               )}
-            </button>
+            </div>
           </div>
-          {errors.password && (
-            <p className="text-xs text-rose-400 mt-1 flex items-center space-x-1">
-              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-              <span>{errors.password}</span>
-            </p>
-          )}
         </div>
-      </div>
 
-      {/* ปุ่มกด Continue to MFA */}
-      <div className="pt-2">
+        {/* 5. ปุ่มใหญ่: เข้าสู่ระบบ */}
+        <div className="pt-2">
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm transition shadow-lg shadow-emerald-900/30 flex items-center justify-center space-x-2 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+          >
+            {loading ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : (
+              <span>เข้าสู่ระบบ</span>
+            )}
+          </button>
+        </div>
+      </form>
+
+      {/* 6. ส่วนล่างสุด: ลิงก์ดาวน์โหลด Agent และติดต่อ Admin */}
+      <div className="text-center text-xs text-slate-400 pt-8 pb-2">
+        <span>ยังไม่ได้ติดตั้ง Agent? </span>
         <button
-          type="submit"
-          disabled={loading}
-          className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-bold rounded-lg text-sm transition shadow-lg shadow-amber-500/20 flex items-center justify-center space-x-2 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+          type="button"
+          onClick={() => alert('ดาวน์โหลด Agent: กรุณารัน npm run mock:agent บนเครื่องของคุณ')}
+          className="text-emerald-400 hover:text-emerald-300 font-medium transition cursor-pointer"
         >
-          {loading ? (
-            <RefreshCw className="w-4 h-4 animate-spin" />
-          ) : (
-            <>
-              <span>Continue to MFA</span>
-              <ArrowRight className="w-4 h-4" />
-            </>
-          )}
+          ดาวน์โหลด
+        </button>
+        <span className="text-slate-500 mx-1">·</span>
+        <button
+          type="button"
+          onClick={() => alert('ติดต่อ Admin: admin@mangovpn.internal')}
+          className="text-emerald-400 hover:text-emerald-300 font-medium transition cursor-pointer"
+        >
+          ติดต่อ Admin
         </button>
       </div>
-
-      {/* ข้อมูลแนะนำรหัสผ่าน */}
-      <div className="p-3 bg-slate-950/70 rounded-lg border border-slate-800 text-[11px] text-slate-400 space-y-1">
-        <div className="font-semibold text-slate-300">💡 Default Password:</div>
-        <div className="font-mono text-amber-400 font-bold">MangoVPN2026!</div>
-        <div className="text-[10px] text-slate-500">
-          คลิกที่ปุ่มลัดด้านบน (Admin / Staff / Client) เพื่อสลับบทบาทในการทดสอบได้ทันที
-        </div>
-      </div>
-    </form>
+    </div>
   );
 };

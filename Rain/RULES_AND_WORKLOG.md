@@ -208,6 +208,10 @@
           - ใน `LoginForm.tsx`: เพิ่มปุ่ม 1-Click Role Switcher (`👑 Admin`, `👔 Staff`, `👤 Client`) กรอกข้อมูลพร้อมรหัสผ่านให้อัตโนมัติในคลิกเดียว
           - เพิ่มปุ่มเปิด/ปิดตาดูรหัสผ่าน (`Eye` / `EyeOff`) สลับระหว่าง text และ password
           - ใน `OtpModal.tsx`: เพิ่มปุ่ม Auto-fill Demo OTP (`123456`) อำนวยความสะดวกในการทดสอบอย่างรวดเร็ว
+        - ปรับดีไซน์หน้า Login & OTP ให้เป็นแบบ **Mobile Application Style** ตามรูปภาพอ้างอิง:
+          - ใน `LoginForm.tsx`: วางโครงสร้างแบบ Mobile App พร้อมโลโก้ MANGO VPN สีเขียว, แถบสถานะ TLS 1.3, หัวข้อ 'เข้าสู่ระบบ VPN', แถบ Progress Bar 3 ท่อน (ขั้นตอนที่ 1 จาก 3), ช่อง Username/Password พร้อมปุ่มกด 'แสดง'/'ซ่อน', และลิงก์ดาวน์โหลด Agent / ติดต่อ Admin
+          - ใน `OtpModal.tsx`: ออกแบบหน้า OTP ให้เข้าชุดกันเป็นขั้นตอนที่ 2 จาก 3 (แถบ Progress 2 ท่อนสีเขียว)
+          - ใน `App.tsx`: ปรับกรอบแสดงผลหน้า Login ให้อยู่ในสัดส่วน Mobile App Card (`max-w-[400px]`) รองรับ Responsive แสดงผลสวยงามทั้งบนมือถือและจอคอมพิวเตอร์
       - ทดสอบการคอมไพล์ด้วย TypeScript และ Vite Build ผ่าน 100% ไม่มีข้อผิดพลาด
 - **ไฟล์ที่สร้าง/แก้ไข**:
   - `Rain/portal/src/components/Sidebar.tsx` *(รองรับเมนูตามบทบาท RBAC ครบทั้ง 3 บทบาท)*

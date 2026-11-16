@@ -8,7 +8,6 @@ import {
 } from '@mango/shared';
 
 // นำเข้า Component ลูกทั้งหมด
-import { Header } from './components/Header';
 import { Sidebar, NavTab } from './components/Sidebar';
 import { LoginForm } from './components/LoginForm';
 import { OtpModal } from './components/OtpModal';
@@ -593,10 +592,10 @@ export default function App() {
   }
 
   // =========================================================================
-  // ก่อนล็อกอิน: แสดงหน้า Login Form กึ่งกลางจอ
+  // ก่อนล็อกอิน: แสดงหน้า Login Form สไตล์ Mobile App
   // =========================================================================
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-[#040806] text-slate-100 flex flex-col items-center justify-center p-4 sm:p-6 font-sans">
       {/* ป๊อปอัปแจ้งเตือน Toast มุมบนขวา */}
       {toast && (
         <Toast
@@ -606,46 +605,38 @@ export default function App() {
         />
       )}
 
-      {/* 1. ส่วนหัว: แถบสถานะระบบ */}
-      <Header
-        portalOnline={portalOnline}
-        agentInstalled={agentInstalled}
-        agentVersion={agentVersion}
-        connectionState={connectionState}
-        isLoggedIn={false}
-        onSignOut={handleSignOut}
-      />
+      {/* สถานะเซิร์ฟเวอร์จิ๋ว */}
+      <div className="flex items-center space-x-1.5 text-[10px] text-slate-500 mb-2 font-mono">
+        <span className={`w-1.5 h-1.5 rounded-full ${portalOnline ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
+        <span>{portalOnline ? 'Gateway API Online' : 'Gateway Standby (Dev Mock)'}</span>
+      </div>
 
-      {/* 2. พื้นที่เนื้อหาหลัก (Login / OTP Box) */}
-      <main className="flex-1 flex items-center justify-center p-6">
-        <div className="w-full max-w-md transition-all duration-300">
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-2xl backdrop-blur">
-            {/* หน้าที่ 1: ฟอร์มล็อกอิน */}
-            {!mfaChallenge && (
-              <LoginForm
-                username={username}
-                setUsername={setUsername}
-                password={password}
-                setPassword={setPassword}
-                loading={loading}
-                onSubmit={handleLogin}
-              />
-            )}
+      {/* กรอบขนาด Mobile App Card */}
+      <div className="w-full max-w-[400px] bg-[#070d0a] border border-slate-800/80 rounded-3xl p-6 sm:p-7 shadow-2xl shadow-emerald-950/20">
+        {/* หน้าที่ 1: ฟอร์มล็อกอิน Mobile */}
+        {!mfaChallenge && (
+          <LoginForm
+            username={username}
+            setUsername={setUsername}
+            password={password}
+            setPassword={setPassword}
+            loading={loading}
+            onSubmit={handleLogin}
+          />
+        )}
 
-            {/* หน้าที่ 2: โมดอลกรอก OTP */}
-            {mfaChallenge && (
-              <OtpModal
-                maskedPhoneNumber={mfaChallenge.maskedPhoneNumber}
-                otpCode={otpCode}
-                setOtpCode={setOtpCode}
-                loading={loading}
-                onVerify={handleVerifyOtp}
-                onBack={() => setMfaChallenge(null)}
-              />
-            )}
-          </div>
-        </div>
-      </main>
+        {/* หน้าที่ 2: โมดอลกรอก OTP Mobile */}
+        {mfaChallenge && (
+          <OtpModal
+            maskedPhoneNumber={mfaChallenge.maskedPhoneNumber}
+            otpCode={otpCode}
+            setOtpCode={setOtpCode}
+            loading={loading}
+            onVerify={handleVerifyOtp}
+            onBack={() => setMfaChallenge(null)}
+          />
+        )}
+      </div>
     </div>
   );
 }
