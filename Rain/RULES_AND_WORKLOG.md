@@ -174,17 +174,24 @@
      - สร้าง Mock Auth & Offline Fallback ให้ `App.tsx` และ `AdminPanel.tsx` รองรับการทดสอบหน้าเว็บได้ครบทุก Role แม้ไม่มี Docker / PostgreSQL
      - แก้ไขปัญหา Trim Whitespace ใน Zod Validation Schema และฟอร์ม ทำให้รองรับการ Copy-paste รหัสผ่านและ Username โดยไม่ติด Error
      - ทดสอบระบบ Role-Based Dashboard ผ่านฉลุยทั้ง 3 บทบาท (`admin_user`, `staff_user`, `client_user`)
-  2. **ช่วงบ่าย (UI/UX Polish)**:
+  2. **ช่วงบ่าย (UI/UX Polish & Modern Enterprise Transformation)**:
      - สร้าง Component `Toast.tsx` ระบบแจ้งเตือนลอยมุมขวาบน รองรับ 3 สถานะ (`success`, `error`, `info`) มีระบบ Auto-dismiss อัตโนมัติหลัง 3.5 วินาที พร้อมปุ่มปิดกากบาท
      - ปรับปรุง `VpnDashboard.tsx` เพิ่มปุ่ม Quick Copy สำหรับคัดลอก Assigned VPN IP และ Endpoint พร้อมไอคอน Checkmark แสดงผล 2 วินาที และยิงแจ้งเตือนผ่าน Toast
      - เพิ่มไอคอนสถานะการรับ-ส่งข้อมูล (RX/TX Download/Upload) ใน Telemetry Box
      - ประกอบ `Toast` และฟังก์ชัน `showToast` เข้ากับ `App.tsx` เชื่อมต่อแจ้งเตือนเมื่อ Login, Logout และคัดลอก IP/Endpoint
-     - เพิ่มระบบวัด Tunnel Latency (Ping ms) แบบ Dynamic พร้อมไฟกระพริบ Pulse สีเขียว และป้ายบอกระดับสัญญาณ (Optimal / Good)
-     - เพิ่มการคำนวณและแสดงผลอัตราความเร็วรับส่งข้อมูลแบบ Real-time Speed Rate (↓ KB/s และ ↑ KB/s)
-     - เพิ่มแถบสถานะแอนิเมชันจำลองขั้นตอนการสร้าง WireGuard Tunnel (PNA Handshake Stepper) ขณะกำลังเชื่อมต่อ (`connecting`)
+     - ปรับโฉมหน้า Dashboard ฝั่ง Staff/Client ให้เป็นสไตล์ **Enterprise Modern Dark Layout**:
+       - สร้าง Component `Sidebar.tsx` แถบเมนูด้านซ้าย รองรับ 4 แท็บ (`เชื่อมต่อ`, `ประวัติ`, `อุปกรณ์`, `Agent`) พร้อมโปรไฟล์และปุ่ม Logout
+       - ยกเครื่อง `VpnDashboard.tsx` ใหม่ตามแบบดีไซน์:
+         - แถบ Breadcrumb `// CONNECT` พร้อมป้าย `● เชื่อมต่อแล้ว` และ `โหมดมืด`
+         - แผนภาพ **Secure Tunnel Diagram**: `เครื่องของคุณ` ─── [🔒] ─── `Private Network` เรืองแสงสีเขียว
+         - ปุ่มสลับการเชื่อมต่อ `ตัดการเชื่อมต่อ` / `เชื่อมต่อ VPN` พร้อม WireGuard Endpoint
+         - การ์ดสถิติ 4 ช่อง (4 Metrics Grid): VPN IP (พร้อมปุ่ม Copy), RX, TX, และตัวนับเวลาเชื่อมต่อจริง (HH:MM:SS)
+         - แผงคอนโซล 2 คอลัมน์ด้านล่าง: `CONNECTION LOG` สไตล์ Terminal สีเขียว และกล่องเครือข่ายที่เข้าถึงได้ (`10.0.0.0/8, 172.16.0.0/12`) + Curve25519 Public Key
+       - ปรับปรุง `App.tsx` เชื่อมโยงระบบแสดงผลเต็มจอเมื่อล็อกอิน และคงหน้า Login กึ่งกลางจอก่อนล็อกอิน
      - ทดสอบการคอมไพล์ด้วย TypeScript และ Vite Build ผ่าน 100% ไม่มีข้อผิดพลาด
 - **ไฟล์ที่สร้าง/แก้ไข**:
+  - `Rain/portal/src/components/Sidebar.tsx` *(สร้างใหม่)*
   - `Rain/portal/src/components/Toast.tsx` *(สร้างใหม่)*
-  - `Rain/portal/src/components/VpnDashboard.tsx` *(เพิ่มปุ่ม Quick Copy, Latency Indicator, Real-time Speed Rate & Connecting Stepper)*
-  - `Rain/portal/src/App.tsx` *(เชื่อมต่อ Toast และระบบแจ้งเตือน)*
+  - `Rain/portal/src/components/VpnDashboard.tsx` *(ยกเครื่องหน้าจอใหม่ตามแบบ Enterprise Design)*
+  - `Rain/portal/src/App.tsx` *(เชื่อมต่อ Sidebar และ Full Dashboard Layout)*
   - `Rain/RULES_AND_WORKLOG.md` *(อัปเดตบันทึกประจำวัน)*

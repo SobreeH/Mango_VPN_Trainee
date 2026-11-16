@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, LayoutDashboard } from 'lucide-react';
 import {
   LoginResponse,
   AuthTokenResponse,
@@ -10,6 +9,7 @@ import {
 
 // นำเข้า Component ลูกทั้งหมด
 import { Header } from './components/Header';
+import { Sidebar, NavTab } from './components/Sidebar';
 import { LoginForm } from './components/LoginForm';
 import { OtpModal } from './components/OtpModal';
 import { VpnDashboard } from './components/VpnDashboard';
@@ -30,14 +30,14 @@ export default function App() {
   // =========================================================================
   // 1. สถานะการล็อกอินและตัวตน (Authentication State)
   // =========================================================================
-  const [username, setUsername] = useState('admin_user');
+  const [username, setUsername] = useState('staff_user');
   const [password, setPassword] = useState('MangoVPN2026!');
   const [mfaChallenge, setMfaChallenge] = useState<LoginResponse | null>(null);
   const [otpCode, setOtpCode] = useState('');
   const [authData, setAuthData] = useState<AuthTokenResponse | null>(null);
 
-  // มุมมองปัจจุบันเมื่อล็อกอินแล้ว: 'vpn' (หน้าเชื่อมต่อ) หรือ 'admin' (หน้าหลังบ้าน)
-  const [activeView, setActiveView] = useState<'vpn' | 'admin'>('vpn');
+  // แท็บเมนูที่เลือกในแถบ Sidebar ด้านซ้าย (connect | history | devices | agent)
+  const [activeTab, setActiveTab] = useState<NavTab>('connect');
 
   // =========================================================================
   // 2. สถานะระบบและเน็ตเวิร์ก (System & Telemetry State)
@@ -285,10 +285,81 @@ export default function App() {
     setAuthData(null);
     setMfaChallenge(null);
     setOtpCode('');
-    setActiveView('vpn');
+    setActiveTab('connect');
     showToast('ออกจากระบบเรียบร้อยแล้ว', 'info');
   };
 
+  // =========================================================================
+  // เมื่อล็อกอินแล้ว: แสดง Full Dashboard Layout พร้อม Sidebar ด้านซ้าย
+  // =========================================================================
+  if (authData) {
+    return (
+      <div className="min-h-screen bg-[#060a08] text-slate-100 flex font-sans">
+        {/* ป๊อปอัปแจ้งเตือน Toast มุมบนขวา */}
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        )}
+
+        {/* เมนูนำทางด้านซ้าย (Sidebar) */}
+        <Sidebar
+          user={authData.user}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          onSignOut={handleSignOut}
+        />
+
+        {/* พื้นที่แสดงเนื้อหาหลัก (Main Content) */}
+        <main className="flex-1 p-6 md:p-8 overflow-y-auto">
+          {activeTab === 'connect' && (
+            <VpnDashboard
+              user={authData.user}
+              assignedIp={assignedIp}
+              connectionState={connectionState}
+              bytesRx={bytesRx}
+              bytesTx={bytesTx}
+              agentInstalled={agentInstalled}
+              agentVersion={agentVersion}
+              loading={loading}
+              onConnect={handleConnectVpn}
+              onDisconnect={handleDisconnectVpn}
+              onNotify={showToast}
+            />
+          )}
+
+          {activeTab !== 'connect' && (
+            <div className="max-w-5xl mx-auto space-y-4">
+              <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+                <h2 className="text-xl font-bold text-white">
+                  {activeTab === 'history' && 'ประวัติการใช้งานระบบ (Sessions & Audit Logs)'}
+                  {activeTab === 'devices' && 'อุปกรณ์ที่ลงทะเบียนในระบบ (Registered Devices)'}
+                  {activeTab === 'agent' && 'ไคลเอนต์เอเจนต์ (Agent Versions & Releases)'}
+                </h2>
+                <button
+                  onClick={() => setActiveTab('connect')}
+                  className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
+                >
+                  ← กลับหน้าเชื่อมต่อ VPN
+                </button>
+              </div>
+
+              <AdminPanel
+                accessToken={authData.accessToken}
+                apiBaseUrl={API_BASE_URL}
+              />
+            </div>
+          )}
+        </main>
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // ก่อนล็อกอิน: แสดงหน้า Login Form กึ่งกลางจอ
+  // =========================================================================
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
       {/* ป๊อปอัปแจ้งเตือน Toast มุมบนขวา */}
@@ -306,21 +377,16 @@ export default function App() {
         agentInstalled={agentInstalled}
         agentVersion={agentVersion}
         connectionState={connectionState}
-        isLoggedIn={!!authData}
+        isLoggedIn={false}
         onSignOut={handleSignOut}
       />
 
-      {/* 2. พื้นที่เนื้อหาหลัก (Main Content) */}
+      {/* 2. พื้นที่เนื้อหาหลัก (Login / OTP Box) */}
       <main className="flex-1 flex items-center justify-center p-6">
-        <div className={`w-full transition-all duration-300 ${
-          authData && activeView === 'admin' ? 'max-w-2xl' : 'max-w-md'
-        }`}>
-
-          {/* การ์ดบรรจุหน้าจอ (Card Container) */}
+        <div className="w-full max-w-md transition-all duration-300">
           <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-2xl backdrop-blur">
-            
             {/* หน้าที่ 1: ฟอร์มล็อกอิน */}
-            {!authData && !mfaChallenge && (
+            {!mfaChallenge && (
               <LoginForm
                 username={username}
                 setUsername={setUsername}
@@ -332,7 +398,7 @@ export default function App() {
             )}
 
             {/* หน้าที่ 2: โมดอลกรอก OTP */}
-            {!authData && mfaChallenge && (
+            {mfaChallenge && (
               <OtpModal
                 maskedPhoneNumber={mfaChallenge.maskedPhoneNumber}
                 otpCode={otpCode}
@@ -342,63 +408,6 @@ export default function App() {
                 onBack={() => setMfaChallenge(null)}
               />
             )}
-
-            {/* หน้าที่ 3: แดชบอร์ดเมื่อล็อกอินสำเร็จแล้ว */}
-            {authData && (
-              <div className="space-y-4">
-                {/* สวิตช์สลับหน้า (แสดงเฉพาะ Role ADMIN) */}
-                {authData.user.role === 'ADMIN' && (
-                  <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
-                    <button
-                      onClick={() => setActiveView('vpn')}
-                      className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5 transition cursor-pointer ${
-                        activeView === 'vpn'
-                          ? 'bg-amber-500 text-slate-950 shadow-md'
-                          : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      <Shield className="w-3.5 h-3.5" />
-                      <span>VPN Client</span>
-                    </button>
-
-                    <button
-                      onClick={() => setActiveView('admin')}
-                      className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5 transition cursor-pointer ${
-                        activeView === 'admin'
-                          ? 'bg-amber-500 text-slate-950 shadow-md'
-                          : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      <LayoutDashboard className="w-3.5 h-3.5" />
-                      <span>Admin Console</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* แสดง View ตามที่เลือก */}
-                {activeView === 'vpn' ? (
-                  <VpnDashboard
-                    user={authData.user}
-                    assignedIp={assignedIp}
-                    connectionState={connectionState}
-                    bytesRx={bytesRx}
-                    bytesTx={bytesTx}
-                    agentInstalled={agentInstalled}
-                    agentVersion={agentVersion}
-                    loading={loading}
-                    onConnect={handleConnectVpn}
-                    onDisconnect={handleDisconnectVpn}
-                    onNotify={showToast}
-                  />
-                ) : (
-                  <AdminPanel
-                    accessToken={authData.accessToken}
-                    apiBaseUrl={API_BASE_URL}
-                  />
-                )}
-              </div>
-            )}
-
           </div>
         </div>
       </main>
