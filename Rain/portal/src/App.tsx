@@ -314,6 +314,7 @@ export default function App() {
 
         {/* พื้นที่แสดงเนื้อหาหลัก (Main Content) */}
         <main className="flex-1 p-6 md:p-8 overflow-y-auto">
+          {/* 1. หน้าเชื่อมต่อ VPN */}
           {activeTab === 'connect' && (
             <VpnDashboard
               user={authData.user}
@@ -330,14 +331,18 @@ export default function App() {
             />
           )}
 
-          {activeTab !== 'connect' && (
+          {/* 2. หน้าประวัติ (แสดงเฉพาะ Sessions & Audit Logs) */}
+          {activeTab === 'history' && (
             <div className="max-w-5xl mx-auto space-y-4">
-              <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-                <h2 className="text-xl font-bold text-white">
-                  {activeTab === 'history' && 'ประวัติการใช้งานระบบ (Sessions & Audit Logs)'}
-                  {activeTab === 'devices' && 'อุปกรณ์ที่ลงทะเบียนในระบบ (Registered Devices)'}
-                  {activeTab === 'agent' && 'ไคลเอนต์เอเจนต์ (Agent Versions & Releases)'}
-                </h2>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div>
+                  <h2 className="text-xl font-bold text-white tracking-wide">
+                    ประวัติการใช้งานระบบ (Sessions & Audit Logs)
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    ตรวจสอบประวัติการเชื่อมต่อ VPN และบันทึกกิจกรรมความปลอดภัย
+                  </p>
+                </div>
                 <button
                   onClick={() => setActiveTab('connect')}
                   className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
@@ -349,6 +354,66 @@ export default function App() {
               <AdminPanel
                 accessToken={authData.accessToken}
                 apiBaseUrl={API_BASE_URL}
+                initialTab="sessions"
+                allowedTabs={['sessions', 'logs']}
+              />
+            </div>
+          )}
+
+          {/* 3. หน้าอุปกรณ์ (แสดงเฉพาะ Registered Devices) */}
+          {activeTab === 'devices' && (
+            <div className="max-w-5xl mx-auto space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div>
+                  <h2 className="text-xl font-bold text-white tracking-wide">
+                    อุปกรณ์ที่ลงทะเบียน (Registered Devices)
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    รายชื่อเครื่องคอมพิวเตอร์และอุปกรณ์ที่ได้รับอนุญาตในระบบ
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab('connect')}
+                  className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
+                >
+                  ← กลับหน้าเชื่อมต่อ VPN
+                </button>
+              </div>
+
+              <AdminPanel
+                accessToken={authData.accessToken}
+                apiBaseUrl={API_BASE_URL}
+                initialTab="devices"
+                allowedTabs={['devices']}
+              />
+            </div>
+          )}
+
+          {/* 4. หน้า Agent (แสดงเฉพาะ Releases & Downloads) */}
+          {activeTab === 'agent' && (
+            <div className="max-w-5xl mx-auto space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div>
+                  <h2 className="text-xl font-bold text-white tracking-wide">
+                    ไคลเอนต์เอเจนต์ (Agent Versions & Releases)
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    ดาวน์โหลดและตรวจสอบเวอร์ชันของ Mango Windows Agent
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab('connect')}
+                  className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
+                >
+                  ← กลับหน้าเชื่อมต่อ VPN
+                </button>
+              </div>
+
+              <AdminPanel
+                accessToken={authData.accessToken}
+                apiBaseUrl={API_BASE_URL}
+                initialTab="versions"
+                allowedTabs={['versions']}
               />
             </div>
           )}

@@ -188,10 +188,16 @@
          - การ์ดสถิติ 4 ช่อง (4 Metrics Grid): VPN IP (พร้อมปุ่ม Copy), RX, TX, และตัวนับเวลาเชื่อมต่อจริง (HH:MM:SS)
          - แผงคอนโซล 2 คอลัมน์ด้านล่าง: `CONNECTION LOG` สไตล์ Terminal สีเขียว และกล่องเครือข่ายที่เข้าถึงได้ (`10.0.0.0/8, 172.16.0.0/12`) + Curve25519 Public Key
        - ปรับปรุง `App.tsx` เชื่อมโยงระบบแสดงผลเต็มจอเมื่อล็อกอิน และคงหน้า Login กึ่งกลางจอก่อนล็อกอิน
+       - แยกหน้าแดชบอร์ดตามเมนู Sidebar ให้เป็นอิสระต่อกัน:
+         - ปรับปรุง `AdminPanel.tsx` ให้รองรับ `initialTab` และ `allowedTabs` ป้องกันปัญหาหน้า History แสดงตาราง Devices
+         - เมื่อคลิกเมนู `ประวัติ`: แสดงเฉพาะข้อมูล **Sessions & Audit Logs** เท่านั้น
+         - เมื่อคลิกเมนู `อุปกรณ์`: แสดงเฉพาะตาราง **Registered Devices** พร้อมซ่อนแท็บส่วนเกิน
+         - เมื่อคลิกเมนู `Agent`: แสดงเฉพาะตาราง **Releases / Versions** พร้อมซ่อนแท็บส่วนเกิน
      - ทดสอบการคอมไพล์ด้วย TypeScript และ Vite Build ผ่าน 100% ไม่มีข้อผิดพลาด
 - **ไฟล์ที่สร้าง/แก้ไข**:
   - `Rain/portal/src/components/Sidebar.tsx` *(สร้างใหม่)*
   - `Rain/portal/src/components/Toast.tsx` *(สร้างใหม่)*
   - `Rain/portal/src/components/VpnDashboard.tsx` *(ยกเครื่องหน้าจอใหม่ตามแบบ Enterprise Design)*
-  - `Rain/portal/src/App.tsx` *(เชื่อมต่อ Sidebar และ Full Dashboard Layout)*
+  - `Rain/portal/src/components/AdminPanel.tsx` *(รองรับ initialTab และ allowedTabs แยกหน้าเป็นอิสระ)*
+  - `Rain/portal/src/App.tsx` *(เชื่อมต่อ Sidebar, Full Dashboard Layout และแยกหน้าจอตามแท็บ)*
   - `Rain/RULES_AND_WORKLOG.md` *(อัปเดตบันทึกประจำวัน)*

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Laptop,
@@ -14,12 +14,14 @@ import {
   AgentVersionDto,
 } from '@mango/shared';
 
+export type AdminTab = 'devices' | 'sessions' | 'logs' | 'versions';
+
 interface AdminPanelProps {
   accessToken: string;
   apiBaseUrl: string;
+  initialTab?: AdminTab;
+  allowedTabs?: AdminTab[];
 }
-
-type AdminTab = 'devices' | 'sessions' | 'logs' | 'versions';
 
 // ข้อมูลตัวอย่างสำหรับโหมดจำลอง (Dev Mock Fallback)
 const MOCK_DEVICES: DeviceDto[] = [
@@ -98,8 +100,20 @@ const MOCK_VERSIONS: AgentVersionDto[] = [
   },
 ];
 
-export const AdminPanel: React.FC<AdminPanelProps> = ({ accessToken, apiBaseUrl }) => {
-  const [activeTab, setActiveTab] = useState<AdminTab>('devices');
+export const AdminPanel: React.FC<AdminPanelProps> = ({
+  accessToken,
+  apiBaseUrl,
+  initialTab = 'devices',
+  allowedTabs,
+}) => {
+  const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
+
+  // อัปเดตแท็บตามที่ส่งมาจาก Sidebar เมื่อมีการเปลี่ยนหน้า
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   const headers = {
     'Content-Type': 'application/json',
@@ -211,68 +225,90 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ accessToken, apiBaseUrl 
 
   return (
     <div className="space-y-4">
-      {/* 1. แถบปุ่มสลับแท็บ */}
-      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-        <div className="flex space-x-1">
-          <button
-            onClick={() => setActiveTab('devices')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
-              activeTab === 'devices'
-                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-            }`}
-          >
-            <Laptop className="w-3.5 h-3.5" />
-            <span>Devices</span>
-          </button>
+      {/* 1. แถบปุ่มสลับแท็บ (แสดงเฉพาะแท็บที่อนุญาต หรือแสดงปุ่มรีเฟรชถ้าเป็นแท็บเดี่ยว) */}
+      {(!allowedTabs || allowedTabs.length > 1) ? (
+        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+          <div className="flex space-x-1">
+            {(!allowedTabs || allowedTabs.includes('devices')) && (
+              <button
+                onClick={() => setActiveTab('devices')}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
+                  activeTab === 'devices'
+                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <Laptop className="w-3.5 h-3.5" />
+                <span>Devices</span>
+              </button>
+            )}
 
-          <button
-            onClick={() => setActiveTab('sessions')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
-              activeTab === 'sessions'
-                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-            }`}
-          >
-            <History className="w-3.5 h-3.5" />
-            <span>Sessions</span>
-          </button>
+            {(!allowedTabs || allowedTabs.includes('sessions')) && (
+              <button
+                onClick={() => setActiveTab('sessions')}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
+                  activeTab === 'sessions'
+                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <History className="w-3.5 h-3.5" />
+                <span>Sessions</span>
+              </button>
+            )}
 
-          <button
-            onClick={() => setActiveTab('logs')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
-              activeTab === 'logs'
-                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-            }`}
-          >
-            <Shield className="w-3.5 h-3.5" />
-            <span>Audit Logs</span>
-          </button>
+            {(!allowedTabs || allowedTabs.includes('logs')) && (
+              <button
+                onClick={() => setActiveTab('logs')}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
+                  activeTab === 'logs'
+                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <Shield className="w-3.5 h-3.5" />
+                <span>Audit Logs</span>
+              </button>
+            )}
 
+            {(!allowedTabs || allowedTabs.includes('versions')) && (
+              <button
+                onClick={() => setActiveTab('versions')}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
+                  activeTab === 'versions'
+                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Releases</span>
+              </button>
+            )}
+          </div>
+
+          {/* ปุ่มรีเฟรชข้อมูล */}
           <button
-            onClick={() => setActiveTab('versions')}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
-              activeTab === 'versions'
-                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-            }`}
+            onClick={handleRefresh}
+            disabled={currentLoading}
+            className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition cursor-pointer disabled:opacity-50"
+            title="รีเฟรชข้อมูล"
           >
-            <Download className="w-3.5 h-3.5" />
-            <span>Releases</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${currentFetching ? 'animate-spin text-amber-400' : ''}`} />
           </button>
         </div>
-
-        {/* ปุ่มรีเฟรชข้อมูล */}
-        <button
-          onClick={handleRefresh}
-          disabled={currentLoading}
-          className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition cursor-pointer disabled:opacity-50"
-          title="รีเฟรชข้อมูล"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${currentFetching ? 'animate-spin text-amber-400' : ''}`} />
-        </button>
-      </div>
+      ) : (
+        <div className="flex justify-end pb-1">
+          <button
+            onClick={handleRefresh}
+            disabled={currentLoading}
+            className="flex items-center space-x-1 px-2.5 py-1 text-xs text-slate-400 hover:text-amber-400 hover:bg-slate-800/80 rounded-lg transition cursor-pointer disabled:opacity-50 border border-slate-800"
+            title="รีเฟรชข้อมูล"
+          >
+            <RefreshCw className={`w-3 h-3 ${currentFetching ? 'animate-spin text-amber-400' : ''}`} />
+            <span>รีเฟรชข้อมูล</span>
+          </button>
+        </div>
+      )}
 
       {/* 2. ตารางข้อมูลตามแท็บที่เลือก */}
       <div className="bg-slate-950/80 rounded-xl border border-slate-800 overflow-hidden min-h-[220px]">
