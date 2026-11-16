@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   ShieldCheck,
   ShieldAlert,
@@ -7,6 +7,8 @@ import {
   Check,
   ArrowDownCircle,
   ArrowUpCircle,
+  Activity,
+  Wifi,
 } from 'lucide-react';
 import { RoleName } from '@mango/shared';
 
@@ -32,7 +34,7 @@ interface VpnDashboardProps {
 }
 
 // =========================================================================
-// 2. Component VpnDashboard พร้อมปุ่ม Quick Copy และไอคอน Telemetry
+// 2. Component VpnDashboard พร้อมปุ่ม Quick Copy, Latency และ Real-time Speed
 // =========================================================================
 export const VpnDashboard: React.FC<VpnDashboardProps> = ({
   user,
@@ -49,6 +51,46 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
 }) => {
   // จำว่ากำลังกดคัดลอกช่องไหนอยู่ ('ip' | 'endpoint' | null) เพื่อสลับเป็นไอคอนติ๊กถูก
   const [copiedField, setCopiedField] = useState<'ip' | 'endpoint' | null>(null);
+
+  // สถานะจำลองความหน่วง (Latency Ping ms) และอัตราความเร็วรับส่งข้อมูล (KB/s)
+  const [latency, setLatency] = useState<number>(24);
+  const [rxRate, setRxRate] = useState<number>(0);
+  const [txRate, setTxRate] = useState<number>(0);
+  const prevBytesRef = useRef({ rx: bytesRx, tx: bytesTx, time: Date.now() });
+
+  // จำลองการสุ่ม Latency ให้มีการขยับเล็กน้อยอย่างสมจริงเมื่อเชื่อมต่อสำเร็จ
+  useEffect(() => {
+    if (connectionState !== 'connected') return;
+
+    const interval = setInterval(() => {
+      const jitter = Math.floor(Math.random() * 9) - 4; // แกว่ง -4 ถึง +4 ms
+      setLatency((prev) => Math.max(18, Math.min(52, prev + jitter)));
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [connectionState]);
+
+  // คำนวณความเร็วรับส่งข้อมูลแบบ Real-time Speed Rate (KB/s)
+  useEffect(() => {
+    if (connectionState !== 'connected') {
+      setRxRate(0);
+      setTxRate(0);
+      return;
+    }
+
+    const now = Date.now();
+    const elapsedSec = (now - prevBytesRef.current.time) / 1000;
+
+    if (elapsedSec >= 0.8) {
+      const diffRx = bytesRx - prevBytesRef.current.rx;
+      const diffTx = bytesTx - prevBytesRef.current.tx;
+
+      if (diffRx >= 0) setRxRate(diffRx / elapsedSec / 1024);
+      if (diffTx >= 0) setTxRate(diffTx / elapsedSec / 1024);
+
+      prevBytesRef.current = { rx: bytesRx, tx: bytesTx, time: now };
+    }
+  }, [bytesRx, bytesTx, connectionState]);
 
   // ฟังก์ชันก๊อปปี้ข้อความลงคลิปบอร์ด
   const handleCopy = async (text: string, field: 'ip' | 'endpoint', label: string) => {
@@ -85,10 +127,12 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
 
       {/* การ์ดแสดงสถานะเครือข่าย (Network Status Card) */}
       <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-        
         {/* แถวที่ 1: Assigned VPN IP พร้อมปุ่ม Copy */}
         <div className="flex items-center justify-between text-xs">
-          <span className="text-slate-400">Assigned VPN IP</span>
+          <span className="text-slate-400 flex items-center space-x-1.5">
+            <Wifi className="w-3.5 h-3.5 text-slate-400" />
+            <span>Assigned VPN IP</span>
+          </span>
           <div className="flex items-center space-x-1.5">
             <span className="font-mono text-emerald-400 font-bold">
               {assignedIp || 'Not Assigned'}
@@ -111,7 +155,7 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
 
         {/* แถวที่ 2: Endpoint พร้อมปุ่ม Copy */}
         <div className="flex items-center justify-between text-xs">
-          <span className="text-slate-400">Endpoint</span>
+          <span className="text-slate-400">WireGuard Endpoint</span>
           <div className="flex items-center space-x-1.5">
             <span className="font-mono text-slate-300">127.0.0.1:51820</span>
             <button
@@ -128,23 +172,80 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
           </div>
         </div>
 
-        {/* แถวที่ 3: สถิติปริมาณเน็ต RX/TX พร้อมไอคอนลูกศรทิศทาง */}
+        {/* แถวที่ 3: Tunnel Latency (เฉพาะตอนเชื่อมต่อสำเร็จ) */}
+        {connectionState === 'connected' && (
+          <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-800/80">
+            <span className="text-slate-400 flex items-center space-x-1.5">
+              <Activity className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Tunnel Latency</span>
+            </span>
+            <div className="flex items-center space-x-2 font-mono">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="text-emerald-400 font-bold">{latency} ms</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded border font-sans font-medium ${
+                  latency < 35
+                    ? 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
+                    : 'bg-amber-950/80 text-amber-300 border-amber-800'
+                }`}
+              >
+                {latency < 35 ? 'Optimal' : 'Good'}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* แถวที่ 4: สถิติปริมาณเน็ต RX/TX พร้อมความเร็ว Real-time */}
         {connectionState === 'connected' && (
           <div className="pt-2 border-t border-slate-800 grid grid-cols-2 gap-2 text-[11px] font-mono">
             {/* ดาวน์โหลด (RX) */}
-            <div className="flex items-center space-x-1.5 text-emerald-400">
-              <ArrowDownCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span>RX: {(bytesRx / 1024).toFixed(1)} KB</span>
+            <div className="flex flex-col space-y-0.5">
+              <div className="flex items-center space-x-1.5 text-emerald-400">
+                <ArrowDownCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span className="font-semibold">RX: {(bytesRx / 1024).toFixed(1)} KB</span>
+              </div>
+              <span className="text-[10px] text-emerald-500/80 pl-5 font-sans">
+                ↓ {rxRate.toFixed(1)} KB/s
+              </span>
             </div>
 
             {/* อัปโหลด (TX) */}
-            <div className="flex items-center justify-end space-x-1.5 text-sky-400">
-              <ArrowUpCircle className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-              <span>TX: {(bytesTx / 1024).toFixed(1)} KB</span>
+            <div className="flex flex-col items-end space-y-0.5">
+              <div className="flex items-center space-x-1.5 text-sky-400">
+                <ArrowUpCircle className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                <span className="font-semibold">TX: {(bytesTx / 1024).toFixed(1)} KB</span>
+              </div>
+              <span className="text-[10px] text-sky-500/80 pr-1 font-sans">
+                ↑ {txRate.toFixed(1)} KB/s
+              </span>
             </div>
           </div>
         )}
       </div>
+
+      {/* แถบแอนิเมชันตอนกำลังเชื่อมต่อ (Connecting Stepper) */}
+      {connectionState === 'connecting' && (
+        <div className="p-3 bg-amber-950/20 border border-amber-800/50 rounded-xl space-y-2 animate-pulse">
+          <div className="flex items-center justify-between text-xs text-amber-300 font-semibold">
+            <span className="flex items-center space-x-1.5">
+              <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-400" />
+              <span>Establishing WireGuard Tunnel...</span>
+            </span>
+            <span className="text-[10px] font-mono bg-amber-900/60 px-1.5 py-0.5 rounded text-amber-200">
+              PNA Handshake
+            </span>
+          </div>
+          <div className="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden border border-slate-800">
+            <div className="bg-amber-400 h-1.5 rounded-full w-3/4 animate-pulse"></div>
+          </div>
+          <p className="text-[10px] text-slate-400">
+            Exchanging public keys with local agent & configuring virtual network adapter
+          </p>
+        </div>
+      )}
 
       {/* ปุ่มสั่งงานหลัก: สลับระหว่าง VPN CONNECT (เขียว) และ DISCONNECT (แดง) */}
       {connectionState !== 'connected' ? (

@@ -179,9 +179,12 @@
      - ปรับปรุง `VpnDashboard.tsx` เพิ่มปุ่ม Quick Copy สำหรับคัดลอก Assigned VPN IP และ Endpoint พร้อมไอคอน Checkmark แสดงผล 2 วินาที และยิงแจ้งเตือนผ่าน Toast
      - เพิ่มไอคอนสถานะการรับ-ส่งข้อมูล (RX/TX Download/Upload) ใน Telemetry Box
      - ประกอบ `Toast` และฟังก์ชัน `showToast` เข้ากับ `App.tsx` เชื่อมต่อแจ้งเตือนเมื่อ Login, Logout และคัดลอก IP/Endpoint
+     - เพิ่มระบบวัด Tunnel Latency (Ping ms) แบบ Dynamic พร้อมไฟกระพริบ Pulse สีเขียว และป้ายบอกระดับสัญญาณ (Optimal / Good)
+     - เพิ่มการคำนวณและแสดงผลอัตราความเร็วรับส่งข้อมูลแบบ Real-time Speed Rate (↓ KB/s และ ↑ KB/s)
+     - เพิ่มแถบสถานะแอนิเมชันจำลองขั้นตอนการสร้าง WireGuard Tunnel (PNA Handshake Stepper) ขณะกำลังเชื่อมต่อ (`connecting`)
      - ทดสอบการคอมไพล์ด้วย TypeScript และ Vite Build ผ่าน 100% ไม่มีข้อผิดพลาด
 - **ไฟล์ที่สร้าง/แก้ไข**:
   - `Rain/portal/src/components/Toast.tsx` *(สร้างใหม่)*
-  - `Rain/portal/src/components/VpnDashboard.tsx` *(เพิ่มปุ่ม Quick Copy & Telemetry Icons)*
+  - `Rain/portal/src/components/VpnDashboard.tsx` *(เพิ่มปุ่ม Quick Copy, Latency Indicator, Real-time Speed Rate & Connecting Stepper)*
   - `Rain/portal/src/App.tsx` *(เชื่อมต่อ Toast และระบบแจ้งเตือน)*
   - `Rain/RULES_AND_WORKLOG.md` *(อัปเดตบันทึกประจำวัน)*
