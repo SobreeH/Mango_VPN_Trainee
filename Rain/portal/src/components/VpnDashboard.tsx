@@ -300,7 +300,7 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
                 ? '10.13.13.100/32 : 80, 443'
                 : user.role === 'STAFF'
                 ? '10.0.0.0/8, 172.16.0.0/12'
-                : '0.0.0.0/0, ::/0 (Full Access)'}
+                : '0.0.0.0/0 (ทุกเครือข่าย)'}
             </div>
           </div>
 

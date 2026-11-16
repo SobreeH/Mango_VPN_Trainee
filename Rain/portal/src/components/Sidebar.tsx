@@ -6,10 +6,19 @@ import {
   Download,
   LogOut,
   Shield,
+  User,
+  AlignLeft,
 } from 'lucide-react';
 import { RoleName } from '@mango/shared';
 
-export type NavTab = 'connect' | 'history' | 'devices' | 'agent';
+export type NavTab =
+  | 'connect'
+  | 'history'
+  | 'devices'
+  | 'users'
+  | 'policies'
+  | 'audit_logs'
+  | 'agent';
 
 interface SidebarProps {
   user: {
@@ -28,16 +37,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onTabChange,
   onSignOut,
 }) => {
-  const isClient = user.role === 'CLIENT';
+  // กำหนดรายการเมนูตามบทบาท (Role-Based Sidebar Navigation) ตรงตามดีไซน์
+  let navItems: { id: NavTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [];
 
-  // รายการเมนูตามสิทธิ์การเข้าถึง (Role-Based Navigation)
-  // บทบาท CLIENT จะไม่มีสิทธิ์เข้าถึงเมนู "อุปกรณ์" ของทั้งบริษัท
-  const navItems = [
-    { id: 'connect' as NavTab, label: 'เชื่อมต่อ', icon: ShieldCheck },
-    { id: 'history' as NavTab, label: 'ประวัติ', icon: Clock },
-    ...(!isClient ? [{ id: 'devices' as NavTab, label: 'อุปกรณ์', icon: Monitor }] : []),
-    { id: 'agent' as NavTab, label: 'Agent', icon: Download },
-  ];
+  if (user.role === 'ADMIN') {
+    // ฝั่ง ADMIN: มีครบทั้ง 7 เมนู
+    navItems = [
+      { id: 'connect', label: 'เชื่อมต่อ', icon: ShieldCheck },
+      { id: 'history', label: 'ประวัติ', icon: Clock },
+      { id: 'devices', label: 'อุปกรณ์', icon: Monitor },
+      { id: 'users', label: 'ผู้ใช้', icon: User },
+      { id: 'policies', label: 'นโยบาย', icon: Shield },
+      { id: 'audit_logs', label: 'Audit Logs', icon: AlignLeft },
+      { id: 'agent', label: 'Agent', icon: Download },
+    ];
+  } else if (user.role === 'STAFF') {
+    // ฝั่ง STAFF: 4 เมนู
+    navItems = [
+      { id: 'connect', label: 'เชื่อมต่อ', icon: ShieldCheck },
+      { id: 'history', label: 'ประวัติ', icon: Clock },
+      { id: 'devices', label: 'อุปกรณ์', icon: Monitor },
+      { id: 'agent', label: 'Agent', icon: Download },
+    ];
+  } else {
+    // ฝั่ง CLIENT: 3 เมนู (ซ่อนอุปกรณ์, ผู้ใช้, นโยบาย, และ Audit Logs)
+    navItems = [
+      { id: 'connect', label: 'เชื่อมต่อ', icon: ShieldCheck },
+      { id: 'history', label: 'ประวัติ', icon: Clock },
+      { id: 'agent', label: 'Agent', icon: Download },
+    ];
+  }
 
   return (
     <aside className="w-56 bg-[#080d0a] border-r border-slate-800/80 flex flex-col justify-between p-4 shrink-0 select-none">

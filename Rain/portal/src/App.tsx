@@ -398,7 +398,168 @@ export default function App() {
             </div>
           )}
 
-          {/* 4. หน้า Agent (แสดงเฉพาะ Releases & Downloads) */}
+          {/* 4. หน้าจัดการผู้ใช้ (User Management - ADMIN ONLY) */}
+          {activeTab === 'users' && (
+            <div className="max-w-5xl mx-auto space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div>
+                  <h2 className="text-xl font-bold text-white tracking-wide">
+                    รายชื่อผู้ใช้ในระบบ (User Management)
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    บริหารจัดการบัญชีผู้ใช้ บทบาท และการยืนยันตัวตน 2FA
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab('connect')}
+                  className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
+                >
+                  ← กลับหน้าเชื่อมต่อ VPN
+                </button>
+              </div>
+
+              <div className="bg-slate-950/80 rounded-xl border border-slate-800 overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-900/60 text-slate-400 border-b border-slate-800 font-mono">
+                    <tr>
+                      <th className="py-2.5 px-3">Username</th>
+                      <th className="py-2.5 px-3">Role</th>
+                      <th className="py-2.5 px-3">Phone (MFA)</th>
+                      <th className="py-2.5 px-3">2FA Status</th>
+                      <th className="py-2.5 px-3 text-right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
+                    {Object.entries(DEMO_ACCOUNTS).map(([name, acc]) => (
+                      <tr key={name} className="hover:bg-slate-900/40">
+                        <td className="py-3 px-3 font-semibold text-white">{name}</td>
+                        <td className="py-3 px-3">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              acc.role === 'ADMIN'
+                                ? 'bg-amber-950 text-amber-400 border border-amber-800'
+                                : acc.role === 'STAFF'
+                                ? 'bg-sky-950 text-sky-400 border border-sky-800'
+                                : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                            }`}
+                          >
+                            {acc.role}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-slate-300">{acc.phone}</td>
+                        <td className="py-3 px-3 text-emerald-400 font-bold">Enforced (SMS)</td>
+                        <td className="py-3 px-3 text-right">
+                          <span className="text-emerald-400 font-bold">● Active</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* 5. หน้านโยบายความปลอดภัย (Zero-Trust Policies - ADMIN ONLY) */}
+          {activeTab === 'policies' && (
+            <div className="max-w-5xl mx-auto space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div>
+                  <h2 className="text-xl font-bold text-white tracking-wide">
+                    นโยบายความปลอดภัยเครือข่าย (Zero-Trust Access Policies)
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    กำหนดขอบเขตและกฎระเบียบการเข้าถึง Subnet สำหรับแต่ละบทบาท (Least-Privilege)
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab('connect')}
+                  className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
+                >
+                  ← กลับหน้าเชื่อมต่อ VPN
+                </button>
+              </div>
+
+              <div className="bg-slate-950/80 rounded-xl border border-slate-800 overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-900/60 text-slate-400 border-b border-slate-800 font-mono">
+                    <tr>
+                      <th className="py-2.5 px-3">Policy Name</th>
+                      <th className="py-2.5 px-3">Target Role</th>
+                      <th className="py-2.5 px-3">Allowed Subnets</th>
+                      <th className="py-2.5 px-3">Allowed Ports</th>
+                      <th className="py-2.5 px-3 text-right">Enforcement</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
+                    <tr className="hover:bg-slate-900/40">
+                      <td className="py-3 px-3 font-semibold text-white">Full-Enterprise-Access</td>
+                      <td className="py-3 px-3">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-400 border border-amber-800">
+                          ADMIN
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-emerald-400 font-bold">0.0.0.0/0 (ทุกเครือข่าย)</td>
+                      <td className="py-3 px-3 text-slate-300">All Ports (*)</td>
+                      <td className="py-3 px-3 text-right text-emerald-400 font-bold">Active</td>
+                    </tr>
+                    <tr className="hover:bg-slate-900/40">
+                      <td className="py-3 px-3 font-semibold text-white">Corp-Internal-Subnet</td>
+                      <td className="py-3 px-3">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-950 text-sky-400 border border-sky-800">
+                          STAFF
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-sky-400 font-bold">10.0.0.0/8, 172.16.0.0/12</td>
+                      <td className="py-3 px-3 text-slate-300">Internal Services</td>
+                      <td className="py-3 px-3 text-right text-emerald-400 font-bold">Active</td>
+                    </tr>
+                    <tr className="hover:bg-slate-900/40">
+                      <td className="py-3 px-3 font-semibold text-white">Zero-Trust-Web-Gateway</td>
+                      <td className="py-3 px-3">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">
+                          CLIENT
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-emerald-300 font-bold">10.13.13.100/32</td>
+                      <td className="py-3 px-3 text-amber-300 font-bold">80, 443 Only</td>
+                      <td className="py-3 px-3 text-right text-emerald-400 font-bold">Active</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* 6. หน้า Audit Logs (ADMIN ONLY) */}
+          {activeTab === 'audit_logs' && (
+            <div className="max-w-5xl mx-auto space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div>
+                  <h2 className="text-xl font-bold text-white tracking-wide">
+                    บันทึกกิจกรรมความปลอดภัย (Audit Logs)
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    ประวัติการตรวจสอบย้อนหลังด้านความมั่นคงปลอดภัยสารสนเทศ
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab('connect')}
+                  className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
+                >
+                  ← กลับหน้าเชื่อมต่อ VPN
+                </button>
+              </div>
+
+              <AdminPanel
+                accessToken={authData.accessToken}
+                apiBaseUrl={API_BASE_URL}
+                initialTab="logs"
+                allowedTabs={['logs']}
+              />
+            </div>
+          )}
+
+          {/* 7. หน้า Agent (แสดงเฉพาะ Releases & Downloads) */}
           {activeTab === 'agent' && (
             <div className="max-w-5xl mx-auto space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-slate-800">
