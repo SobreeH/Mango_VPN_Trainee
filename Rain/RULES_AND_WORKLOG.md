@@ -204,6 +204,10 @@
           - ใน `Sidebar.tsx`: เพิ่มเมนูสำหรับ Admin ครบทั้ง 7 เมนู (เชื่อมต่อ, ประวัติ, อุปกรณ์, ผู้ใช้, นโยบาย, Audit Logs, Agent)
           - ใน `VpnDashboard.tsx`: แสดง **เครือข่ายที่เข้าถึงได้** เป็น `0.0.0.0/0 (ทุกเครือข่าย)` แบบ Full Corporate Access
           - ใน `App.tsx`: เพิ่มหน้าจอระบบ **User Management** (จัดการบัญชีและ 2FA) และหน้า **Zero-Trust Access Policies** (กฎความปลอดภัยการเข้าถึง Subnet) รองรับการคลิกดูข้อมูลจาก Sidebar ได้จริง
+        - ยกระดับหน้าจอ Login & OTP Verification:
+          - ใน `LoginForm.tsx`: เพิ่มปุ่ม 1-Click Role Switcher (`👑 Admin`, `👔 Staff`, `👤 Client`) กรอกข้อมูลพร้อมรหัสผ่านให้อัตโนมัติในคลิกเดียว
+          - เพิ่มปุ่มเปิด/ปิดตาดูรหัสผ่าน (`Eye` / `EyeOff`) สลับระหว่าง text และ password
+          - ใน `OtpModal.tsx`: เพิ่มปุ่ม Auto-fill Demo OTP (`123456`) อำนวยความสะดวกในการทดสอบอย่างรวดเร็ว
       - ทดสอบการคอมไพล์ด้วย TypeScript และ Vite Build ผ่าน 100% ไม่มีข้อผิดพลาด
 - **ไฟล์ที่สร้าง/แก้ไข**:
   - `Rain/portal/src/components/Sidebar.tsx` *(รองรับเมนูตามบทบาท RBAC ครบทั้ง 3 บทบาท)*
@@ -211,4 +215,6 @@
   - `Rain/portal/src/components/VpnDashboard.tsx` *(แสดงเครือข่าย 0.0.0.0/0 (ทุกเครือข่าย) สำหรับ ADMIN)*
   - `Rain/portal/src/components/AdminPanel.tsx` *(รองรับ initialTab และ allowedTabs แยกหน้าเป็นอิสระ)*
   - `Rain/portal/src/App.tsx` *(เชื่อมต่อ User Management, Policies และแยกหน้าจอตามแท็บ Sidebar ครบวงจร)*
+  - `Rain/portal/src/components/LoginForm.tsx` *(เพิ่มปุ่ม 1-Click Role Fill และปุ่มเปิด/ปิดตาดูรหัสผ่าน)*
+  - `Rain/portal/src/components/OtpModal.tsx` *(เพิ่มปุ่ม Auto-fill Demo OTP)*
   - `Rain/RULES_AND_WORKLOG.md` *(อัปเดตบันทึกประจำวัน)*

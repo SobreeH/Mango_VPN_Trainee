@@ -92,9 +92,19 @@ export const OtpModal: React.FC<OtpModalProps> = ({
             <span>{error}</span>
           </p>
         ) : (
-          <p className="text-[11px] text-slate-500 text-center mt-2">
-            (In dev mode, check backend API terminal logs for generated OTP)
-          </p>
+          <div className="flex justify-center mt-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                setOtpCode('123456');
+                setError(null);
+              }}
+              className="text-[11px] text-amber-400 hover:text-amber-300 bg-amber-950/40 hover:bg-amber-950/70 px-2.5 py-1 rounded border border-amber-800/60 font-mono transition cursor-pointer flex items-center space-x-1"
+            >
+              <span>⚡ Auto-fill Demo OTP:</span>
+              <strong className="underline">123456</strong>
+            </button>
+          </div>
         )}
       </div>
 
