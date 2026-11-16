@@ -296,7 +296,11 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
               เครือข่ายที่เข้าถึงได้
             </div>
             <div className="font-mono text-slate-300 text-xs tracking-wide">
-              10.0.0.0/8, 172.16.0.0/12
+              {user.role === 'CLIENT'
+                ? '10.13.13.100/32 : 80, 443'
+                : user.role === 'STAFF'
+                ? '10.0.0.0/8, 172.16.0.0/12'
+                : '0.0.0.0/0, ::/0 (Full Access)'}
             </div>
           </div>
 

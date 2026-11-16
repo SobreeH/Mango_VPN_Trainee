@@ -196,11 +196,15 @@
        - แก้ไขปัญหา Toast Notification ค้างไม่ยอมปิดตัวเองอัตโนมัติ:
          - เกิดจาก `useEffect` ใน `Toast.tsx` มี dependency ผูกกับ `onClose` ที่ถูกสร้างใหม่ทุกครั้งที่มีการ Re-render (จากลูปเช็คสถานะ Polling ทุก 1-3 วินาที) ทำให้ `clearTimeout` ถูกเรียกยกเลิกเวลาซ้ำๆ
          - แก้ไขด้วยการใช้ `useRef` เก็บฟังก์ชัน callback และใช้ `useCallback` ใน `App.tsx` ทำให้ Toast นับเวลาถอยหลัง 3.5 วินาทีและปิดตัวเองได้ 100%
+        - ปรับแต่งหน้าแดชบอร์ดฝั่ง Client (`client_user`) ให้ตรงตามหลัก Zero-Trust และรูปภาพดีไซน์อ้างอิง:
+          - ใน `Sidebar.tsx`: ซ่อนเมนู **"อุปกรณ์"** สำหรับผู้ใช้บทบาท `CLIENT` เพื่อจำกัดสิทธิ์ (เหลือ 3 เมนู: เชื่อมต่อ, ประวัติ, Agent)
+          - ใน `VpnDashboard.tsx`: แสดง **เครือข่ายที่เข้าถึงได้** แบบ Least-Privilege เฉพาะพอร์ต 80, 443 (`10.13.13.100/32 : 80, 443`) สำหรับ CLIENT
+          - ใน `App.tsx`: หน้าประวัติของ CLIENT แสดงเฉพาะตาราง Sessions ของตัวเอง ซ่อน Audit Logs ตามสิทธิ์
      - ทดสอบการคอมไพล์ด้วย TypeScript และ Vite Build ผ่าน 100% ไม่มีข้อผิดพลาด
 - **ไฟล์ที่สร้าง/แก้ไข**:
-  - `Rain/portal/src/components/Sidebar.tsx` *(สร้างใหม่)*
+  - `Rain/portal/src/components/Sidebar.tsx` *(ซ่อนเมนูอุปกรณ์สำหรับ CLIENT)*
   - `Rain/portal/src/components/Toast.tsx` *(แก้บั๊ก Auto-dismiss ด้วย useRef)*
-  - `Rain/portal/src/components/VpnDashboard.tsx` *(ยกเครื่องหน้าจอใหม่ตามแบบ Enterprise Design)*
+  - `Rain/portal/src/components/VpnDashboard.tsx` *(แสดงเครือข่ายที่เข้าถึงได้แบบไดนามิกตาม Role)*
   - `Rain/portal/src/components/AdminPanel.tsx` *(รองรับ initialTab และ allowedTabs แยกหน้าเป็นอิสระ)*
   - `Rain/portal/src/App.tsx` *(เชื่อมต่อ Sidebar, Full Dashboard Layout, แยกหน้าจอตามแท็บ และเสถียรภาพ Toast)*
   - `Rain/RULES_AND_WORKLOG.md` *(อัปเดตบันทึกประจำวัน)*

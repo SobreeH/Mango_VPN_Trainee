@@ -28,10 +28,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onTabChange,
   onSignOut,
 }) => {
+  const isClient = user.role === 'CLIENT';
+
+  // รายการเมนูตามสิทธิ์การเข้าถึง (Role-Based Navigation)
+  // บทบาท CLIENT จะไม่มีสิทธิ์เข้าถึงเมนู "อุปกรณ์" ของทั้งบริษัท
   const navItems = [
     { id: 'connect' as NavTab, label: 'เชื่อมต่อ', icon: ShieldCheck },
     { id: 'history' as NavTab, label: 'ประวัติ', icon: Clock },
-    { id: 'devices' as NavTab, label: 'อุปกรณ์', icon: Monitor },
+    ...(!isClient ? [{ id: 'devices' as NavTab, label: 'อุปกรณ์', icon: Monitor }] : []),
     { id: 'agent' as NavTab, label: 'Agent', icon: Download },
   ];
 

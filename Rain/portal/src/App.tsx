@@ -336,16 +336,20 @@ export default function App() {
             />
           )}
 
-          {/* 2. หน้าประวัติ (แสดงเฉพาะ Sessions & Audit Logs) */}
+          {/* 2. หน้าประวัติ (CLIENT ดูเฉพาะ Sessions ของตัวเอง, STAFF/ADMIN ดูได้ทั้ง Sessions & Logs) */}
           {activeTab === 'history' && (
             <div className="max-w-5xl mx-auto space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                 <div>
                   <h2 className="text-xl font-bold text-white tracking-wide">
-                    ประวัติการใช้งานระบบ (Sessions & Audit Logs)
+                    {authData.user.role === 'CLIENT'
+                      ? 'ประวัติการเชื่อมต่อ VPN (VPN Sessions)'
+                      : 'ประวัติการใช้งานระบบ (Sessions & Audit Logs)'}
                   </h2>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    ตรวจสอบประวัติการเชื่อมต่อ VPN และบันทึกกิจกรรมความปลอดภัย
+                    {authData.user.role === 'CLIENT'
+                      ? 'ตรวจสอบประวัติวันเวลาและปริมาณการเชื่อมต่อ WireGuard ของคุณ'
+                      : 'ตรวจสอบประวัติการเชื่อมต่อ VPN และบันทึกกิจกรรมความปลอดภัย'}
                   </p>
                 </div>
                 <button
@@ -360,7 +364,7 @@ export default function App() {
                 accessToken={authData.accessToken}
                 apiBaseUrl={API_BASE_URL}
                 initialTab="sessions"
-                allowedTabs={['sessions', 'logs']}
+                allowedTabs={authData.user.role === 'CLIENT' ? ['sessions'] : ['sessions', 'logs']}
               />
             </div>
           )}
