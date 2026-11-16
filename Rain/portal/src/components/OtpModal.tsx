@@ -230,7 +230,7 @@ export const OtpModal: React.FC<OtpModalProps> = ({
             {loading ? (
               <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
             ) : (
-              <span>ยืนยัน (กรอกให้ครบ 6 หลัก)</span>
+              <span>ยืนยัน</span>
             )}
           </button>
         </div>
