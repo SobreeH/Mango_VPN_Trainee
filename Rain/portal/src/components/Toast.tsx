@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 
 export type ToastType = 'success' | 'error' | 'info';
@@ -22,15 +22,21 @@ export const Toast: React.FC<ToastProps> = ({
   durationMs = 3500,
   onClose,
 }) => {
-  // นับเวลาถอยหลังเพื่อสั่งปิด Toast อัตโนมัติ
+  // เก็บฟังก์ชัน onClose ล่าสุดไว้ใน Ref เพื่อป้องกันไม่ให้ Timer ถูก Reset ซ้ำซากเมื่อ Parent Re-render
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  // นับเวลาถอยหลังเพื่อสั่งปิด Toast อัตโนมัติ (จะเริ่มนับใหม่เฉพาะเมื่อ message หรือ durationMs เปลี่ยน)
   useEffect(() => {
     const timer = setTimeout(() => {
-      onClose();
+      onCloseRef.current();
     }, durationMs);
 
-    // เคลียร์ Timer ทิ้งเมื่อ Component ถูกปิด ป้องกัน Memory Leak
+    // เคลียร์ Timer ทิ้งเมื่อ Component ถูก Unmount หรือมีข้อความใหม่เข้ามา
     return () => clearTimeout(timer);
-  }, [durationMs, onClose]);
+  }, [durationMs, message]);
 
   // กำหนดสีและไอคอนตาม type
   const config = {

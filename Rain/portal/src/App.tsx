@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   LoginResponse,
   AuthTokenResponse,
@@ -57,9 +57,14 @@ export default function App() {
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
   // ฟังก์ชันยิง Toast แจ้งเตือนมุมขวาบน
-  const showToast = (message: string, type: ToastType = 'info') => {
+  const showToast = useCallback((message: string, type: ToastType = 'info') => {
     setToast({ message, type });
-  };
+  }, []);
+
+  // ฟังก์ชันปิด Toast (ใช้ useCallback คงที่เพื่อไม่ให้ Timer รีเซ็ต)
+  const handleCloseToast = useCallback(() => {
+    setToast(null);
+  }, []);
 
   // ตรวจสอบความพร้อมของ Backend API (ทุก 5 วินาที)
   useEffect(() => {
@@ -300,7 +305,7 @@ export default function App() {
           <Toast
             message={toast.message}
             type={toast.type}
-            onClose={() => setToast(null)}
+            onClose={handleCloseToast}
           />
         )}
 
@@ -432,7 +437,7 @@ export default function App() {
         <Toast
           message={toast.message}
           type={toast.type}
-          onClose={() => setToast(null)}
+          onClose={handleCloseToast}
         />
       )}
 
