@@ -6,6 +6,7 @@ import { z } from 'zod';
 export const loginSchema = z.object({
   username: z
     .string()
+    .trim()
     .min(1, 'กรุณากรอก Username')
     .max(50, 'Username ต้องไม่เกิน 50 ตัวอักษร')
     .regex(/^[a-zA-Z0-9_.-]+$/, 'Username ต้องประกอบด้วยตัวอักษร, ตัวเลข, _ หรือ - เท่านั้น'),

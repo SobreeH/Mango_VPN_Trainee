@@ -132,11 +132,12 @@ export default function App() {
     setInfoMessage(null);
 
     try {
+      const cleanUsername = username.trim();
       // 1. ลองพยายามติดต่อ Backend API จริงก่อน
       const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username: cleanUsername, password }),
       });
 
       const json = await res.json();
@@ -148,7 +149,8 @@ export default function App() {
       throw new Error(json.error?.message || 'Invalid credentials');
     } catch {
       // 2. Dev Mock Fallback: ถ้า API หลังบ้านออฟไลน์ ตรวจสอบกับบัญชี Demo ทันที!
-      const demoAccount = DEMO_ACCOUNTS[username];
+      const cleanUsername = username.trim();
+      const demoAccount = DEMO_ACCOUNTS[cleanUsername];
       if (demoAccount && password === 'MangoVPN2026!') {
         setMfaChallenge({
           requiresOtp: true,
@@ -176,7 +178,8 @@ export default function App() {
     try {
       // ถ้าเป็นโหมด Dev Mock
       if (mfaChallenge.challengeId === 'mock-challenge-dev') {
-        const demoAccount = DEMO_ACCOUNTS[username] || { role: 'ADMIN', phone: '+15551234567' };
+        const cleanUsername = username.trim();
+        const demoAccount = DEMO_ACCOUNTS[cleanUsername] || { role: 'ADMIN', phone: '+15551234567' };
         setAuthData({
           accessToken: 'mock-jwt-access-token-mango-2026',
           refreshToken: 'mock-jwt-refresh-token-mango-2026',
@@ -184,13 +187,13 @@ export default function App() {
           expiresIn: 3600,
           user: {
             id: 'mock-dev-uuid-001',
-            username,
+            username: cleanUsername,
             phoneNumber: demoAccount.phone,
             role: demoAccount.role,
           },
         });
         setMfaChallenge(null);
-        setInfoMessage(`เข้าสู่ระบบสำเร็จในฐานะ ${username} (${demoAccount.role})`);
+        setInfoMessage(`เข้าสู่ระบบสำเร็จในฐานะ ${cleanUsername} (${demoAccount.role})`);
         return;
       }
 

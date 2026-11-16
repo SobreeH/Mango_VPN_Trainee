@@ -32,8 +32,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 1. ใช้ Zod ตรวจสอบข้อมูลในฟอร์ม
-    const validationResult = loginSchema.safeParse({ username, password });
+    // 1. ใช้ Zod ตรวจสอบข้อมูลในฟอร์ม (ตัดช่องว่างหน้าหลังออกด้วย trim())
+    const trimmedUsername = username.trim();
+    const validationResult = loginSchema.safeParse({ username: trimmedUsername, password });
 
     // 2. ถ้าไม่ผ่านเกณฑ์
     if (!validationResult.success) {
