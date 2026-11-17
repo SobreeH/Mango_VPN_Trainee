@@ -39,6 +39,7 @@ interface AdminPanelProps {
   apiBaseUrl: string;
   initialTab?: AdminTab;
   allowedTabs?: AdminTab[];
+  userRole?: string;
   onShowToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
 
@@ -190,6 +191,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   apiBaseUrl,
   initialTab = 'devices',
   allowedTabs,
+  userRole,
   onShowToast,
 }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
@@ -567,52 +569,54 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* 0. แดชบอร์ดสรุปภาพรวม (Quick Stats 4 Cards) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 flex items-center space-x-3 hover:border-emerald-500/30 transition">
-          <div className="p-2 rounded-lg bg-emerald-950/70 border border-emerald-800/60 text-emerald-400">
-            <Users className="w-4 h-4" />
+      {/* 0. แดชบอร์ดสรุปภาพรวม (Quick Stats 4 Cards - แสดงเฉพาะ ADMIN และ STAFF ตามหลัก Zero-Trust) */}
+      {userRole !== 'CLIENT' && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 flex items-center space-x-3 hover:border-emerald-500/30 transition">
+            <div className="p-2 rounded-lg bg-emerald-950/70 border border-emerald-800/60 text-emerald-400">
+              <Users className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-[10px] uppercase font-mono text-slate-400 font-bold">ผู้ใช้ทั้งหมด</div>
+              <div className="text-base font-bold font-mono text-white">{totalUsersCount} <span className="text-[10px] text-emerald-400 font-normal">บัญชี</span></div>
+            </div>
           </div>
-          <div>
-            <div className="text-[10px] uppercase font-mono text-slate-400 font-bold">ผู้ใช้ทั้งหมด</div>
-            <div className="text-base font-bold font-mono text-white">{totalUsersCount} <span className="text-[10px] text-emerald-400 font-normal">บัญชี</span></div>
-          </div>
-        </div>
 
-        <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 flex items-center space-x-3 hover:border-amber-500/30 transition">
-          <div className="p-2 rounded-lg bg-amber-950/70 border border-amber-800/60 text-amber-400">
-            <Laptop className="w-4 h-4" />
+          <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 flex items-center space-x-3 hover:border-amber-500/30 transition">
+            <div className="p-2 rounded-lg bg-amber-950/70 border border-amber-800/60 text-amber-400">
+              <Laptop className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-[10px] uppercase font-mono text-slate-400 font-bold">อุปกรณ์ที่ลงทะเบียน</div>
+              <div className="text-base font-bold font-mono text-white">{totalDevicesCount} <span className="text-[10px] text-amber-400 font-normal">เครื่อง</span></div>
+            </div>
           </div>
-          <div>
-            <div className="text-[10px] uppercase font-mono text-slate-400 font-bold">อุปกรณ์ที่ลงทะเบียน</div>
-            <div className="text-base font-bold font-mono text-white">{totalDevicesCount} <span className="text-[10px] text-amber-400 font-normal">เครื่อง</span></div>
-          </div>
-        </div>
 
-        <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 flex items-center space-x-3 hover:border-sky-500/30 transition">
-          <div className="p-2 rounded-lg bg-sky-950/70 border border-sky-800/60 text-sky-400">
-            <ShieldCheck className="w-4 h-4" />
+          <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 flex items-center space-x-3 hover:border-sky-500/30 transition">
+            <div className="p-2 rounded-lg bg-sky-950/70 border border-sky-800/60 text-sky-400">
+              <ShieldCheck className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-[10px] uppercase font-mono text-slate-400 font-bold">กฎ Zero-Trust</div>
+              <div className="text-base font-bold font-mono text-white">{totalPoliciesCount} <span className="text-[10px] text-sky-400 font-normal">นโยบาย</span></div>
+            </div>
           </div>
-          <div>
-            <div className="text-[10px] uppercase font-mono text-slate-400 font-bold">กฎ Zero-Trust</div>
-            <div className="text-base font-bold font-mono text-white">{totalPoliciesCount} <span className="text-[10px] text-sky-400 font-normal">นโยบาย</span></div>
-          </div>
-        </div>
 
-        <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 flex items-center space-x-3 hover:border-emerald-500/30 transition">
-          <div className="p-2 rounded-lg bg-emerald-950/70 border border-emerald-800/60 text-emerald-400 relative">
-            <Activity className="w-4 h-4" />
-            <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase font-mono text-slate-400 font-bold">เซสชันออนไลน์</div>
-            <div className="text-base font-bold font-mono text-white">{activeSessionsCount} <span className="text-[10px] text-emerald-400 font-normal">Active</span></div>
+          <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 flex items-center space-x-3 hover:border-emerald-500/30 transition">
+            <div className="p-2 rounded-lg bg-emerald-950/70 border border-emerald-800/60 text-emerald-400 relative">
+              <Activity className="w-4 h-4" />
+              <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase font-mono text-slate-400 font-bold">เซสชันออนไลน์</div>
+              <div className="text-base font-bold font-mono text-white">{activeSessionsCount} <span className="text-[10px] text-emerald-400 font-normal">Active</span></div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* 1. แถบปุ่มสลับแท็บ และช่องค้นหา (Search Filter & Tab Controls) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-2.5">
