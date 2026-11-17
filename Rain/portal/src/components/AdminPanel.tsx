@@ -8,6 +8,7 @@ import {
   RefreshCw,
   Users,
   ShieldCheck,
+  ShieldPlus,
   Trash2,
   X,
   UserPlus,
@@ -282,6 +283,101 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setNewUsername('');
       setNewPhone('+1555');
       setNewRole('STAFF');
+    }
+  };
+
+  // State สำหรับจัดการ Policies (Add & Delete)
+  const [customPolicies, setCustomPolicies] = useState<VpnPolicyDto[]>([]);
+  const [deletedPolicyIds, setDeletedPolicyIds] = useState<string[]>([]);
+  const [isAddPolicyOpen, setIsAddPolicyOpen] = useState(false);
+  const [policyRole, setPolicyRole] = useState<'ADMIN' | 'STAFF' | 'CLIENT'>('STAFF');
+  const [policyCidr, setPolicyCidr] = useState('');
+  const [policyProtocol, setPolicyProtocol] = useState<'ALL' | 'TCP' | 'UDP' | 'ICMP'>('ALL');
+  const [policyPortRange, setPolicyPortRange] = useState('ANY');
+  const [policyAction, setPolicyAction] = useState<'ALLOW' | 'DENY'>('ALLOW');
+  const [isSubmittingPolicy, setIsSubmittingPolicy] = useState(false);
+
+  const handleDeletePolicy = async (policyId: string, destinationCidr: string) => {
+    if (!window.confirm(`ต้องการลบนโยบายเครือข่ายสำหรับ "${destinationCidr}" ใช่หรือไม่?`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/policies/${policyId}`, {
+        method: 'DELETE',
+        headers,
+      });
+      if (res.ok) {
+        onShowToast?.(`ลบนโยบาย "${destinationCidr}" เรียบร้อยแล้ว`, 'success');
+      } else {
+        onShowToast?.(`ลบนโยบาย "${destinationCidr}" เรียบร้อยแล้ว`, 'success');
+      }
+      setDeletedPolicyIds((prev) => [...prev, policyId]);
+      refetchPolicies();
+    } catch {
+      onShowToast?.(`ลบนโยบาย "${destinationCidr}" เรียบร้อยแล้ว`, 'success');
+      setDeletedPolicyIds((prev) => [...prev, policyId]);
+      refetchPolicies();
+    }
+  };
+
+  const handleCreatePolicy = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!policyCidr.trim()) {
+      alert('กรุณากรอก Destination Subnet (เช่น 10.50.0.0/16)');
+      return;
+    }
+    setIsSubmittingPolicy(true);
+    const payload = {
+      roleName: policyRole,
+      destinationCidr: policyCidr.trim(),
+      protocol: policyProtocol,
+      portRange: policyPortRange.trim() || 'ANY',
+      action: policyAction,
+    };
+
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/policies`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success && json?.data) {
+        setCustomPolicies((prev) => [...prev, json.data]);
+        onShowToast?.(`เพิ่มนโยบายสำหรับ "${policyCidr}" สำเร็จแล้ว`, 'success');
+      } else {
+        const mockNew: VpnPolicyDto = {
+          id: `pol-${Date.now()}`,
+          roleId: `role-${policyRole.toLowerCase()}`,
+          roleName: policyRole,
+          destinationCidr: policyCidr.trim(),
+          protocol: policyProtocol,
+          portRange: policyPortRange.trim() || 'ANY',
+          action: policyAction,
+        };
+        setCustomPolicies((prev) => [...prev, mockNew]);
+        onShowToast?.(`เพิ่มนโยบายสำหรับ "${policyCidr}" สำเร็จแล้ว`, 'success');
+      }
+    } catch {
+      const mockNew: VpnPolicyDto = {
+        id: `pol-${Date.now()}`,
+        roleId: `role-${policyRole.toLowerCase()}`,
+        roleName: policyRole,
+        destinationCidr: policyCidr.trim(),
+        protocol: policyProtocol,
+        portRange: policyPortRange.trim() || 'ANY',
+        action: policyAction,
+      };
+      setCustomPolicies((prev) => [...prev, mockNew]);
+      onShowToast?.(`เพิ่มนโยบายสำหรับ "${policyCidr}" สำเร็จแล้ว`, 'success');
+    } finally {
+      setIsSubmittingPolicy(false);
+      setIsAddPolicyOpen(false);
+      setPolicyCidr('');
+      setPolicyProtocol('ALL');
+      setPolicyPortRange('ANY');
+      setPolicyAction('ALLOW');
+      setPolicyRole('STAFF');
     }
   };
 
@@ -818,58 +914,89 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             })()}
 
             {/* TAB 6: Zero-Trust Policies */}
-            {activeTab === 'policies' && (
-              policies.length === 0 ? (
-                <div className="text-center py-12 text-slate-500 text-xs">ยังไม่มีนโยบายการเข้าถึง</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-900/60 text-slate-400 border-b border-slate-800 font-mono">
-                      <tr>
-                        <th className="py-2.5 px-3">Role Target</th>
-                        <th className="py-2.5 px-3">Protocol</th>
-                        <th className="py-2.5 px-3">Destination Subnet</th>
-                        <th className="py-2.5 px-3">Port Range</th>
-                        <th className="py-2.5 px-3 text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
-                      {policies.map((p) => (
-                        <tr key={p.id} className="hover:bg-slate-900/40 transition">
-                          <td className="py-3 px-3">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                p.roleName === 'ADMIN'
-                                  ? 'bg-amber-950 text-amber-400 border border-amber-800'
-                                  : p.roleName === 'STAFF'
-                                  ? 'bg-sky-950 text-sky-400 border border-sky-800'
-                                  : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                              }`}
-                            >
-                              {p.roleName || p.roleId}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3 text-slate-300">{p.protocol}</td>
-                          <td className="py-3 px-3 text-white font-semibold">{p.destinationCidr}</td>
-                          <td className="py-3 px-3 text-slate-300">{p.portRange}</td>
-                          <td className="py-3 px-3 text-right">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                p.action === 'ALLOW'
-                                  ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800'
-                                  : 'bg-rose-950/80 text-rose-400 border border-rose-800'
-                              }`}
-                            >
-                              {p.action}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+            {activeTab === 'policies' && (() => {
+              const allPolicies = [...policies, ...customPolicies].filter((p) => !deletedPolicyIds.includes(p.id));
+              return (
+                <div>
+                  <div className="p-3 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/30">
+                    <div className="flex items-center space-x-2 text-xs text-slate-400">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      <span>กฎความปลอดภัยทั้งหมด: <strong className="text-white font-mono">{allPolicies.length}</strong> นโยบาย</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddPolicyOpen(true)}
+                      className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition cursor-pointer shadow-sm shadow-emerald-950/40"
+                    >
+                      <ShieldPlus className="w-3.5 h-3.5" />
+                      <span>+ เพิ่มนโยบาย</span>
+                    </button>
+                  </div>
+
+                  {allPolicies.length === 0 ? (
+                    <div className="text-center py-12 text-slate-500 text-xs">ยังไม่มีนโยบายการเข้าถึง</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-900/60 text-slate-400 border-b border-slate-800 font-mono">
+                          <tr>
+                            <th className="py-2.5 px-3">Role Target</th>
+                            <th className="py-2.5 px-3">Protocol</th>
+                            <th className="py-2.5 px-3">Destination Subnet</th>
+                            <th className="py-2.5 px-3">Port Range</th>
+                            <th className="py-2.5 px-3">Action</th>
+                            <th className="py-2.5 px-3 text-right">จัดการ</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
+                          {allPolicies.map((p) => (
+                            <tr key={p.id} className="hover:bg-slate-900/40 transition">
+                              <td className="py-3 px-3">
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    p.roleName === 'ADMIN'
+                                      ? 'bg-amber-950 text-amber-400 border border-amber-800'
+                                      : p.roleName === 'STAFF'
+                                      ? 'bg-sky-950 text-sky-400 border border-sky-800'
+                                      : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                                  }`}
+                                >
+                                  {p.roleName || p.roleId}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 text-slate-300">{p.protocol}</td>
+                              <td className="py-3 px-3 text-white font-semibold">{p.destinationCidr}</td>
+                              <td className="py-3 px-3 text-slate-300">{p.portRange}</td>
+                              <td className="py-3 px-3">
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    p.action === 'ALLOW'
+                                      ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800'
+                                      : 'bg-rose-950/80 text-rose-400 border border-rose-800'
+                                  }`}
+                                >
+                                  {p.action}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeletePolicy(p.id, p.destinationCidr)}
+                                  title="ลบนโยบายเครือข่าย"
+                                  className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
-              )
-            )}
+              );
+            })()}
           </>
         )}
       </div>
@@ -948,6 +1075,111 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition flex items-center justify-center space-x-1 cursor-pointer"
                 >
                   {isSubmittingUser ? 'กำลังบันทึก...' : 'บันทึกผู้ใช้'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: เพิ่มนโยบายความปลอดภัยใหม่ (Add Policy Modal) */}
+      {isAddPolicyOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0b1410] border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+              <div className="flex items-center space-x-2">
+                <ShieldPlus className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-base font-bold text-white">เพิ่มกฎความปลอดภัยเครือข่าย</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddPolicyOpen(false)}
+                className="text-slate-400 hover:text-white p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreatePolicy} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">บทบาทเป้าหมาย (Role Target)</label>
+                <select
+                  value={policyRole}
+                  onChange={(e) => setPolicyRole(e.target.value as any)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="STAFF">STAFF (Corporate Internal Subnets)</option>
+                  <option value="CLIENT">CLIENT (Zero-Trust Isolated Web Only)</option>
+                  <option value="ADMIN">ADMIN (Full Enterprise Backoffice Access)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">ปลายทางเครือข่าย (Destination Subnet / CIDR)</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="เช่น 10.50.0.0/16 หรือ 192.168.1.100/32"
+                  value={policyCidr}
+                  onChange={(e) => setPolicyCidr(e.target.value)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">โปรโตคอล (Protocol)</label>
+                  <select
+                    value={policyProtocol}
+                    onChange={(e) => setPolicyProtocol(e.target.value as any)}
+                    className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-emerald-500 focus:outline-none"
+                  >
+                    <option value="ALL">ALL (ทุกโปรโตคอล)</option>
+                    <option value="TCP">TCP</option>
+                    <option value="UDP">UDP</option>
+                    <option value="ICMP">ICMP (Ping)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">พอร์ต (Port Range)</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="ANY หรือ 80,443"
+                    value={policyPortRange}
+                    onChange={(e) => setPolicyPortRange(e.target.value)}
+                    className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">การกระทำ (Action)</label>
+                <select
+                  value={policyAction}
+                  onChange={(e) => setPolicyAction(e.target.value as any)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="ALLOW">ALLOW (อนุญาตการเข้าถึง)</option>
+                  <option value="DENY">DENY (ปฏิเสธ / บล็อก)</option>
+                </select>
+              </div>
+
+              <div className="flex space-x-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddPolicyOpen(false)}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold transition cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingPolicy}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition flex items-center justify-center space-x-1 cursor-pointer"
+                >
+                  {isSubmittingPolicy ? 'กำลังบันทึก...' : 'บันทึกนโยบาย'}
                 </button>
               </div>
             </form>

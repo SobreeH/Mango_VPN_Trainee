@@ -11,6 +11,14 @@ export interface CreateUserDto {
   roleName: 'ADMIN' | 'STAFF' | 'CLIENT';
 }
 
+export interface CreatePolicyDto {
+  roleName: 'ADMIN' | 'STAFF' | 'CLIENT';
+  destinationCidr: string;
+  protocol: 'ALL' | 'TCP' | 'UDP' | 'ICMP';
+  portRange: string;
+  action: 'ALLOW' | 'DENY';
+}
+
 export interface UserDto {
   id: string;
   username: string;
@@ -158,6 +166,43 @@ export class AdminService {
       throw new Error('Device not found');
     }
     await prisma.device.delete({ where: { id: deviceId } });
+    return true;
+  }
+
+  async createPolicy(data: CreatePolicyDto): Promise<VpnPolicyDto> {
+    const role = await prisma.role.findUnique({ where: { name: data.roleName } });
+    if (!role) {
+      throw new Error(`Role ${data.roleName} not found`);
+    }
+
+    const policy = await prisma.vpnPolicy.create({
+      data: {
+        roleId: role.id,
+        destinationCidr: data.destinationCidr,
+        protocol: data.protocol,
+        portRange: data.portRange,
+        action: data.action,
+      },
+      include: { role: true },
+    });
+
+    return {
+      id: policy.id,
+      roleId: policy.roleId,
+      roleName: policy.role?.name,
+      destinationCidr: policy.destinationCidr,
+      protocol: policy.protocol as any,
+      portRange: policy.portRange,
+      action: policy.action as any,
+    };
+  }
+
+  async deletePolicy(policyId: string): Promise<boolean> {
+    const existing = await prisma.vpnPolicy.findUnique({ where: { id: policyId } });
+    if (!existing) {
+      throw new Error('Policy not found');
+    }
+    await prisma.vpnPolicy.delete({ where: { id: policyId } });
     return true;
   }
 }
