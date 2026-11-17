@@ -12,6 +12,8 @@ import {
   Trash2,
   X,
   UserPlus,
+  Search,
+  Activity,
 } from 'lucide-react';
 import {
   DeviceDto,
@@ -393,6 +395,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     Authorization: `Bearer ${accessToken}`,
   };
 
+  const [searchTerm, setSearchTerm] = useState('');
+
   // 1. Query Devices
   const {
     data: devices = [],
@@ -411,7 +415,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }
       return MOCK_DEVICES;
     },
-    enabled: activeTab === 'devices',
   });
 
   // 2. Query Sessions
@@ -432,7 +435,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }
       return MOCK_SESSIONS;
     },
-    enabled: activeTab === 'sessions',
   });
 
   // 3. Query Audit Logs
@@ -453,7 +455,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }
       return MOCK_LOGS;
     },
-    enabled: activeTab === 'logs',
   });
 
   // 4. Query Agent Releases
@@ -474,7 +475,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }
       return MOCK_VERSIONS;
     },
-    enabled: activeTab === 'versions',
   });
 
   // 5. Query Users (ADMIN ONLY)
@@ -495,7 +495,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }
       return MOCK_USERS;
     },
-    enabled: activeTab === 'users',
   });
 
   // 6. Query Policies (ADMIN ONLY)
@@ -516,8 +515,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }
       return MOCK_POLICIES;
     },
-    enabled: activeTab === 'policies',
   });
+
+  // คำนวณสถิติภาพรวมสำหรับ Quick Stats Cards
+  const totalUsersCount = (users.length > 0 ? users.length : MOCK_USERS.length) + customUsers.length;
+  const visibleDevicesBase = devices.length > 0 ? devices : MOCK_DEVICES;
+  const totalDevicesCount = visibleDevicesBase.filter((d) => !revokedDeviceIds.includes(d.id)).length;
+  const policiesBase = policies.length > 0 ? policies : MOCK_POLICIES;
+  const totalPoliciesCount = policiesBase.filter((p) => !deletedPolicyIds.includes(p.id)).length + customPolicies.length;
+  const currentSessionsList = sessions.length > 0 ? sessions : MOCK_SESSIONS;
+  const activeSessionsCount = currentSessionsList.filter((s) => !s.disconnectedAt).length;
 
   const currentLoading =
     (activeTab === 'devices' && isDevicesLoading) ||
@@ -560,10 +567,57 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* 1. แถบปุ่มสลับแท็บ (แสดงเฉพาะแท็บที่อนุญาต หรือแสดงปุ่มรีเฟรชถ้าเป็นแท็บเดี่ยว) */}
-      {(!allowedTabs || allowedTabs.length > 1) ? (
-        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-          <div className="flex space-x-1">
+      {/* 0. แดชบอร์ดสรุปภาพรวม (Quick Stats 4 Cards) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 flex items-center space-x-3 hover:border-emerald-500/30 transition">
+          <div className="p-2 rounded-lg bg-emerald-950/70 border border-emerald-800/60 text-emerald-400">
+            <Users className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="text-[10px] uppercase font-mono text-slate-400 font-bold">ผู้ใช้ทั้งหมด</div>
+            <div className="text-base font-bold font-mono text-white">{totalUsersCount} <span className="text-[10px] text-emerald-400 font-normal">บัญชี</span></div>
+          </div>
+        </div>
+
+        <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 flex items-center space-x-3 hover:border-amber-500/30 transition">
+          <div className="p-2 rounded-lg bg-amber-950/70 border border-amber-800/60 text-amber-400">
+            <Laptop className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="text-[10px] uppercase font-mono text-slate-400 font-bold">อุปกรณ์ที่ลงทะเบียน</div>
+            <div className="text-base font-bold font-mono text-white">{totalDevicesCount} <span className="text-[10px] text-amber-400 font-normal">เครื่อง</span></div>
+          </div>
+        </div>
+
+        <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 flex items-center space-x-3 hover:border-sky-500/30 transition">
+          <div className="p-2 rounded-lg bg-sky-950/70 border border-sky-800/60 text-sky-400">
+            <ShieldCheck className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="text-[10px] uppercase font-mono text-slate-400 font-bold">กฎ Zero-Trust</div>
+            <div className="text-base font-bold font-mono text-white">{totalPoliciesCount} <span className="text-[10px] text-sky-400 font-normal">นโยบาย</span></div>
+          </div>
+        </div>
+
+        <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 flex items-center space-x-3 hover:border-emerald-500/30 transition">
+          <div className="p-2 rounded-lg bg-emerald-950/70 border border-emerald-800/60 text-emerald-400 relative">
+            <Activity className="w-4 h-4" />
+            <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase font-mono text-slate-400 font-bold">เซสชันออนไลน์</div>
+            <div className="text-base font-bold font-mono text-white">{activeSessionsCount} <span className="text-[10px] text-emerald-400 font-normal">Active</span></div>
+          </div>
+        </div>
+      </div>
+
+      {/* 1. แถบปุ่มสลับแท็บ และช่องค้นหา (Search Filter & Tab Controls) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-2.5">
+        {(!allowedTabs || allowedTabs.length > 1) ? (
+          <div className="flex flex-wrap gap-1">
             {(!allowedTabs || allowedTabs.includes('devices')) && (
               <button
                 onClick={() => setActiveTab('devices')}
@@ -648,30 +702,47 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </button>
             )}
           </div>
+        ) : (
+          <div className="text-xs text-slate-400 font-mono flex items-center space-x-1">
+            <span className="text-emerald-400 font-bold">●</span>
+            <span>จัดการข้อมูลระบบ ({activeTab.toUpperCase()})</span>
+          </div>
+        )}
 
-          {/* ปุ่มรีเฟรชข้อมูล */}
+        {/* ช่องค้นหา Real-time Search + ปุ่มรีเฟรชข้อมูล */}
+        <div className="flex items-center space-x-2">
+          <div className="relative w-48 sm:w-56">
+            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="ค้นหาข้อมูล..."
+              className="w-full bg-[#050b08] border border-slate-800 rounded-lg pl-8 pr-7 py-1 text-xs text-white placeholder-slate-500 font-mono focus:border-emerald-500 focus:outline-none transition"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white p-0.5 cursor-pointer"
+                title="ล้างคำค้นหา"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
           <button
             onClick={handleRefresh}
             disabled={currentLoading || isManualRefreshing}
-            className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition cursor-pointer disabled:opacity-50"
+            className="flex items-center space-x-1 p-1.5 px-2.5 text-xs text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition cursor-pointer disabled:opacity-50 border border-slate-800/80 shrink-0"
             title="รีเฟรชข้อมูล"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${currentFetching || isManualRefreshing ? 'animate-spin text-amber-400' : ''}`} />
+            <span className="hidden sm:inline text-[11px]">รีเฟรช</span>
           </button>
         </div>
-      ) : (
-        <div className="flex justify-end pb-1">
-          <button
-            onClick={handleRefresh}
-            disabled={currentLoading || isManualRefreshing}
-            className="flex items-center space-x-1 px-2.5 py-1 text-xs text-slate-400 hover:text-amber-400 hover:bg-slate-800/80 rounded-lg transition cursor-pointer disabled:opacity-50 border border-slate-800"
-            title="รีเฟรชข้อมูล"
-          >
-            <RefreshCw className={`w-3 h-3 ${currentFetching || isManualRefreshing ? 'animate-spin text-amber-400' : ''}`} />
-            <span>รีเฟรชข้อมูล</span>
-          </button>
-        </div>
-      )}
+      </div>
 
       {/* 2. ตารางข้อมูลตามแท็บที่เลือก */}
       <div className="bg-slate-950/80 rounded-xl border border-slate-800 overflow-hidden min-h-[220px]">
@@ -684,9 +755,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <>
             {/* TAB 1: Devices */}
             {activeTab === 'devices' && (() => {
-              const visibleDevices = devices.filter((d) => !revokedDeviceIds.includes(d.id));
+              const baseDevices = devices.length > 0 ? devices : MOCK_DEVICES;
+              const visibleDevices = baseDevices
+                .filter((d) => !revokedDeviceIds.includes(d.id))
+                .filter((d) => {
+                  if (!searchTerm.trim()) return true;
+                  const term = searchTerm.toLowerCase();
+                  return (
+                    d.deviceName.toLowerCase().includes(term) ||
+                    d.osInfo.toLowerCase().includes(term) ||
+                    (d.macAddress && d.macAddress.toLowerCase().includes(term))
+                  );
+                });
               return visibleDevices.length === 0 ? (
-                <div className="text-center py-12 text-slate-500 text-xs">ยังไม่มีข้อมูลอุปกรณ์ที่ลงทะเบียน</div>
+                <div className="text-center py-12 text-slate-500 text-xs">
+                  {searchTerm ? `ไม่พบอุปกรณ์ที่ตรงกับ "${searchTerm}"` : 'ยังไม่มีข้อมูลอุปกรณ์ที่ลงทะเบียน'}
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
@@ -729,9 +813,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             })()}
 
             {/* TAB 2: Sessions */}
-            {activeTab === 'sessions' && (
-              sessions.length === 0 ? (
-                <div className="text-center py-12 text-slate-500 text-xs">ยังไม่มีประวัติการเชื่อมต่อ</div>
+            {activeTab === 'sessions' && (() => {
+              const baseSessions = sessions.length > 0 ? sessions : MOCK_SESSIONS;
+              const visibleSessions = baseSessions.filter((s) => {
+                if (!searchTerm.trim()) return true;
+                const term = searchTerm.toLowerCase();
+                return (
+                  s.clientPublicIp.toLowerCase().includes(term) ||
+                  s.peerId.toLowerCase().includes(term)
+                );
+              });
+              return visibleSessions.length === 0 ? (
+                <div className="text-center py-12 text-slate-500 text-xs">
+                  {searchTerm ? `ไม่พบเซสชันที่ตรงกับ "${searchTerm}"` : 'ยังไม่มีประวัติการเชื่อมต่อ'}
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
@@ -744,7 +839,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
-                      {sessions.map((s) => (
+                      {visibleSessions.map((s) => (
                         <tr key={s.id} className="hover:bg-slate-900/40 transition">
                           <td className="py-2.5 px-3 text-slate-200">{s.clientPublicIp}</td>
                           <td className="py-2.5 px-3 text-slate-400">
@@ -770,13 +865,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </tbody>
                   </table>
                 </div>
-              )
-            )}
+              );
+            })()}
 
             {/* TAB 3: Audit Logs */}
-            {activeTab === 'logs' && (
-              auditLogs.length === 0 ? (
-                <div className="text-center py-12 text-slate-500 text-xs">ยังไม่มีบันทึก Audit Log</div>
+            {activeTab === 'logs' && (() => {
+              const baseLogs = auditLogs.length > 0 ? auditLogs : MOCK_LOGS;
+              const visibleLogs = baseLogs.filter((l) => {
+                if (!searchTerm.trim()) return true;
+                const term = searchTerm.toLowerCase();
+                return (
+                  l.action.toLowerCase().includes(term) ||
+                  l.ipAddress.toLowerCase().includes(term)
+                );
+              });
+              return visibleLogs.length === 0 ? (
+                <div className="text-center py-12 text-slate-500 text-xs">
+                  {searchTerm ? `ไม่พบบันทึก Log ที่ตรงกับ "${searchTerm}"` : 'ยังไม่มีบันทึก Audit Log'}
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
@@ -788,7 +894,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
-                      {auditLogs.map((l) => (
+                      {visibleLogs.map((l) => (
                         <tr key={l.id} className="hover:bg-slate-900/40 transition">
                           <td className="py-2.5 px-3 text-amber-400">{l.action}</td>
                           <td className="py-2.5 px-3 text-slate-400">{l.ipAddress}</td>
@@ -800,16 +906,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </tbody>
                   </table>
                 </div>
-              )
-            )}
+              );
+            })()}
 
             {/* TAB 4: Agent Releases */}
-            {activeTab === 'versions' && (
-              agentVersions.length === 0 ? (
-                <div className="text-center py-12 text-slate-500 text-xs">ไม่มีข้อมูลเวอร์ชัน Agent</div>
+            {activeTab === 'versions' && (() => {
+              const baseVersions = agentVersions.length > 0 ? agentVersions : MOCK_VERSIONS;
+              const visibleVersions = baseVersions.filter((v) => {
+                if (!searchTerm.trim()) return true;
+                return v.versionString.toLowerCase().includes(searchTerm.toLowerCase());
+              });
+              return visibleVersions.length === 0 ? (
+                <div className="text-center py-12 text-slate-500 text-xs">
+                  {searchTerm ? `ไม่พบเวอร์ชันที่ตรงกับ "${searchTerm}"` : 'ไม่มีข้อมูลเวอร์ชัน Agent'}
+                </div>
               ) : (
                 <div className="p-3 space-y-2">
-                  {agentVersions.map((v) => (
+                  {visibleVersions.map((v) => (
                     <div
                       key={v.id}
                       className="p-3 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center justify-between text-xs"
@@ -840,12 +953,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                   ))}
                 </div>
-              )
-            )}
+              );
+            })()}
 
             {/* TAB 5: Users Management */}
             {activeTab === 'users' && (() => {
-              const allUsers = [...users, ...customUsers];
+              const baseUsers = users.length > 0 ? users : MOCK_USERS;
+              const allUsers = [...baseUsers, ...customUsers].filter((u) => {
+                if (!searchTerm.trim()) return true;
+                const term = searchTerm.toLowerCase();
+                return (
+                  u.username.toLowerCase().includes(term) ||
+                  u.phoneNumber.toLowerCase().includes(term) ||
+                  u.roleName.toLowerCase().includes(term)
+                );
+              });
               return (
                 <div>
                   <div className="p-3 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/30">
@@ -864,7 +986,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </div>
 
                   {allUsers.length === 0 ? (
-                    <div className="text-center py-12 text-slate-500 text-xs">ยังไม่มีข้อมูลผู้ใช้ในระบบ</div>
+                    <div className="text-center py-12 text-slate-500 text-xs">
+                      {searchTerm ? `ไม่พบผู้ใช้ที่ตรงกับ "${searchTerm}"` : 'ยังไม่มีข้อมูลผู้ใช้ในระบบ'}
+                    </div>
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-xs">
@@ -915,7 +1039,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             {/* TAB 6: Zero-Trust Policies */}
             {activeTab === 'policies' && (() => {
-              const allPolicies = [...policies, ...customPolicies].filter((p) => !deletedPolicyIds.includes(p.id));
+              const basePolicies = policies.length > 0 ? policies : MOCK_POLICIES;
+              const allPolicies = [...basePolicies, ...customPolicies]
+                .filter((p) => !deletedPolicyIds.includes(p.id))
+                .filter((p) => {
+                  if (!searchTerm.trim()) return true;
+                  const term = searchTerm.toLowerCase();
+                  return (
+                    p.destinationCidr.toLowerCase().includes(term) ||
+                    (p.roleName && p.roleName.toLowerCase().includes(term)) ||
+                    p.protocol.toLowerCase().includes(term) ||
+                    p.action.toLowerCase().includes(term)
+                  );
+                });
               return (
                 <div>
                   <div className="p-3 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/30">
@@ -934,7 +1070,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </div>
 
                   {allPolicies.length === 0 ? (
-                    <div className="text-center py-12 text-slate-500 text-xs">ยังไม่มีนโยบายการเข้าถึง</div>
+                    <div className="text-center py-12 text-slate-500 text-xs">
+                      {searchTerm ? `ไม่พบนโยบายที่ตรงกับ "${searchTerm}"` : 'ยังไม่มีนโยบายการเข้าถึง'}
+                    </div>
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-xs">
