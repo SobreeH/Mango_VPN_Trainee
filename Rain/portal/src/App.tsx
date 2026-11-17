@@ -364,6 +364,7 @@ export default function App() {
                 apiBaseUrl={API_BASE_URL}
                 initialTab="sessions"
                 allowedTabs={authData.user.role === 'CLIENT' ? ['sessions'] : ['sessions', 'logs']}
+                onShowToast={showToast}
               />
             </div>
           )}
@@ -393,6 +394,7 @@ export default function App() {
                 apiBaseUrl={API_BASE_URL}
                 initialTab="devices"
                 allowedTabs={['devices']}
+                onShowToast={showToast}
               />
             </div>
           )}
@@ -422,6 +424,7 @@ export default function App() {
                 apiBaseUrl={API_BASE_URL}
                 initialTab="users"
                 allowedTabs={['users']}
+                onShowToast={showToast}
               />
             </div>
           )}
@@ -451,6 +454,7 @@ export default function App() {
                 apiBaseUrl={API_BASE_URL}
                 initialTab="policies"
                 allowedTabs={['policies']}
+                onShowToast={showToast}
               />
             </div>
           )}
@@ -480,6 +484,7 @@ export default function App() {
                 apiBaseUrl={API_BASE_URL}
                 initialTab="logs"
                 allowedTabs={['logs']}
+                onShowToast={showToast}
               />
             </div>
           )}
@@ -509,6 +514,7 @@ export default function App() {
                 apiBaseUrl={API_BASE_URL}
                 initialTab="versions"
                 allowedTabs={['versions']}
+                onShowToast={showToast}
               />
             </div>
           )}

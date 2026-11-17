@@ -33,6 +33,7 @@ interface AdminPanelProps {
   apiBaseUrl: string;
   initialTab?: AdminTab;
   allowedTabs?: AdminTab[];
+  onShowToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
 
 // ข้อมูลตัวอย่างสำหรับโหมดจำลอง (Dev Mock Fallback)
@@ -183,8 +184,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   apiBaseUrl,
   initialTab = 'devices',
   allowedTabs,
+  onShowToast,
 }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
 
   // อัปเดตแท็บตามที่ส่งมาจาก Sidebar เมื่อมีการเปลี่ยนหน้า
   useEffect(() => {
@@ -340,13 +343,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     (activeTab === 'users' && isUsersFetching) ||
     (activeTab === 'policies' && isPoliciesFetching);
 
-  const handleRefresh = () => {
-    if (activeTab === 'devices') refetchDevices();
-    else if (activeTab === 'sessions') refetchSessions();
-    else if (activeTab === 'logs') refetchLogs();
-    else if (activeTab === 'versions') refetchVersions();
-    else if (activeTab === 'users') refetchUsers();
-    else if (activeTab === 'policies') refetchPolicies();
+  const handleRefresh = async () => {
+    setIsManualRefreshing(true);
+    if (activeTab === 'devices') await refetchDevices();
+    else if (activeTab === 'sessions') await refetchSessions();
+    else if (activeTab === 'logs') await refetchLogs();
+    else if (activeTab === 'versions') await refetchVersions();
+    else if (activeTab === 'users') await refetchUsers();
+    else if (activeTab === 'policies') await refetchPolicies();
+
+    setTimeout(() => {
+      setIsManualRefreshing(false);
+      const tabNames: Record<AdminTab, string> = {
+        devices: 'อุปกรณ์ (Devices)',
+        sessions: 'ประวัติเชื่อมต่อ (Sessions)',
+        logs: 'บันทึกความปลอดภัย (Audit Logs)',
+        versions: 'เวอร์ชัน Agent',
+        users: 'ผู้ใช้ (Users)',
+        policies: 'นโยบาย (Policies)',
+      };
+      onShowToast?.(`ซิงค์ข้อมูล ${tabNames[activeTab] || activeTab} ล่าสุดเรียบร้อยแล้ว`, 'info');
+    }, 450);
   };
 
   return (
@@ -443,22 +460,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           {/* ปุ่มรีเฟรชข้อมูล */}
           <button
             onClick={handleRefresh}
-            disabled={currentLoading}
+            disabled={currentLoading || isManualRefreshing}
             className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition cursor-pointer disabled:opacity-50"
             title="รีเฟรชข้อมูล"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${currentFetching ? 'animate-spin text-amber-400' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${currentFetching || isManualRefreshing ? 'animate-spin text-amber-400' : ''}`} />
           </button>
         </div>
       ) : (
         <div className="flex justify-end pb-1">
           <button
             onClick={handleRefresh}
-            disabled={currentLoading}
+            disabled={currentLoading || isManualRefreshing}
             className="flex items-center space-x-1 px-2.5 py-1 text-xs text-slate-400 hover:text-amber-400 hover:bg-slate-800/80 rounded-lg transition cursor-pointer disabled:opacity-50 border border-slate-800"
             title="รีเฟรชข้อมูล"
           >
-            <RefreshCw className={`w-3 h-3 ${currentFetching ? 'animate-spin text-amber-400' : ''}`} />
+            <RefreshCw className={`w-3 h-3 ${currentFetching || isManualRefreshing ? 'animate-spin text-amber-400' : ''}`} />
             <span>รีเฟรชข้อมูล</span>
           </button>
         </div>
