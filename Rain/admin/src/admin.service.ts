@@ -1,7 +1,15 @@
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 import { DeviceDto, VpnSessionDto, AuditLogDto, AgentVersionDto, VpnPolicyDto } from '@mango/shared';
 
 const prisma = new PrismaClient();
+
+export interface CreateUserDto {
+  username: string;
+  password?: string;
+  phoneNumber: string;
+  roleName: 'ADMIN' | 'STAFF' | 'CLIENT';
+}
 
 export interface UserDto {
   id: string;
@@ -13,6 +21,35 @@ export interface UserDto {
 }
 
 export class AdminService {
+  async createUser(data: CreateUserDto): Promise<UserDto> {
+    const role = await prisma.role.findUnique({ where: { name: data.roleName } });
+    if (!role) {
+      throw new Error(`Role ${data.roleName} not found`);
+    }
+
+    const password = data.password || 'MangoVPN2026!';
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const user = await prisma.user.create({
+      data: {
+        username: data.username,
+        passwordHash,
+        phoneNumber: data.phoneNumber,
+        roleId: role.id,
+        isActive: true,
+      },
+      include: { role: true },
+    });
+
+    return {
+      id: user.id,
+      username: user.username,
+      phoneNumber: user.phoneNumber,
+      roleName: user.role.name,
+      isActive: user.isActive,
+      createdAt: user.createdAt.toISOString(),
+    };
+  }
   async getUsers(): Promise<UserDto[]> {
     const users = await prisma.user.findMany({
       include: { role: true },

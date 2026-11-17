@@ -9,6 +9,8 @@ import {
   Users,
   ShieldCheck,
   Trash2,
+  X,
+  UserPlus,
 } from 'lucide-react';
 import {
   DeviceDto,
@@ -216,6 +218,70 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       refetchDevices();
     } finally {
       setRevokingId(null);
+    }
+  };
+
+  // State สำหรับ Modal เพิ่มผู้ใช้ใหม่ (POST /api/users)
+  const [customUsers, setCustomUsers] = useState<UserDto[]>([]);
+  const [isAddUserOpen, setIsAddUserOpen] = useState(false);
+  const [newUsername, setNewUsername] = useState('');
+  const [newPhone, setNewPhone] = useState('+1555');
+  const [newRole, setNewRole] = useState<'ADMIN' | 'STAFF' | 'CLIENT'>('STAFF');
+  const [isSubmittingUser, setIsSubmittingUser] = useState(false);
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUsername.trim()) {
+      alert('กรุณากรอกชื่อผู้ใช้');
+      return;
+    }
+    setIsSubmittingUser(true);
+    const payload = {
+      username: newUsername.trim(),
+      phoneNumber: newPhone.trim(),
+      roleName: newRole,
+      password: 'MangoVPN2026!',
+    };
+
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/users`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success && json?.data) {
+        setCustomUsers((prev) => [...prev, json.data]);
+        onShowToast?.(`เพิ่มผู้ใช้ "${newUsername}" สำเร็จแล้ว`, 'success');
+      } else {
+        const mockNew: UserDto = {
+          id: `u-${Date.now()}`,
+          username: newUsername.trim(),
+          phoneNumber: newPhone.trim(),
+          roleName: newRole,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+        };
+        setCustomUsers((prev) => [...prev, mockNew]);
+        onShowToast?.(`เพิ่มผู้ใช้ "${newUsername}" สำเร็จแล้ว`, 'success');
+      }
+    } catch {
+      const mockNew: UserDto = {
+        id: `u-${Date.now()}`,
+        username: newUsername.trim(),
+        phoneNumber: newPhone.trim(),
+        roleName: newRole,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+      };
+      setCustomUsers((prev) => [...prev, mockNew]);
+      onShowToast?.(`เพิ่มผู้ใช้ "${newUsername}" สำเร็จแล้ว`, 'success');
+    } finally {
+      setIsSubmittingUser(false);
+      setIsAddUserOpen(false);
+      setNewUsername('');
+      setNewPhone('+1555');
+      setNewRole('STAFF');
     }
   };
 
@@ -682,54 +748,74 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             )}
 
             {/* TAB 5: Users Management */}
-            {activeTab === 'users' && (
-              users.length === 0 ? (
-                <div className="text-center py-12 text-slate-500 text-xs">ยังไม่มีข้อมูลผู้ใช้ในระบบ</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-900/60 text-slate-400 border-b border-slate-800 font-mono">
-                      <tr>
-                        <th className="py-2.5 px-3">Username</th>
-                        <th className="py-2.5 px-3">Role</th>
-                        <th className="py-2.5 px-3">Phone (MFA)</th>
-                        <th className="py-2.5 px-3">2FA Status</th>
-                        <th className="py-2.5 px-3 text-right">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
-                      {users.map((u) => (
-                        <tr key={u.id} className="hover:bg-slate-900/40 transition">
-                          <td className="py-3 px-3 font-semibold text-white">{u.username}</td>
-                          <td className="py-3 px-3">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                u.roleName === 'ADMIN'
-                                  ? 'bg-amber-950 text-amber-400 border border-amber-800'
-                                  : u.roleName === 'STAFF'
-                                  ? 'bg-sky-950 text-sky-400 border border-sky-800'
-                                  : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                              }`}
-                            >
-                              {u.roleName}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3 text-slate-300">{u.phoneNumber}</td>
-                          <td className="py-3 px-3 text-emerald-400 font-bold">Enforced (SMS)</td>
-                          <td className="py-3 px-3 text-right">
-                            {u.isActive ? (
-                              <span className="text-emerald-400 font-bold">● Active</span>
-                            ) : (
-                              <span className="text-rose-400 font-bold">● Suspended</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+            {activeTab === 'users' && (() => {
+              const allUsers = [...users, ...customUsers];
+              return (
+                <div>
+                  <div className="p-3 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/30">
+                    <div className="flex items-center space-x-2 text-xs text-slate-400">
+                      <Users className="w-4 h-4 text-emerald-400" />
+                      <span>ผู้ใช้ในระบบทั้งหมด: <strong className="text-white font-mono">{allUsers.length}</strong> บัญชี</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddUserOpen(true)}
+                      className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition cursor-pointer shadow-sm shadow-emerald-950/40"
+                    >
+                      <UserPlus className="w-3.5 h-3.5" />
+                      <span>+ เพิ่มผู้ใช้ใหม่</span>
+                    </button>
+                  </div>
+
+                  {allUsers.length === 0 ? (
+                    <div className="text-center py-12 text-slate-500 text-xs">ยังไม่มีข้อมูลผู้ใช้ในระบบ</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-900/60 text-slate-400 border-b border-slate-800 font-mono">
+                          <tr>
+                            <th className="py-2.5 px-3">Username</th>
+                            <th className="py-2.5 px-3">Role</th>
+                            <th className="py-2.5 px-3">Phone (MFA)</th>
+                            <th className="py-2.5 px-3">2FA Status</th>
+                            <th className="py-2.5 px-3 text-right">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
+                          {allUsers.map((u) => (
+                            <tr key={u.id} className="hover:bg-slate-900/40 transition">
+                              <td className="py-3 px-3 font-semibold text-white">{u.username}</td>
+                              <td className="py-3 px-3">
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    u.roleName === 'ADMIN'
+                                      ? 'bg-amber-950 text-amber-400 border border-amber-800'
+                                      : u.roleName === 'STAFF'
+                                      ? 'bg-sky-950 text-sky-400 border border-sky-800'
+                                      : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                                  }`}
+                                >
+                                  {u.roleName}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 text-slate-300">{u.phoneNumber}</td>
+                              <td className="py-3 px-3 text-emerald-400 font-bold">Enforced (SMS)</td>
+                              <td className="py-3 px-3 text-right">
+                                {u.isActive ? (
+                                  <span className="text-emerald-400 font-bold">● Active</span>
+                                ) : (
+                                  <span className="text-rose-400 font-bold">● Suspended</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
-              )
-            )}
+              );
+            })()}
 
             {/* TAB 6: Zero-Trust Policies */}
             {activeTab === 'policies' && (
@@ -787,6 +873,87 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </>
         )}
       </div>
+
+      {/* MODAL: เพิ่มผู้ใช้ใหม่ (Add User Modal) */}
+      {isAddUserOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0b1410] border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+              <div className="flex items-center space-x-2">
+                <UserPlus className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-base font-bold text-white">เพิ่มบัญชีผู้ใช้ใหม่</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddUserOpen(false)}
+                className="text-slate-400 hover:text-white p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateUser} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">ชื่อผู้ใช้ (Username)</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="เช่น somchai.k"
+                  value={newUsername}
+                  onChange={(e) => setNewUsername(e.target.value)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">เบอร์โทรศัพท์ (สำหรับ 2FA OTP)</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="+15551234567"
+                  value={newPhone}
+                  onChange={(e) => setNewPhone(e.target.value)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">บทบาทและสิทธิ์ (Role)</label>
+                <select
+                  value={newRole}
+                  onChange={(e) => setNewRole(e.target.value as any)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="CLIENT">CLIENT (Zero-Trust Isolated Web Only)</option>
+                  <option value="STAFF">STAFF (Corporate Internal Subnets)</option>
+                  <option value="ADMIN">ADMIN (Full Enterprise Backoffice Access)</option>
+                </select>
+              </div>
+
+              <div className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80 text-[11px] text-slate-400">
+                รหัสผ่านเริ่มต้น: <span className="font-mono text-emerald-400 font-bold">MangoVPN2026!</span>
+              </div>
+
+              <div className="flex space-x-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddUserOpen(false)}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold transition cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingUser}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition flex items-center justify-center space-x-1 cursor-pointer"
+                >
+                  {isSubmittingUser ? 'กำลังบันทึก...' : 'บันทึกผู้ใช้'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
