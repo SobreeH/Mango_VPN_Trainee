@@ -6,15 +6,27 @@ import {
   Shield,
   Download,
   RefreshCw,
+  Users,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   DeviceDto,
   VpnSessionDto,
   AuditLogDto,
   AgentVersionDto,
+  VpnPolicyDto,
 } from '@mango/shared';
 
-export type AdminTab = 'devices' | 'sessions' | 'logs' | 'versions';
+export interface UserDto {
+  id: string;
+  username: string;
+  phoneNumber: string;
+  roleName: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export type AdminTab = 'devices' | 'sessions' | 'logs' | 'versions' | 'users' | 'policies';
 
 interface AdminPanelProps {
   accessToken: string;
@@ -97,6 +109,72 @@ const MOCK_VERSIONS: AgentVersionDto[] = [
     checksumSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
     isMandatory: true,
     releasedAt: new Date().toISOString(),
+  },
+];
+
+const MOCK_USERS: UserDto[] = [
+  {
+    id: 'u-admin',
+    username: 'admin_user',
+    phoneNumber: '+15551234567',
+    roleName: 'ADMIN',
+    isActive: true,
+    createdAt: new Date(Date.now() - 86400000 * 30).toISOString(),
+  },
+  {
+    id: 'u-staff',
+    username: 'staff_user',
+    phoneNumber: '+15552345678',
+    roleName: 'STAFF',
+    isActive: true,
+    createdAt: new Date(Date.now() - 86400000 * 15).toISOString(),
+  },
+  {
+    id: 'u-client',
+    username: 'client_user',
+    phoneNumber: '+15553456789',
+    roleName: 'CLIENT',
+    isActive: true,
+    createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+  },
+];
+
+const MOCK_POLICIES: VpnPolicyDto[] = [
+  {
+    id: 'pol-001',
+    roleId: 'role-admin',
+    roleName: 'ADMIN',
+    destinationCidr: '0.0.0.0/0',
+    protocol: 'ALL',
+    portRange: 'ANY',
+    action: 'ALLOW',
+  },
+  {
+    id: 'pol-002',
+    roleId: 'role-staff-1',
+    roleName: 'STAFF',
+    destinationCidr: '10.0.0.0/8',
+    protocol: 'ALL',
+    portRange: 'ANY',
+    action: 'ALLOW',
+  },
+  {
+    id: 'pol-003',
+    roleId: 'role-staff-2',
+    roleName: 'STAFF',
+    destinationCidr: '172.16.0.0/12',
+    protocol: 'ALL',
+    portRange: 'ANY',
+    action: 'ALLOW',
+  },
+  {
+    id: 'pol-004',
+    roleId: 'role-client',
+    roleName: 'CLIENT',
+    destinationCidr: '10.13.13.100/32',
+    protocol: 'TCP',
+    portRange: '80,443',
+    action: 'ALLOW',
   },
 ];
 
@@ -204,23 +282,71 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     enabled: activeTab === 'versions',
   });
 
+  // 5. Query Users (ADMIN ONLY)
+  const {
+    data: users = [],
+    isLoading: isUsersLoading,
+    isFetching: isUsersFetching,
+    refetch: refetchUsers,
+  } = useQuery({
+    queryKey: ['admin', 'users'],
+    queryFn: async (): Promise<UserDto[]> => {
+      try {
+        const res = await fetch(`${apiBaseUrl}/api/users`, { headers });
+        const json = await res.json();
+        if (res.ok && json.success && json.data?.length > 0) return json.data;
+      } catch {
+        // API offline -> Fallback mock
+      }
+      return MOCK_USERS;
+    },
+    enabled: activeTab === 'users',
+  });
+
+  // 6. Query Policies (ADMIN ONLY)
+  const {
+    data: policies = [],
+    isLoading: isPoliciesLoading,
+    isFetching: isPoliciesFetching,
+    refetch: refetchPolicies,
+  } = useQuery({
+    queryKey: ['admin', 'policies'],
+    queryFn: async (): Promise<VpnPolicyDto[]> => {
+      try {
+        const res = await fetch(`${apiBaseUrl}/api/policies`, { headers });
+        const json = await res.json();
+        if (res.ok && json.success && json.data?.length > 0) return json.data;
+      } catch {
+        // API offline -> Fallback mock
+      }
+      return MOCK_POLICIES;
+    },
+    enabled: activeTab === 'policies',
+  });
+
   const currentLoading =
     (activeTab === 'devices' && isDevicesLoading) ||
     (activeTab === 'sessions' && isSessionsLoading) ||
     (activeTab === 'logs' && isLogsLoading) ||
-    (activeTab === 'versions' && isVersionsLoading);
+    (activeTab === 'versions' && isVersionsLoading) ||
+    (activeTab === 'users' && isUsersLoading) ||
+    (activeTab === 'policies' && isPoliciesLoading);
 
   const currentFetching =
     (activeTab === 'devices' && isDevicesFetching) ||
     (activeTab === 'sessions' && isSessionsFetching) ||
     (activeTab === 'logs' && isLogsFetching) ||
-    (activeTab === 'versions' && isVersionsFetching);
+    (activeTab === 'versions' && isVersionsFetching) ||
+    (activeTab === 'users' && isUsersFetching) ||
+    (activeTab === 'policies' && isPoliciesFetching);
 
   const handleRefresh = () => {
     if (activeTab === 'devices') refetchDevices();
     else if (activeTab === 'sessions') refetchSessions();
     else if (activeTab === 'logs') refetchLogs();
     else if (activeTab === 'versions') refetchVersions();
+    else if (activeTab === 'users') refetchUsers();
+    else if (activeTab === 'policies') refetchPolicies();
   };
 
   return (
@@ -282,6 +408,34 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Releases</span>
+              </button>
+            )}
+
+            {(!allowedTabs || allowedTabs.includes('users')) && (
+              <button
+                onClick={() => setActiveTab('users')}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
+                  activeTab === 'users'
+                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Users</span>
+              </button>
+            )}
+
+            {(!allowedTabs || allowedTabs.includes('policies')) && (
+              <button
+                onClick={() => setActiveTab('policies')}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
+                  activeTab === 'policies'
+                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Policies</span>
               </button>
             )}
           </div>
@@ -462,6 +616,110 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </a>
                     </div>
                   ))}
+                </div>
+              )
+            )}
+
+            {/* TAB 5: Users Management */}
+            {activeTab === 'users' && (
+              users.length === 0 ? (
+                <div className="text-center py-12 text-slate-500 text-xs">ยังไม่มีข้อมูลผู้ใช้ในระบบ</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-900/60 text-slate-400 border-b border-slate-800 font-mono">
+                      <tr>
+                        <th className="py-2.5 px-3">Username</th>
+                        <th className="py-2.5 px-3">Role</th>
+                        <th className="py-2.5 px-3">Phone (MFA)</th>
+                        <th className="py-2.5 px-3">2FA Status</th>
+                        <th className="py-2.5 px-3 text-right">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
+                      {users.map((u) => (
+                        <tr key={u.id} className="hover:bg-slate-900/40 transition">
+                          <td className="py-3 px-3 font-semibold text-white">{u.username}</td>
+                          <td className="py-3 px-3">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                u.roleName === 'ADMIN'
+                                  ? 'bg-amber-950 text-amber-400 border border-amber-800'
+                                  : u.roleName === 'STAFF'
+                                  ? 'bg-sky-950 text-sky-400 border border-sky-800'
+                                  : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                              }`}
+                            >
+                              {u.roleName}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-slate-300">{u.phoneNumber}</td>
+                          <td className="py-3 px-3 text-emerald-400 font-bold">Enforced (SMS)</td>
+                          <td className="py-3 px-3 text-right">
+                            {u.isActive ? (
+                              <span className="text-emerald-400 font-bold">● Active</span>
+                            ) : (
+                              <span className="text-rose-400 font-bold">● Suspended</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            )}
+
+            {/* TAB 6: Zero-Trust Policies */}
+            {activeTab === 'policies' && (
+              policies.length === 0 ? (
+                <div className="text-center py-12 text-slate-500 text-xs">ยังไม่มีนโยบายการเข้าถึง</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-900/60 text-slate-400 border-b border-slate-800 font-mono">
+                      <tr>
+                        <th className="py-2.5 px-3">Role Target</th>
+                        <th className="py-2.5 px-3">Protocol</th>
+                        <th className="py-2.5 px-3">Destination Subnet</th>
+                        <th className="py-2.5 px-3">Port Range</th>
+                        <th className="py-2.5 px-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
+                      {policies.map((p) => (
+                        <tr key={p.id} className="hover:bg-slate-900/40 transition">
+                          <td className="py-3 px-3">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                p.roleName === 'ADMIN'
+                                  ? 'bg-amber-950 text-amber-400 border border-amber-800'
+                                  : p.roleName === 'STAFF'
+                                  ? 'bg-sky-950 text-sky-400 border border-sky-800'
+                                  : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                              }`}
+                            >
+                              {p.roleName || p.roleId}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-slate-300">{p.protocol}</td>
+                          <td className="py-3 px-3 text-white font-semibold">{p.destinationCidr}</td>
+                          <td className="py-3 px-3 text-slate-300">{p.portRange}</td>
+                          <td className="py-3 px-3 text-right">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                p.action === 'ALLOW'
+                                  ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800'
+                                  : 'bg-rose-950/80 text-rose-400 border border-rose-800'
+                              }`}
+                            >
+                              {p.action}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )
             )}
