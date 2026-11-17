@@ -1,9 +1,50 @@
 import { PrismaClient } from '@prisma/client';
-import { DeviceDto, VpnSessionDto, AuditLogDto, AgentVersionDto } from '@mango/shared';
+import { DeviceDto, VpnSessionDto, AuditLogDto, AgentVersionDto, VpnPolicyDto } from '@mango/shared';
 
 const prisma = new PrismaClient();
 
+export interface UserDto {
+  id: string;
+  username: string;
+  phoneNumber: string;
+  roleName: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
 export class AdminService {
+  async getUsers(): Promise<UserDto[]> {
+    const users = await prisma.user.findMany({
+      include: { role: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return users.map(u => ({
+      id: u.id,
+      username: u.username,
+      phoneNumber: u.phoneNumber,
+      roleName: u.role.name,
+      isActive: u.isActive,
+      createdAt: u.createdAt.toISOString(),
+    }));
+  }
+
+  async getPolicies(): Promise<VpnPolicyDto[]> {
+    const policies = await prisma.vpnPolicy.findMany({
+      include: { role: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return policies.map(p => ({
+      id: p.id,
+      roleId: p.roleId,
+      roleName: p.role?.name,
+      destinationCidr: p.destinationCidr,
+      protocol: p.protocol as any,
+      portRange: p.portRange,
+      action: p.action as any,
+    }));
+  }
   async getDevices(userId: string, isAdmin: boolean): Promise<DeviceDto[]> {
     const devices = await prisma.device.findMany({
       where: isAdmin ? {} : { userId },

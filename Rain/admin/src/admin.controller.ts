@@ -86,5 +86,49 @@ export class AdminController {
       });
     }
   }
+
+  async getUsers(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const user = (request as any).user;
+      if (user?.role !== 'ADMIN') {
+        return reply.status(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'Admin access required' } });
+      }
+
+      const users = await adminService.getUsers();
+      return reply.status(200).send({
+        success: true,
+        data: users,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      return reply.status(500).send({
+        success: false,
+        error: { code: 'SERVER_ERROR', message: err.message },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  async getPolicies(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const user = (request as any).user;
+      if (user?.role !== 'ADMIN') {
+        return reply.status(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'Admin access required' } });
+      }
+
+      const policies = await adminService.getPolicies();
+      return reply.status(200).send({
+        success: true,
+        data: policies,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      return reply.status(500).send({
+        success: false,
+        error: { code: 'SERVER_ERROR', message: err.message },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
 }
 

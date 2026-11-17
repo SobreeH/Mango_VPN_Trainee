@@ -8,5 +8,7 @@ export async function adminRoutes(app: FastifyInstance) {
   app.get('/api/sessions', (req, reply) => controller.getSessions(req, reply));
   app.get('/api/audit-logs', (req, reply) => controller.getAuditLogs(req, reply));
   app.get('/api/agent-versions', (req, reply) => controller.getAgentVersions(req, reply));
+  app.get('/api/users', (req, reply) => controller.getUsers(req, reply));
+  app.get('/api/policies', (req, reply) => controller.getPolicies(req, reply));
 }
 
