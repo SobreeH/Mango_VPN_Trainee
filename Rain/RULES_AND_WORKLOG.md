@@ -227,3 +227,31 @@
   - `Rain/portal/src/components/LoginForm.tsx` *(เพิ่มปุ่ม 1-Click Role Fill และปุ่มเปิด/ปิดตาดูรหัสผ่าน)*
   - `Rain/portal/src/components/OtpModal.tsx` *(เพิ่มปุ่ม Auto-fill Demo OTP)*
   - `Rain/RULES_AND_WORKLOG.md` *(อัปเดตบันทึกประจำวัน)*
+
+### 📅 วันที่: 2026-11-17
+- **Branch**: `feature/rain-admin`
+- **Commit**: `f17db4e` (`feat(admin): implement users and policies endpoints in backend service, controller, and routes`) & `a2acdbe` (`feat(portal): integrate users and policies tables with TanStack Query in AdminPanel and App`)
+- **สิ่งที่ทำ**:
+  1. [ช่วงเช้า] ศึกษาหลักการทำงานของ Prisma ORM, สถาปัตยกรรม 3 เลเยอร์ (Routes -> Controller -> Service) และพื้นฐานการทำ REST API
+  2. [ช่วงบ่าย] ดำเนินการตาม Implementation Plan:
+     - แตก Branch ใหม่ตามกฎข้อที่ 6: `feature/rain-admin`
+     - ขยายระบบหลังบ้านใน `Rain/admin`:
+       - เพิ่มเมธอด `getUsers()` และ `getPolicies()` ใน `admin.service.ts` โดยใช้ Prisma ORM (พร้อมกรองความปลอดภัยไม่ส่งรหัสผ่าน)
+       - เพิ่มด่านตรวจสิทธิ์ RBAC (บังคับเฉพาะ ADMIN เท่านั้น) ใน `admin.controller.ts`
+       - จดทะเบียนเส้นทางใหม่ `GET /api/users` และ `GET /api/policies` ใน `admin.routes.ts`
+     - เชื่อมต่อหน้าเว็บพอร์ทัลใน `Rain/portal`:
+       - ขยาย `AdminPanel.tsx` เพิ่มการจัดการแท็บ `users` และ `policies` ด้วย TanStack Query (`useQuery`)
+       - เพิ่มตัวจัดการ Mock Data Fallback เมื่อ API ออฟไลน์
+       - ปรับปรุง `App.tsx` เชื่อมต่อหน้า User Management และ Zero-Trust Policies เข้ากับ AdminPanel พร้อมปุ่มรีเฟรชข้อมูลสด
+  3. ทดสอบคอมไพล์ผ่าน 100%:
+     - `npm --workspace=@mango/rain-admin run build` (ผ่านฉลุย)
+     - `npm --workspace=@mango/portal run build` (ผ่านฉลุย)
+     - `npm --workspace=@mango/api run build` (ผ่านฉลุย)
+  4. ทำ Version Control: `git add`, `git commit` แยก Commit ชัดเจน และสั่ง `git push -u origin feature/rain-admin` ขึ้น GitHub เรียบร้อย
+- **ไฟล์ที่สร้าง/แก้ไข**:
+  - `Rain/admin/src/admin.service.ts` *(เพิ่ม UserDto, getUsers, getPolicies)*
+  - `Rain/admin/src/admin.controller.ts` *(เพิ่ม getUsers, getPolicies พร้อมดักสิทธิ์ ADMIN)*
+  - `Rain/admin/src/admin.routes.ts` *(ลงทะเบียน GET /api/users และ GET /api/policies)*
+  - `Rain/portal/src/components/AdminPanel.tsx` *(เพิ่มแท็บและ useQuery สำหรับ users & policies)*
+  - `Rain/portal/src/App.tsx` *(เชื่อมโยง Component AdminPanel ลดโค้ดซ้ำซ้อน 74 บรรทัด)*
+  - `Rain/RULES_AND_WORKLOG.md` *(อัปเดตบันทึกประจำวัน)*
