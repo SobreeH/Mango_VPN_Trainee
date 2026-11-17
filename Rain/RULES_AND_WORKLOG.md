@@ -237,6 +237,7 @@
   - `44fb770` (`feat(admin): implement device revocation endpoint and UI action button`)
   - `beb8656` (`feat(admin): implement create user endpoint and modal form in admin panel`)
   - `afa467a` (`feat(admin): implement policy creation and deletion endpoints with ui modal in admin panel`)
+  - `beba27f` (`feat(portal): add quick stats summary cards and real-time search filter in admin panel`)
 - **สิ่งที่ทำ**:
   1. [ช่วงเช้า] ศึกษาหลักการทำงานของ Prisma ORM, สถาปัตยกรรม 3 เลเยอร์ (Routes -> Controller -> Service) และพื้นฐานการทำ REST API
   2. [ช่วงบ่าย] ดำเนินการพัฒนาตาม Implementation Plan:
@@ -255,6 +256,8 @@
        - เพิ่มปุ่ม '+ เพิ่มผู้ใช้ใหม่' และหน้าต่าง Modal ฟอร์มกรอกข้อมูลผู้ใช้ (Username, Phone, Role) บันทึกเข้าตารางทันที
        - เพิ่มปุ่ม '+ เพิ่มนโยบาย' และหน้าต่าง Modal ฟอร์มกรอกกฎความปลอดภัย Zero-Trust (Role Target, Destination CIDR, Protocol, Port Range, Action ALLOW/DENY)
        - เพิ่มปุ่มไอคอนถังขยะสำหรับลบนโยบายเครือข่าย พร้อมไดอะล็อกยืนยันและการแจ้งเตือน Toast
+       - เพิ่มแดชบอร์ดสรุปภาพรวม Quick Stats 4 มิติ (ผู้ใช้ทั้งหมด, อุปกรณ์ที่ลงทะเบียน, กฎ Zero-Trust, เซสชันออนไลน์พร้อมไฟสถานะสีเขียวกระพริบ)
+       - เพิ่มช่องค้นหาอัจฉริยะ Real-time Search Filter Bar กรองข้อมูลตารางแบบตอบสนองทันใจในทุกแท็บ
        - ปรับปรุง `App.tsx` เชื่อมต่อ Component AdminPanel เข้าด้วยกัน ลดโค้ดซ้ำซ้อน 74 บรรทัด
   3. [ช่วงเย็น] ศึกษาเชิงลึกภาพรวมสถาปัตยกรรมระบบทั้ง 4 ภาพจากพี่เลี้ยง:
      - การทำงานของ Zero-Trust Network Access (ZTNA) แบบ Least-Privilege
