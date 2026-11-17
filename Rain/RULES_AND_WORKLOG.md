@@ -236,6 +236,7 @@
   - `67cf960` (`feat(portal): add visual spin animation and toast notification on data refresh`)
   - `44fb770` (`feat(admin): implement device revocation endpoint and UI action button`)
   - `beb8656` (`feat(admin): implement create user endpoint and modal form in admin panel`)
+  - `afa467a` (`feat(admin): implement policy creation and deletion endpoints with ui modal in admin panel`)
 - **สิ่งที่ทำ**:
   1. [ช่วงเช้า] ศึกษาหลักการทำงานของ Prisma ORM, สถาปัตยกรรม 3 เลเยอร์ (Routes -> Controller -> Service) และพื้นฐานการทำ REST API
   2. [ช่วงบ่าย] ดำเนินการพัฒนาตาม Implementation Plan:
@@ -246,21 +247,28 @@
        - จดทะเบียนเส้นทางใหม่ `GET /api/users` และ `GET /api/policies` ใน `admin.routes.ts`
        - เพิ่มระบบเพิกถอนอุปกรณ์: `DELETE /api/devices/:id` (`revokeDevice` ใน service & controller)
        - เพิ่มระบบสร้างผู้ใช้ใหม่: `POST /api/users` (`createUser` พร้อมแฮชรหัสผ่านด้วย bcrypt)
+       - เพิ่มระบบสร้างและลบนโยบายเครือข่าย: `POST /api/policies` (`createPolicy`) และ `DELETE /api/policies/:id` (`deletePolicy`)
      - ยกระดับและเชื่อมต่อหน้าเว็บพอร์ทัลใน `Rain/portal`:
        - ขยาย `AdminPanel.tsx` เพิ่มแท็บ `users` และ `policies` จัดการด้วย TanStack Query (`useQuery`)
        - เพิ่ม Visual Feedback: ป๊อปอัปแจ้งเตือน Toast เมื่อกดปุ่ม 'รีเฟรชข้อมูล' พร้อมอนิเมชันหมุนแสดงสถานะ
        - เพิ่มปุ่มสีแดง 'เพิกถอน' ในตารางอุปกรณ์ (Registered Devices) เพื่อตัดการเชื่อมต่ออุปกรณ์ที่ไม่ปลอดภัย
        - เพิ่มปุ่ม '+ เพิ่มผู้ใช้ใหม่' และหน้าต่าง Modal ฟอร์มกรอกข้อมูลผู้ใช้ (Username, Phone, Role) บันทึกเข้าตารางทันที
+       - เพิ่มปุ่ม '+ เพิ่มนโยบาย' และหน้าต่าง Modal ฟอร์มกรอกกฎความปลอดภัย Zero-Trust (Role Target, Destination CIDR, Protocol, Port Range, Action ALLOW/DENY)
+       - เพิ่มปุ่มไอคอนถังขยะสำหรับลบนโยบายเครือข่าย พร้อมไดอะล็อกยืนยันและการแจ้งเตือน Toast
        - ปรับปรุง `App.tsx` เชื่อมต่อ Component AdminPanel เข้าด้วยกัน ลดโค้ดซ้ำซ้อน 74 บรรทัด
-  3. ทดสอบคอมไพล์ผ่าน 100%:
+  3. [ช่วงเย็น] ศึกษาเชิงลึกภาพรวมสถาปัตยกรรมระบบทั้ง 4 ภาพจากพี่เลี้ยง:
+     - การทำงานของ Zero-Trust Network Access (ZTNA) แบบ Least-Privilege
+     - ความสำคัญของ Client Agent (พอร์ต 127.0.0.1:47821) ในฐานะตัวแทนเบราว์เซอร์ในการสั่งงาน WireGuard Kernel
+     - ความสัมพันธ์ระหว่าง Public Key ในตาราง `vpn_peers` และกฎความปลอดภัยในตาราง `vpn_policies`
+  4. ทดสอบคอมไพล์ผ่าน 100%:
      - `npm --workspace=@mango/rain-admin run build` (ผ่านฉลุย)
      - `npm --workspace=@mango/portal run build` (ผ่านฉลุย)
      - `npm --workspace=@mango/api run build` (ผ่านฉลุย)
-  4. ทำ Version Control ตามกฎข้อที่ 6: แยก Commit อย่างชัดเจนตามฟีเจอร์ และสั่ง `git push` ขึ้น GitHub เรียบร้อยทุกสเต็ป
+  5. ทำ Version Control ตามกฎข้อที่ 6: แยก Commit อย่างชัดเจนตามฟีเจอร์ และสั่ง `git push` ขึ้น GitHub เรียบร้อยทุกสเต็ป
 - **ไฟล์ที่สร้าง/แก้ไข**:
-  - `Rain/admin/src/admin.service.ts` *(เพิ่ม UserDto, CreateUserDto, getUsers, getPolicies, revokeDevice, createUser)*
-  - `Rain/admin/src/admin.controller.ts` *(เพิ่ม getUsers, getPolicies, deleteDevice, createUser พร้อมดักสิทธิ์ ADMIN)*
-  - `Rain/admin/src/admin.routes.ts` *(ลงทะเบียน GET/POST /api/users, GET /api/policies, DELETE /api/devices/:id)*
-  - `Rain/portal/src/components/AdminPanel.tsx` *(เพิ่มแท็บและ useQuery สำหรับ users & policies, ปุ่ม Revoke Device, Modal Add User, Toast Refresh)*
+  - `Rain/admin/src/admin.service.ts` *(เพิ่ม UserDto, CreateUserDto, CreatePolicyDto, getUsers, getPolicies, revokeDevice, createUser, createPolicy, deletePolicy)*
+  - `Rain/admin/src/admin.controller.ts` *(เพิ่ม getUsers, getPolicies, deleteDevice, createUser, createPolicy, deletePolicy พร้อมดักสิทธิ์ ADMIN)*
+  - `Rain/admin/src/admin.routes.ts` *(ลงทะเบียน GET/POST /api/users, GET/POST /api/policies, DELETE /api/policies/:id, DELETE /api/devices/:id)*
+  - `Rain/portal/src/components/AdminPanel.tsx` *(เพิ่มแท็บและ useQuery สำหรับ users & policies, ปุ่ม Revoke Device, Modal Add User, Modal Add Policy, ปุ่ม Delete Policy, Toast Refresh)*
   - `Rain/portal/src/App.tsx` *(เชื่อมโยง Component AdminPanel และส่งฟังก์ชัน showToast)*
   - `Rain/RULES_AND_WORKLOG.md` *(อัปเดตบันทึกประจำวัน)*
