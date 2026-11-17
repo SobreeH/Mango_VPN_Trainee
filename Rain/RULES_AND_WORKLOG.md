@@ -239,6 +239,7 @@
   - `afa467a` (`feat(admin): implement policy creation and deletion endpoints with ui modal in admin panel`)
   - `beba27f` (`feat(portal): add quick stats summary cards and real-time search filter in admin panel`)
   - `a111f52` (`feat(portal): enforce zero-trust role-based visibility on quick stats cards`)
+  - `017fd26` (`feat(portal): refine stats cards visibility according to hci principles`)
 - **สิ่งที่ทำ**:
   1. [ช่วงเช้า] ศึกษาหลักการทำงานของ Prisma ORM, สถาปัตยกรรม 3 เลเยอร์ (Routes -> Controller -> Service) และพื้นฐานการทำ REST API
   2. [ช่วงบ่าย] ดำเนินการพัฒนาตาม Implementation Plan:
