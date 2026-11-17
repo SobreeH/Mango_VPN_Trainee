@@ -114,5 +114,14 @@ export class AdminService {
       releasedAt: v.releasedAt.toISOString(),
     }));
   }
+
+  async revokeDevice(deviceId: string): Promise<boolean> {
+    const existing = await prisma.device.findUnique({ where: { id: deviceId } });
+    if (!existing) {
+      throw new Error('Device not found');
+    }
+    await prisma.device.delete({ where: { id: deviceId } });
+    return true;
+  }
 }
 

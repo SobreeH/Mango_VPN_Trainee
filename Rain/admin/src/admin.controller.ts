@@ -130,5 +130,28 @@ export class AdminController {
       });
     }
   }
+
+  async deleteDevice(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
+    try {
+      const user = (request as any).user;
+      if (user?.role !== 'ADMIN') {
+        return reply.status(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'Admin access required' } });
+      }
+
+      const { id } = request.params;
+      await adminService.revokeDevice(id);
+      return reply.status(200).send({
+        success: true,
+        message: 'Device revoked successfully',
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      return reply.status(err.message === 'Device not found' ? 404 : 500).send({
+        success: false,
+        error: { code: err.message === 'Device not found' ? 'NOT_FOUND' : 'SERVER_ERROR', message: err.message },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
 }
 

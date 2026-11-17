@@ -10,5 +10,6 @@ export async function adminRoutes(app: FastifyInstance) {
   app.get('/api/agent-versions', (req, reply) => controller.getAgentVersions(req, reply));
   app.get('/api/users', (req, reply) => controller.getUsers(req, reply));
   app.get('/api/policies', (req, reply) => controller.getPolicies(req, reply));
+  app.delete('/api/devices/:id', (req, reply) => controller.deleteDevice(req as any, reply));
 }
 

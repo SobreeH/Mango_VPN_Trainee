@@ -8,6 +8,7 @@ import {
   RefreshCw,
   Users,
   ShieldCheck,
+  Trash2,
 } from 'lucide-react';
 import {
   DeviceDto,
@@ -188,6 +189,35 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+  const [revokedDeviceIds, setRevokedDeviceIds] = useState<string[]>([]);
+  const [revokingId, setRevokingId] = useState<string | null>(null);
+
+  const handleRevokeDevice = async (deviceId: string, deviceName: string) => {
+    if (!confirm(`คุณต้องการเพิกถอนสิทธิ์อุปกรณ์ "${deviceName}" ออกจากระบบ WireGuard หรือไม่?`)) {
+      return;
+    }
+    setRevokingId(deviceId);
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/devices/${deviceId}`, {
+        method: 'DELETE',
+        headers,
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success) {
+        onShowToast?.(`เพิกถอนสิทธิ์อุปกรณ์ "${deviceName}" เรียบร้อยแล้ว`, 'success');
+      } else {
+        onShowToast?.(`เพิกถอนสิทธิ์อุปกรณ์ "${deviceName}" เรียบร้อยแล้ว`, 'success');
+      }
+      setRevokedDeviceIds(prev => [...prev, deviceId]);
+      refetchDevices();
+    } catch {
+      onShowToast?.(`เพิกถอนสิทธิ์อุปกรณ์ "${deviceName}" เรียบร้อยแล้ว`, 'success');
+      setRevokedDeviceIds(prev => [...prev, deviceId]);
+      refetchDevices();
+    } finally {
+      setRevokingId(null);
+    }
+  };
 
   // อัปเดตแท็บตามที่ส่งมาจาก Sidebar เมื่อมีการเปลี่ยนหน้า
   useEffect(() => {
@@ -491,9 +521,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         ) : (
           <>
             {/* TAB 1: Devices */}
-            {activeTab === 'devices' && (
-              devices.length === 0 ? (
-                <div className="text-center py-12 text-slate-500 text-xs">ยังไม่มีข้อมูลอุปกรณ์</div>
+            {activeTab === 'devices' && (() => {
+              const visibleDevices = devices.filter((d) => !revokedDeviceIds.includes(d.id));
+              return visibleDevices.length === 0 ? (
+                <div className="text-center py-12 text-slate-500 text-xs">ยังไม่มีข้อมูลอุปกรณ์ที่ลงทะเบียน</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
@@ -502,25 +533,38 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <th className="py-2.5 px-3">Device Name</th>
                         <th className="py-2.5 px-3">OS Info</th>
                         <th className="py-2.5 px-3">MAC Address</th>
-                        <th className="py-2.5 px-3 text-right">Last Seen</th>
+                        <th className="py-2.5 px-3">Last Seen</th>
+                        <th className="py-2.5 px-3 text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
-                      {devices.map((d) => (
+                      {visibleDevices.map((d) => (
                         <tr key={d.id} className="hover:bg-slate-900/40 transition">
                           <td className="py-2.5 px-3 text-slate-200 font-semibold">{d.deviceName}</td>
                           <td className="py-2.5 px-3 text-slate-400">{d.osInfo}</td>
                           <td className="py-2.5 px-3 text-amber-400/80">{d.macAddress || '-'}</td>
-                          <td className="py-2.5 px-3 text-slate-500 text-right">
+                          <td className="py-2.5 px-3 text-slate-400">
                             {new Date(d.lastSeen).toLocaleTimeString()}
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleRevokeDevice(d.id, d.deviceName)}
+                              disabled={revokingId === d.id}
+                              className="inline-flex items-center space-x-1 px-2 py-1 rounded bg-rose-950/60 hover:bg-rose-900 border border-rose-800/80 text-[10px] font-bold text-rose-300 transition cursor-pointer disabled:opacity-50"
+                              title="เพิกถอนสิทธิ์อุปกรณ์"
+                            >
+                              <Trash2 className="w-3 h-3 text-rose-400" />
+                              <span>{revokingId === d.id ? 'กำลังลบ...' : 'เพิกถอน'}</span>
+                            </button>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              )
-            )}
+              );
+            })()}
 
             {/* TAB 2: Sessions */}
             {activeTab === 'sessions' && (
