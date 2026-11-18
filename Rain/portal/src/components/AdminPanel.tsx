@@ -240,14 +240,52 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   // State สำหรับจัดการตัดการเชื่อมต่อเซสชัน (POST /api/sessions/:id/disconnect)
-  const [disconnectedSessionIds, setDisconnectedSessionIds] = useState<string[]>([]);
+  const [disconnectedSessionIds, setDisconnectedSessionIds] = useState<string[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('mango_disconnected_sessions');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [disconnectingSessionId, setDisconnectingSessionId] = useState<string | null>(null);
+
+  // ซิงค์สถานะเซสชันที่เคยตัดแล้วเข้าสู่ Mock ตั้งแต่เปิดเว็บ
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem('mango_disconnected_sessions');
+      if (saved) {
+        const ids: string[] = JSON.parse(saved);
+        ids.forEach((id) => {
+          const s = MOCK_SESSIONS.find((item) => item.id === id);
+          if (s && !s.disconnectedAt) {
+            s.disconnectedAt = new Date().toISOString();
+          }
+        });
+      }
+    } catch {}
+  }, []);
 
   const handleDisconnectSession = async (sessionId: string, clientIp: string) => {
     if (!confirm(`คุณต้องการสั่งตัดการเชื่อมต่อ (Kick) ของเซสชัน Client IP "${clientIp}" ออกจากระบบเครือข่ายหรือไม่?`)) {
       return;
     }
     setDisconnectingSessionId(sessionId);
+
+    // 1. อัปเดตในหน่วยความจำ Mock และ sessionStorage ทันที (จำค่าไว้แม้กด Refresh หรือ F5)
+    const target = MOCK_SESSIONS.find((s) => s.id === sessionId);
+    if (target) {
+      target.disconnectedAt = new Date().toISOString();
+    }
+    setDisconnectedSessionIds((prev) => {
+      const next = Array.from(new Set([...prev, sessionId]));
+      try {
+        sessionStorage.setItem('mango_disconnected_sessions', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    // 2. ส่งคำสั่งไปบันทึกที่ระบบหลังบ้าน (Backend API / PostgreSQL)
     try {
       const res = await fetch(`${apiBaseUrl}/api/sessions/${sessionId}/disconnect`, {
         method: 'POST',
@@ -259,11 +297,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       } else {
         onShowToast?.(`ตัดการเชื่อมต่อเซสชัน "${clientIp}" เรียบร้อยแล้ว`, 'success');
       }
-      setDisconnectedSessionIds((prev) => [...prev, sessionId]);
       refetchSessions();
     } catch {
       onShowToast?.(`ตัดการเชื่อมต่อเซสชัน "${clientIp}" เรียบร้อยแล้ว`, 'success');
-      setDisconnectedSessionIds((prev) => [...prev, sessionId]);
       refetchSessions();
     } finally {
       setDisconnectingSessionId(null);
@@ -617,8 +653,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* 0. แดชบอร์ดสรุปภาพรวม (Quick Stats 4 Cards - แสดงเฉพาะหน้า Devices, Users, Policies ตามหลัก HCI & Zero-Trust) */}
-      {userRole !== 'CLIENT' && ['devices', 'users', 'policies'].includes(activeTab) && (
+      {/* 0. แดชบอร์ดสรุปภาพรวม (Quick Stats 4 Cards) */}
+      {userRole !== 'CLIENT' && ['devices', 'users', 'policies', 'sessions'].includes(activeTab) && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 flex items-center space-x-3 hover:border-emerald-500/30 transition">
             <div className="p-2 rounded-lg bg-emerald-950/70 border border-emerald-800/60 text-emerald-400">

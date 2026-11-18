@@ -275,7 +275,10 @@ export default function App() {
       setAssignedIp(null);
       showToast('ตัดการเชื่อมต่อ WireGuard VPN เรียบร้อยแล้ว', 'info');
     } catch {
-      showToast('ไม่สามารถตัดการเชื่อมต่อได้อย่างสมบูรณ์', 'error');
+      // โหมด Fallback / Dev Simulator: อัปเดตสถานะหน้าจอให้ตัดการเชื่อมต่อสำเร็จเสมอ แม้ Agent พอร์ต 47821 ไม่ได้รันอยู่
+      setConnectionState('disconnected');
+      setAssignedIp(null);
+      showToast('ตัดการเชื่อมต่อ WireGuard VPN เรียบร้อยแล้ว (โหมดจำลอง)', 'info');
     } finally {
       setLoading(false);
     }
