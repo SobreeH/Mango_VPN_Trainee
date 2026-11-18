@@ -286,6 +286,8 @@
   - `8683070` (`feat(admin): complete database seeder for all 8 prisma tables`)
   - `b6dcd8d` (`docs(rain): update worklog with 8-table database seeder commit`)
   - `6f541d0` (`feat(admin): implement session disconnect endpoint and audit logging`)
+  - `2a77948` (`docs(rain): update worklog with session disconnect api commit`)
+  - `956ed1a` (`feat(portal): add session disconnect action and polish traffic telemetry ui in admin panel`)
 - **สิ่งที่ทำ**:
   1. [ช่วงเช้า] จัดทำและอนุมัติแผนปฏิบัติงานประจำวัน (18 พ.ย. 2569) และสรุปหัวข้อโครงงานสหกิจศึกษา 3.2 ลงในเล่มรายงาน
   2. [ช่วงเช้า] ตรวจสอบสถาปัตยกรรมโมเดลฐานข้อมูล 8 ตารางหลักใน Prisma ORM (`roles`, `users`, `devices`, `vpn_peers`, `vpn_sessions`, `vpn_policies`, `audit_logs`, `agent_versions`)
@@ -303,14 +305,23 @@
      - เพิ่มเมธอด `disconnectSession(sessionId, adminUserId)` ใน `admin.service.ts` พร้อมเขียนประวัติความปลอดภัย AuditLog อัตโนมัติ (`VPN_SESSION_DISCONNECTED`)
      - เพิ่มตัวควบคุม `disconnectSession` ใน `admin.controller.ts` ดักตรวจสิทธิ์เฉพาะบทบาท `ADMIN` (Zero-Trust RBAC)
      - จดทะเบียนเส้นทาง API ใหม่ `POST /api/sessions/:id/disconnect` ใน `admin.routes.ts`
-  5. ทดสอบคอมไพล์ระบบ TypeScript:
+  5. [ช่วงบ่าย] ศึกษาทำความเข้าใจหลักการทำงานเชิงลึกของ WireGuard VPN (Asymmetric Cryptography Curve25519, Public/Private Key, Peer, AllowedIPs, UDP Roaming)
+  6. [ช่วงบ่าย] พัฒนาและยกระดับ UI การจัดการเซสชันในเว็บพอร์ทัล (`Rain/portal/src/components/AdminPanel.tsx`):
+     - เพิ่มฟังก์ชัน `formatBytes(bytes)` สำหรับแปลงขนาดเน็ตเวิร์กทราฟฟิกเป็น B, KB, MB, GB โดยอัตโนมัติ
+     - ปรับแต่งการแสดงผลคอลัมน์ Traffic (RX/TX) ด้วย Badge สี Emerald (Download) และ Sky (Upload) พร้อมไอคอนลูกศรทิศทางกำกับ
+     - เพิ่มคอลัมน์ Action ในตาราง Sessions และสร้างปุ่มสีแดง 'ตัดการเชื่อมต่อ' พร้อมไอคอน `PowerOff` สำหรับเซสชันที่สถานะ Online
+     - เชื่อมต่อฟังก์ชัน `handleDisconnectSession` ยิงเรียก API `POST /api/sessions/:id/disconnect` พร้อมกล่องไดอะล็อกยืนยันและการแจ้งเตือน Toast
+     - อัปเดตสถิติ Quick Stats Card แบบ Real-time: ปรับลดจำนวนเซสชันออนไลน์ทันทีเมื่อมีการตัดการเชื่อมต่อ
+  7. ทดสอบคอมไพล์ระบบ TypeScript & Vite:
      - `npm --workspace=@mango/rain-admin run build` (ผ่านฉลุย 100%)
      - `npm --workspace=@mango/api run build` (ผ่านฉลุย 100%)
-  6. ดำเนินการ Git Commit & Push ขึ้น Branch `feature/rain-db-seeder` เรียบร้อย
+     - `npm --workspace=@mango/portal run build` (ผ่านฉลุย 100%)
+  8. ดำเนินการ Git Commit & Push ขึ้น Branch `feature/rain-db-seeder` เรียบร้อย
 - **ไฟล์ที่สร้าง/แก้ไข**:
   - `Rain/admin/src/seed.ts` *(ขยาย Seeder ครบ 8 ตาราง พร้อมความสัมพันธ์และตัวอย่างข้อมูล)*
   - `Rain/admin/src/admin.service.ts` *(เพิ่มฟังก์ชัน disconnectSession และสร้างบันทึก AuditLog)*
   - `Rain/admin/src/admin.controller.ts` *(เพิ่มตัวจัดการ request disconnectSession ดักสิทธิ์ ADMIN)*
   - `Rain/admin/src/admin.routes.ts` *(ลงทะเบียนเส้นทาง POST /api/sessions/:id/disconnect)*
+  - `Rain/portal/src/components/AdminPanel.tsx` *(เพิ่มปุ่มตัดการเชื่อมต่อ, ฟังก์ชัน formatBytes, จัดรูปแบบ Traffic RX/TX และคำนวณ Quick Stats)*
   - `Rain/RULES_AND_WORKLOG.md` *(อัปเดตบันทึกประจำวัน)*
 
