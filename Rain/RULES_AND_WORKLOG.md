@@ -284,6 +284,8 @@
 - **Branch**: `feature/rain-db-seeder`
 - **Commits**:
   - `8683070` (`feat(admin): complete database seeder for all 8 prisma tables`)
+  - `b6dcd8d` (`docs(rain): update worklog with 8-table database seeder commit`)
+  - `6f541d0` (`feat(admin): implement session disconnect endpoint and audit logging`)
 - **สิ่งที่ทำ**:
   1. [ช่วงเช้า] จัดทำและอนุมัติแผนปฏิบัติงานประจำวัน (18 พ.ย. 2569) และสรุปหัวข้อโครงงานสหกิจศึกษา 3.2 ลงในเล่มรายงาน
   2. [ช่วงเช้า] ตรวจสอบสถาปัตยกรรมโมเดลฐานข้อมูล 8 ตารางหลักใน Prisma ORM (`roles`, `users`, `devices`, `vpn_peers`, `vpn_sessions`, `vpn_policies`, `audit_logs`, `agent_versions`)
@@ -297,10 +299,18 @@
      - สร้าง VPN Sessions จำลองทราฟฟิกข้อมูล Rx/Tx และสถานะ Active Online / Closed
      - สร้าง Audit Logs จำลองประวัติกิจกรรมด้านความปลอดภัย เช่น การล็อกอิน การยืนยัน 2FA และการตั้งค่าระบบ
      - บันทึกเวอร์ชัน Agent ล่าสุด (1.0.0 และ 1.1.0-beta)
-  4. ทดสอบคอมไพล์ระบบ TypeScript:
+  4. [ช่วงเช้า] พัฒนาระบบหลังบ้าน Session Disconnect API ในโมดูล `Rain/admin`:
+     - เพิ่มเมธอด `disconnectSession(sessionId, adminUserId)` ใน `admin.service.ts` พร้อมเขียนประวัติความปลอดภัย AuditLog อัตโนมัติ (`VPN_SESSION_DISCONNECTED`)
+     - เพิ่มตัวควบคุม `disconnectSession` ใน `admin.controller.ts` ดักตรวจสิทธิ์เฉพาะบทบาท `ADMIN` (Zero-Trust RBAC)
+     - จดทะเบียนเส้นทาง API ใหม่ `POST /api/sessions/:id/disconnect` ใน `admin.routes.ts`
+  5. ทดสอบคอมไพล์ระบบ TypeScript:
      - `npm --workspace=@mango/rain-admin run build` (ผ่านฉลุย 100%)
-  5. ดำเนินการ Git Commit & Push ขึ้น Branch `feature/rain-db-seeder` เรียบร้อย
+     - `npm --workspace=@mango/api run build` (ผ่านฉลุย 100%)
+  6. ดำเนินการ Git Commit & Push ขึ้น Branch `feature/rain-db-seeder` เรียบร้อย
 - **ไฟล์ที่สร้าง/แก้ไข**:
   - `Rain/admin/src/seed.ts` *(ขยาย Seeder ครบ 8 ตาราง พร้อมความสัมพันธ์และตัวอย่างข้อมูล)*
+  - `Rain/admin/src/admin.service.ts` *(เพิ่มฟังก์ชัน disconnectSession และสร้างบันทึก AuditLog)*
+  - `Rain/admin/src/admin.controller.ts` *(เพิ่มตัวจัดการ request disconnectSession ดักสิทธิ์ ADMIN)*
+  - `Rain/admin/src/admin.routes.ts` *(ลงทะเบียนเส้นทาง POST /api/sessions/:id/disconnect)*
   - `Rain/RULES_AND_WORKLOG.md` *(อัปเดตบันทึกประจำวัน)*
 
