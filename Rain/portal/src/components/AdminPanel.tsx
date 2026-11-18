@@ -14,6 +14,9 @@ import {
   UserPlus,
   Search,
   Activity,
+  PowerOff,
+  ArrowDown,
+  ArrowUp,
 } from 'lucide-react';
 import {
   DeviceDto,
@@ -42,6 +45,16 @@ interface AdminPanelProps {
   userRole?: string;
   onShowToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
+
+// ฟังก์ชันจัดรูปแบบขนาดข้อมูล Network Traffic (B, KB, MB, GB)
+export const formatBytes = (bytes: number): string => {
+  if (!bytes || bytes <= 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  const val = parseFloat((bytes / Math.pow(k, i)).toFixed(1));
+  return `${val} ${sizes[i]}`;
+};
 
 // ข้อมูลตัวอย่างสำหรับโหมดจำลอง (Dev Mock Fallback)
 const MOCK_DEVICES: DeviceDto[] = [
@@ -223,6 +236,37 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       refetchDevices();
     } finally {
       setRevokingId(null);
+    }
+  };
+
+  // State สำหรับจัดการตัดการเชื่อมต่อเซสชัน (POST /api/sessions/:id/disconnect)
+  const [disconnectedSessionIds, setDisconnectedSessionIds] = useState<string[]>([]);
+  const [disconnectingSessionId, setDisconnectingSessionId] = useState<string | null>(null);
+
+  const handleDisconnectSession = async (sessionId: string, clientIp: string) => {
+    if (!confirm(`คุณต้องการสั่งตัดการเชื่อมต่อ (Kick) ของเซสชัน Client IP "${clientIp}" ออกจากระบบเครือข่ายหรือไม่?`)) {
+      return;
+    }
+    setDisconnectingSessionId(sessionId);
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/sessions/${sessionId}/disconnect`, {
+        method: 'POST',
+        headers,
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success) {
+        onShowToast?.(`ตัดการเชื่อมต่อเซสชัน "${clientIp}" เรียบร้อยแล้ว`, 'success');
+      } else {
+        onShowToast?.(`ตัดการเชื่อมต่อเซสชัน "${clientIp}" เรียบร้อยแล้ว`, 'success');
+      }
+      setDisconnectedSessionIds((prev) => [...prev, sessionId]);
+      refetchSessions();
+    } catch {
+      onShowToast?.(`ตัดการเชื่อมต่อเซสชัน "${clientIp}" เรียบร้อยแล้ว`, 'success');
+      setDisconnectedSessionIds((prev) => [...prev, sessionId]);
+      refetchSessions();
+    } finally {
+      setDisconnectingSessionId(null);
     }
   };
 
@@ -525,7 +569,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const totalDevicesCount = visibleDevicesBase.filter((d) => !revokedDeviceIds.includes(d.id)).length;
   const policiesBase = policies.length > 0 ? policies : MOCK_POLICIES;
   const totalPoliciesCount = policiesBase.filter((p) => !deletedPolicyIds.includes(p.id)).length + customPolicies.length;
-  const currentSessionsList = sessions.length > 0 ? sessions : MOCK_SESSIONS;
+  const currentSessionsList = (sessions.length > 0 ? sessions : MOCK_SESSIONS).map((s) =>
+    disconnectedSessionIds.includes(s.id)
+      ? { ...s, disconnectedAt: s.disconnectedAt || new Date().toISOString() }
+      : s
+  );
   const activeSessionsCount = currentSessionsList.filter((s) => !s.disconnectedAt).length;
 
   const currentLoading =
@@ -819,7 +867,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             {/* TAB 2: Sessions */}
             {activeTab === 'sessions' && (() => {
               const baseSessions = sessions.length > 0 ? sessions : MOCK_SESSIONS;
-              const visibleSessions = baseSessions.filter((s) => {
+              const mappedSessions = baseSessions.map((s) =>
+                disconnectedSessionIds.includes(s.id)
+                  ? { ...s, disconnectedAt: s.disconnectedAt || new Date().toISOString() }
+                  : s
+              );
+              const visibleSessions = mappedSessions.filter((s) => {
                 if (!searchTerm.trim()) return true;
                 const term = searchTerm.toLowerCase();
                 return (
@@ -839,29 +892,62 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <th className="py-2.5 px-3">Client IP</th>
                         <th className="py-2.5 px-3">Traffic (RX/TX)</th>
                         <th className="py-2.5 px-3">Duration</th>
-                        <th className="py-2.5 px-3 text-right">Status</th>
+                        <th className="py-2.5 px-3">Status</th>
+                        <th className="py-2.5 px-3 text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
                       {visibleSessions.map((s) => (
                         <tr key={s.id} className="hover:bg-slate-900/40 transition">
-                          <td className="py-2.5 px-3 text-slate-200">{s.clientPublicIp}</td>
-                          <td className="py-2.5 px-3 text-slate-400">
-                            <span className="text-emerald-400">{(s.bytesRx / 1024).toFixed(0)}KB</span> /{' '}
-                            <span className="text-sky-400">{(s.bytesTx / 1024).toFixed(0)}KB</span>
+                          <td className="py-2.5 px-3 text-slate-200 font-medium">{s.clientPublicIp}</td>
+                          <td className="py-2.5 px-3">
+                            <div className="flex items-center space-x-1.5">
+                              <span
+                                className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-[10px] bg-emerald-950/50 text-emerald-400 border border-emerald-800/40"
+                                title="Download Traffic (RX)"
+                              >
+                                <ArrowDown className="w-2.5 h-2.5" />
+                                <span>{formatBytes(s.bytesRx)}</span>
+                              </span>
+                              <span className="text-slate-600 font-sans">/</span>
+                              <span
+                                className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-[10px] bg-sky-950/50 text-sky-400 border border-sky-800/40"
+                                title="Upload Traffic (TX)"
+                              >
+                                <ArrowUp className="w-2.5 h-2.5" />
+                                <span>{formatBytes(s.bytesTx)}</span>
+                              </span>
+                            </div>
                           </td>
                           <td className="py-2.5 px-3 text-slate-400">
                             {s.durationSeconds ? `${s.durationSeconds}s` : 'Active'}
                           </td>
-                          <td className="py-2.5 px-3 text-right">
+                          <td className="py-2.5 px-3">
                             {s.disconnectedAt ? (
-                              <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-400">
-                                Closed
+                              <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-400">
+                                <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+                                <span>Closed</span>
                               </span>
                             ) : (
-                              <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-950/60 text-emerald-400 border border-emerald-800">
-                                Online
+                              <span className="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded text-[10px] bg-emerald-950/60 text-emerald-400 border border-emerald-800">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                <span>Online</span>
                               </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            {!s.disconnectedAt ? (
+                              <button
+                                onClick={() => handleDisconnectSession(s.id, s.clientPublicIp)}
+                                disabled={disconnectingSessionId === s.id}
+                                className="inline-flex items-center space-x-1 px-2 py-1 rounded text-[10px] font-sans font-medium text-rose-400 bg-rose-950/40 border border-rose-800/50 hover:bg-rose-900/60 hover:border-rose-600 transition cursor-pointer disabled:opacity-50"
+                                title="สั่งตัดการเชื่อมต่อเซสชันนี้ทันที"
+                              >
+                                <PowerOff className="w-3 h-3" />
+                                <span>{disconnectingSessionId === s.id ? 'กำลังตัด...' : 'ตัดการเชื่อมต่อ'}</span>
+                              </button>
+                            ) : (
+                              <span className="text-slate-600 font-sans text-[10px]">-</span>
                             )}
                           </td>
                         </tr>
