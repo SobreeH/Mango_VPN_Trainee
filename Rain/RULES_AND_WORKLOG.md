@@ -288,6 +288,8 @@
   - `6f541d0` (`feat(admin): implement session disconnect endpoint and audit logging`)
   - `2a77948` (`docs(rain): update worklog with session disconnect api commit`)
   - `956ed1a` (`feat(portal): add session disconnect action and polish traffic telemetry ui in admin panel`)
+  - `ec59430` (`docs(rain): update worklog with portal session disconnect and telemetry commit`)
+  - `4aa7b2e` (`feat(portal): refine disconnect fallback behavior and enable quick stats on sessions tab`)
 - **สิ่งที่ทำ**:
   1. [ช่วงเช้า] จัดทำและอนุมัติแผนปฏิบัติงานประจำวัน (18 พ.ย. 2569) และสรุปหัวข้อโครงงานสหกิจศึกษา 3.2 ลงในเล่มรายงาน
   2. [ช่วงเช้า] ตรวจสอบสถาปัตยกรรมโมเดลฐานข้อมูล 8 ตารางหลักใน Prisma ORM (`roles`, `users`, `devices`, `vpn_peers`, `vpn_sessions`, `vpn_policies`, `audit_logs`, `agent_versions`)
@@ -312,16 +314,21 @@
      - เพิ่มคอลัมน์ Action ในตาราง Sessions และสร้างปุ่มสีแดง 'ตัดการเชื่อมต่อ' พร้อมไอคอน `PowerOff` สำหรับเซสชันที่สถานะ Online
      - เชื่อมต่อฟังก์ชัน `handleDisconnectSession` ยิงเรียก API `POST /api/sessions/:id/disconnect` พร้อมกล่องไดอะล็อกยืนยันและการแจ้งเตือน Toast
      - อัปเดตสถิติ Quick Stats Card แบบ Real-time: ปรับลดจำนวนเซสชันออนไลน์ทันทีเมื่อมีการตัดการเชื่อมต่อ
-  7. ทดสอบคอมไพล์ระบบ TypeScript & Vite:
+  7. [ช่วงบ่าย] ปรับปรุงกลไก Fallback ในการตัดการเชื่อมต่อให้ทำงานสมบูรณ์ 100%:
+     - ปรับ `App.tsx` (`handleDisconnectVpn`): ในโหมดที่ Agent พอร์ต 47821 ไม่ได้รันอยู่ ให้สลับสถานะหน้าจอเป็น `disconnected` ทันที ไม่ค้างสถานะเดิม
+     - ปรับ `AdminPanel.tsx`: เปิดแสดง Quick Stats 4 Cards ในแท็บ Sessions เพื่อให้เห็นการเปลี่ยนแปลงของเซสชันออนไลน์ทันที
+     - อัปเดตข้อมูลเซสชันในหน่วยความจำ Mock โดยตรง ป้องกันการรีเซ็ตกลับเป็นสถานะเดิม
+  8. ทดสอบคอมไพล์ระบบ TypeScript & Vite:
      - `npm --workspace=@mango/rain-admin run build` (ผ่านฉลุย 100%)
      - `npm --workspace=@mango/api run build` (ผ่านฉลุย 100%)
      - `npm --workspace=@mango/portal run build` (ผ่านฉลุย 100%)
-  8. ดำเนินการ Git Commit & Push ขึ้น Branch `feature/rain-db-seeder` เรียบร้อย
+  9. ดำเนินการ Git Commit & Push ขึ้น Branch `feature/rain-db-seeder` เรียบร้อย
 - **ไฟล์ที่สร้าง/แก้ไข**:
   - `Rain/admin/src/seed.ts` *(ขยาย Seeder ครบ 8 ตาราง พร้อมความสัมพันธ์และตัวอย่างข้อมูล)*
   - `Rain/admin/src/admin.service.ts` *(เพิ่มฟังก์ชัน disconnectSession และสร้างบันทึก AuditLog)*
   - `Rain/admin/src/admin.controller.ts` *(เพิ่มตัวจัดการ request disconnectSession ดักสิทธิ์ ADMIN)*
   - `Rain/admin/src/admin.routes.ts` *(ลงทะเบียนเส้นทาง POST /api/sessions/:id/disconnect)*
-  - `Rain/portal/src/components/AdminPanel.tsx` *(เพิ่มปุ่มตัดการเชื่อมต่อ, ฟังก์ชัน formatBytes, จัดรูปแบบ Traffic RX/TX และคำนวณ Quick Stats)*
+  - `Rain/portal/src/App.tsx` *(ปรับ fallback การตัดการเชื่อมต่อ VPN ในหน้า Dashboard)*
+  - `Rain/portal/src/components/AdminPanel.tsx` *(เพิ่มปุ่มตัดการเชื่อมต่อ, ฟังก์ชัน formatBytes, แสดง Quick Stats ในแท็บ Sessions)*
   - `Rain/RULES_AND_WORKLOG.md` *(อัปเดตบันทึกประจำวัน)*
 
