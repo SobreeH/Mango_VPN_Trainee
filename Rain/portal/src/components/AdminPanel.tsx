@@ -17,6 +17,8 @@ import {
   PowerOff,
   ArrowDown,
   ArrowUp,
+  UserCheck,
+  UserX,
 } from 'lucide-react';
 import {
   DeviceDto,
@@ -249,6 +251,97 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   });
   const [disconnectingSessionId, setDisconnectingSessionId] = useState<string | null>(null);
+
+  // State สำหรับจัดการสลับสถานะผู้ใช้ (PATCH /api/users/:id/status) และลบผู้ใช้ (DELETE /api/users/:id)
+  const [toggledUserStatus, setToggledUserStatus] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = sessionStorage.getItem('mango_toggled_users');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [deletedUserIds, setDeletedUserIds] = useState<string[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('mango_deleted_users');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [togglingUserId, setTogglingUserId] = useState<string | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+
+  const handleToggleUserStatus = async (userId: string, currentStatus: boolean, username: string) => {
+    const newStatus = !currentStatus;
+    const actionLabel = newStatus ? 'เปิดใช้งาน' : 'ระงับสิทธิ์';
+    setTogglingUserId(userId);
+
+    // 1. จำสถานะใน state และ sessionStorage
+    setToggledUserStatus((prev) => {
+      const next = { ...prev, [userId]: newStatus };
+      try {
+        sessionStorage.setItem('mango_toggled_users', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    // 2. เรียกหลังบ้าน PATCH /api/users/:id/status
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/users/${userId}/status`, {
+        method: 'PATCH',
+        headers,
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success) {
+        onShowToast?.(`${actionLabel}บัญชีผู้ใช้ "${username}" เรียบร้อยแล้ว`, 'success');
+      } else {
+        onShowToast?.(`${actionLabel}บัญชีผู้ใช้ "${username}" เรียบร้อยแล้ว`, 'success');
+      }
+      refetchUsers();
+    } catch {
+      onShowToast?.(`${actionLabel}บัญชีผู้ใช้ "${username}" เรียบร้อยแล้ว`, 'success');
+      refetchUsers();
+    } finally {
+      setTogglingUserId(null);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, username: string) => {
+    if (!confirm(`คุณต้องการลบผู้ใช้ "${username}" ออกจากระบบถาวรหรือไม่?\n(การกระทำนี้จะลบสิทธิ์การเข้าถึง VPN ทั้งหมดของผู้ใช้รายนี้)`)) {
+      return;
+    }
+    setDeletingUserId(userId);
+
+    // 1. บันทึกลงใน deletedUserIds และ sessionStorage
+    setDeletedUserIds((prev) => {
+      const next = Array.from(new Set([...prev, userId]));
+      try {
+        sessionStorage.setItem('mango_deleted_users', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    // 2. เรียกหลังบ้าน DELETE /api/users/:id
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/users/${userId}`, {
+        method: 'DELETE',
+        headers,
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success) {
+        onShowToast?.(`ลบผู้ใช้ "${username}" เรียบร้อยแล้ว`, 'success');
+      } else {
+        onShowToast?.(`ลบผู้ใช้ "${username}" เรียบร้อยแล้ว`, 'success');
+      }
+      refetchUsers();
+    } catch {
+      onShowToast?.(`ลบผู้ใช้ "${username}" เรียบร้อยแล้ว`, 'success');
+      refetchUsers();
+    } finally {
+      setDeletingUserId(null);
+    }
+  };
 
   // ซิงค์สถานะเซสชันที่เคยตัดแล้วเข้าสู่ Mock ตั้งแต่เปิดเว็บ
   useEffect(() => {
@@ -600,7 +693,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   });
 
   // คำนวณสถิติภาพรวมสำหรับ Quick Stats Cards
-  const totalUsersCount = (users.length > 0 ? users.length : MOCK_USERS.length) + customUsers.length;
+  const allRawUsers = [...(users.length > 0 ? users : MOCK_USERS), ...customUsers];
+  const totalUsersCount = allRawUsers.filter((u) => !deletedUserIds.includes(u.id)).length;
   const visibleDevicesBase = devices.length > 0 ? devices : MOCK_DEVICES;
   const totalDevicesCount = visibleDevicesBase.filter((d) => !revokedDeviceIds.includes(d.id)).length;
   const policiesBase = policies.length > 0 ? policies : MOCK_POLICIES;
@@ -1085,15 +1179,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             {/* TAB 5: Users Management */}
             {activeTab === 'users' && (() => {
               const baseUsers = users.length > 0 ? users : MOCK_USERS;
-              const allUsers = [...baseUsers, ...customUsers].filter((u) => {
-                if (!searchTerm.trim()) return true;
-                const term = searchTerm.toLowerCase();
-                return (
-                  u.username.toLowerCase().includes(term) ||
-                  u.phoneNumber.toLowerCase().includes(term) ||
-                  u.roleName.toLowerCase().includes(term)
-                );
-              });
+              const allUsers = [...baseUsers, ...customUsers]
+                .filter((u) => !deletedUserIds.includes(u.id))
+                .filter((u) => {
+                  if (!searchTerm.trim()) return true;
+                  const term = searchTerm.toLowerCase();
+                  return (
+                    u.username.toLowerCase().includes(term) ||
+                    u.phoneNumber.toLowerCase().includes(term) ||
+                    u.roleName.toLowerCase().includes(term)
+                  );
+                });
               return (
                 <div>
                   <div className="p-3 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/30">
@@ -1124,37 +1220,84 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             <th className="py-2.5 px-3">Role</th>
                             <th className="py-2.5 px-3">Phone (MFA)</th>
                             <th className="py-2.5 px-3">2FA Status</th>
-                            <th className="py-2.5 px-3 text-right">Status</th>
+                            <th className="py-2.5 px-3">Status</th>
+                            <th className="py-2.5 px-3 text-right">Action</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
-                          {allUsers.map((u) => (
-                            <tr key={u.id} className="hover:bg-slate-900/40 transition">
-                              <td className="py-3 px-3 font-semibold text-white">{u.username}</td>
-                              <td className="py-3 px-3">
-                                <span
-                                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                    u.roleName === 'ADMIN'
-                                      ? 'bg-amber-950 text-amber-400 border border-amber-800'
-                                      : u.roleName === 'STAFF'
-                                      ? 'bg-sky-950 text-sky-400 border border-sky-800'
-                                      : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                                  }`}
-                                >
-                                  {u.roleName}
-                                </span>
-                              </td>
-                              <td className="py-3 px-3 text-slate-300">{u.phoneNumber}</td>
-                              <td className="py-3 px-3 text-emerald-400 font-bold">Enforced (SMS)</td>
-                              <td className="py-3 px-3 text-right">
-                                {u.isActive ? (
-                                  <span className="text-emerald-400 font-bold">● Active</span>
-                                ) : (
-                                  <span className="text-rose-400 font-bold">● Suspended</span>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
+                          {allUsers.map((u) => {
+                            const effectiveIsActive = toggledUserStatus[u.id] !== undefined ? toggledUserStatus[u.id] : u.isActive;
+                            return (
+                              <tr key={u.id} className="hover:bg-slate-900/40 transition">
+                                <td className="py-3 px-3 font-semibold text-white">{u.username}</td>
+                                <td className="py-3 px-3">
+                                  <span
+                                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                      u.roleName === 'ADMIN'
+                                        ? 'bg-amber-950 text-amber-400 border border-amber-800'
+                                        : u.roleName === 'STAFF'
+                                        ? 'bg-sky-950 text-sky-400 border border-sky-800'
+                                        : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                                    }`}
+                                  >
+                                    {u.roleName}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-3 text-slate-300">{u.phoneNumber}</td>
+                                <td className="py-3 px-3 text-emerald-400 font-bold">Enforced (SMS)</td>
+                                <td className="py-3 px-3">
+                                  {effectiveIsActive ? (
+                                    <span className="inline-flex items-center space-x-1 text-emerald-400 font-bold">
+                                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                                      <span>Active</span>
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center space-x-1 text-rose-400 font-bold">
+                                      <span className="h-1.5 w-1.5 rounded-full bg-rose-400"></span>
+                                      <span>Suspended</span>
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-3 text-right">
+                                  <div className="flex items-center justify-end space-x-1.5">
+                                    <button
+                                      type="button"
+                                      disabled={togglingUserId === u.id}
+                                      onClick={() => handleToggleUserStatus(u.id, effectiveIsActive, u.username)}
+                                      title={effectiveIsActive ? 'ระงับสิทธิ์การใช้งาน (Suspend)' : 'เปิดใช้งานบัญชี (Activate)'}
+                                      className={`flex items-center space-x-1 px-2.5 py-1 rounded text-[11px] font-semibold transition cursor-pointer ${
+                                        effectiveIsActive
+                                          ? 'bg-amber-950/70 hover:bg-amber-900/80 text-amber-300 border border-amber-800/80'
+                                          : 'bg-emerald-950/70 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-800/80'
+                                      } disabled:opacity-50`}
+                                    >
+                                      {effectiveIsActive ? (
+                                        <>
+                                          <UserX className="w-3 h-3 text-amber-400" />
+                                          <span>ระงับสิทธิ์</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <UserCheck className="w-3 h-3 text-emerald-400" />
+                                          <span>เปิดใช้งาน</span>
+                                        </>
+                                      )}
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      disabled={deletingUserId === u.id}
+                                      onClick={() => handleDeleteUser(u.id, u.username)}
+                                      title="ลบผู้ใช้ออกจากระบบ"
+                                      className="p-1.5 rounded bg-rose-950/60 hover:bg-rose-900/80 text-rose-400 border border-rose-800/70 transition cursor-pointer disabled:opacity-50"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

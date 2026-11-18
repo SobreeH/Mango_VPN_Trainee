@@ -15,5 +15,7 @@ export async function adminRoutes(app: FastifyInstance) {
   app.delete('/api/policies/:id', (req, reply) => controller.deletePolicy(req as any, reply));
   app.delete('/api/devices/:id', (req, reply) => controller.deleteDevice(req as any, reply));
   app.post('/api/sessions/:id/disconnect', (req, reply) => controller.disconnectSession(req as any, reply));
+  app.patch('/api/users/:id/status', (req, reply) => controller.toggleUserStatus(req as any, reply));
+  app.delete('/api/users/:id', (req, reply) => controller.deleteUser(req as any, reply));
 }
 

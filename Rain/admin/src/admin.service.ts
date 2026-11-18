@@ -254,5 +254,76 @@ export class AdminService {
 
     return true;
   }
+
+  async toggleUserStatus(userId: string, adminUserId?: string): Promise<UserDto> {
+    const existing = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { role: true },
+    });
+
+    if (!existing) {
+      throw new Error('User not found');
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { isActive: !existing.isActive },
+      include: { role: true },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: adminUserId || null,
+        action: 'USER_STATUS_UPDATED',
+        ipAddress: '127.0.0.1',
+        metadataJson: {
+          targetUserId: updated.id,
+          targetUsername: updated.username,
+          previousStatus: existing.isActive,
+          newStatus: updated.isActive,
+          statusLabel: updated.isActive ? 'ACTIVE' : 'SUSPENDED',
+        },
+      },
+    });
+
+    return {
+      id: updated.id,
+      username: updated.username,
+      phoneNumber: updated.phoneNumber,
+      roleName: updated.role.name,
+      isActive: updated.isActive,
+      createdAt: updated.createdAt.toISOString(),
+    };
+  }
+
+  async deleteUser(userId: string, adminUserId?: string): Promise<boolean> {
+    const existing = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { role: true },
+    });
+
+    if (!existing) {
+      throw new Error('User not found');
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        userId: adminUserId || null,
+        action: 'USER_DELETED',
+        ipAddress: '127.0.0.1',
+        metadataJson: {
+          deletedUserId: existing.id,
+          deletedUsername: existing.username,
+          role: existing.role.name,
+        },
+      },
+    });
+
+    await prisma.user.delete({
+      where: { id: userId },
+    });
+
+    return true;
+  }
 }
 
