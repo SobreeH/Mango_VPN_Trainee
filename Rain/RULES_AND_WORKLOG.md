@@ -290,6 +290,8 @@
   - `956ed1a` (`feat(portal): add session disconnect action and polish traffic telemetry ui in admin panel`)
   - `ec59430` (`docs(rain): update worklog with portal session disconnect and telemetry commit`)
   - `d596d39` (`feat(portal): add sessionStorage persistence for session kicks and display quick stats on sessions tab`)
+  - `0d4b645` (`docs(rain): update worklog with persistence and quick stats commit`)
+  - `2ab8383` (`feat(portal): implement user status toggle and deletion in admin panel`)
 - **สิ่งที่ทำ**:
   1. [ช่วงเช้า] จัดทำและอนุมัติแผนปฏิบัติงานประจำวัน (18 พ.ย. 2569) และสรุปหัวข้อโครงงานสหกิจศึกษา 3.2 ลงในเล่มรายงาน
   2. [ช่วงเช้า] ตรวจสอบสถาปัตยกรรมโมเดลฐานข้อมูล 8 ตารางหลักใน Prisma ORM (`roles`, `users`, `devices`, `vpn_peers`, `vpn_sessions`, `vpn_policies`, `audit_logs`, `agent_versions`)
@@ -323,12 +325,24 @@
      - `npm --workspace=@mango/api run build` (ผ่านฉลุย 100%)
      - `npm --workspace=@mango/portal run build` (ผ่านฉลุย 100%)
   9. ดำเนินการ Git Commit & Push ขึ้น Branch `feature/rain-db-seeder` เรียบร้อย
+  10. [ช่วงบ่าย] พัฒนาระบบจัดการผู้ใช้งานครบวงจร (User Management Full CRUD):
+      - ฝั่งหลังบ้าน (`Rain/admin`):
+        - เพิ่มฟังก์ชัน `toggleUserStatus(userId, adminUserId)` ใน `admin.service.ts` สำหรับสลับสถานะเปิดใช้งาน/ระงับสิทธิ์ พร้อมบันทึก `USER_STATUS_UPDATED` ลงใน AuditLog อัตโนมัติ
+        - เพิ่มฟังก์ชัน `deleteUser(userId, adminUserId)` ใน `admin.service.ts` สำหรับลบข้อมูลผู้ใช้ออกจากฐานข้อมูล พร้อมบันทึก `USER_DELETED` ลงใน AuditLog
+        - เพิ่มตัวจัดการ `toggleUserStatus` และ `deleteUser` ใน `admin.controller.ts` ดักตรวจสิทธิ์เฉพาะบทบาท `ADMIN`
+        - จดทะเบียนเส้นทาง API `PATCH /api/users/:id/status` และ `DELETE /api/users/:id` ใน `admin.routes.ts`
+      - ฝั่งหน้าเว็บ (`Rain/portal/src/components/AdminPanel.tsx`):
+        - เพิ่มคอลัมน์ "Action" ในแท็บจัดการผู้ใช้งาน (Users)
+        - พัฒนาปุ่มสลับสถานะผู้ใช้ (Toggle Active/Suspended) แสดงปุ่ม "ระงับสิทธิ์" (ไอคอน `UserX`) หรือ "เปิดใช้งาน" (ไอคอน `UserCheck`) ตามสถานะปัจจุบัน
+        - พัฒนาปุ่มลบผู้ใช้ (ไอคอน `Trash2` สีแดง) พร้อมกล่องไดอะล็อกยืนยันการลบ
+        - ออกแบบ State Persistence ด้วย `sessionStorage` (`mango_toggled_users` และ `mango_deleted_users`) เพื่อให้ข้อมูลที่ถูกสลับสถานะหรือลบออกยังคงแสดงผลถูกต้องแม้กด F5 หรือรีเฟรชหน้าเว็บ
+        - อัปเดตตัวเลขสถิติภาพรวม "ผู้ใช้ทั้งหมด" ใน Quick Stats Card ให้คำนวณตัดจำนวนผู้ใช้ที่ถูกลบออกทันทีแบบไดนามิก
 - **ไฟล์ที่สร้าง/แก้ไข**:
   - `Rain/admin/src/seed.ts` *(ขยาย Seeder ครบ 8 ตาราง พร้อมความสัมพันธ์และตัวอย่างข้อมูล)*
-  - `Rain/admin/src/admin.service.ts` *(เพิ่มฟังก์ชัน disconnectSession และสร้างบันทึก AuditLog)*
-  - `Rain/admin/src/admin.controller.ts` *(เพิ่มตัวจัดการ request disconnectSession ดักสิทธิ์ ADMIN)*
-  - `Rain/admin/src/admin.routes.ts` *(ลงทะเบียนเส้นทาง POST /api/sessions/:id/disconnect)*
+  - `Rain/admin/src/admin.service.ts` *(เพิ่ม disconnectSession, toggleUserStatus, deleteUser และ AuditLog)*
+  - `Rain/admin/src/admin.controller.ts` *(เพิ่ม endpoint handlers สำหรับตัดเซสชัน สลับสถานะผู้ใช้ และลบผู้ใช้)*
+  - `Rain/admin/src/admin.routes.ts` *(ลงทะเบียน POST /api/sessions/:id/disconnect, PATCH /api/users/:id/status, DELETE /api/users/:id)*
   - `Rain/portal/src/App.tsx` *(เพิ่ม Fallback การตัดการเชื่อมต่อ VPN ในหน้า Dashboard)*
-  - `Rain/portal/src/components/AdminPanel.tsx` *(เพิ่มปุ่มตัดการเชื่อมต่อ, formatBytes, sessionStorage persistence, Quick Stats ในแท็บ Sessions)*
+  - `Rain/portal/src/components/AdminPanel.tsx` *(เพิ่ม UI จัดการ Session Disconnect, Quick Stats, User Status Toggle และ Delete User)*
   - `Rain/RULES_AND_WORKLOG.md` *(อัปเดตบันทึกประจำวัน)*
 
