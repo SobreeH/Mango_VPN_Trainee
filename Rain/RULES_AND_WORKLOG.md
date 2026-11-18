@@ -292,6 +292,8 @@
   - `d596d39` (`feat(portal): add sessionStorage persistence for session kicks and display quick stats on sessions tab`)
   - `0d4b645` (`docs(rain): update worklog with persistence and quick stats commit`)
   - `2ab8383` (`feat(portal): implement user status toggle and deletion in admin panel`)
+  - `29aa551` (`feat(portal): implement zero-trust policy update modal and api integration`)
+  - `43f658d` (`feat(portal): refine policy update modal and state persistence`)
 - **สิ่งที่ทำ**:
   1. [ช่วงเช้า] จัดทำและอนุมัติแผนปฏิบัติงานประจำวัน (18 พ.ย. 2569) และสรุปหัวข้อโครงงานสหกิจศึกษา 3.2 ลงในเล่มรายงาน
   2. [ช่วงเช้า] ตรวจสอบสถาปัตยกรรมโมเดลฐานข้อมูล 8 ตารางหลักใน Prisma ORM (`roles`, `users`, `devices`, `vpn_peers`, `vpn_sessions`, `vpn_policies`, `audit_logs`, `agent_versions`)
@@ -337,12 +339,22 @@
         - พัฒนาปุ่มลบผู้ใช้ (ไอคอน `Trash2` สีแดง) พร้อมกล่องไดอะล็อกยืนยันการลบ
         - ออกแบบ State Persistence ด้วย `sessionStorage` (`mango_toggled_users` และ `mango_deleted_users`) เพื่อให้ข้อมูลที่ถูกสลับสถานะหรือลบออกยังคงแสดงผลถูกต้องแม้กด F5 หรือรีเฟรชหน้าเว็บ
         - อัปเดตตัวเลขสถิติภาพรวม "ผู้ใช้ทั้งหมด" ใน Quick Stats Card ให้คำนวณตัดจำนวนผู้ใช้ที่ถูกลบออกทันทีแบบไดนามิก
+  11. [ช่วงบ่าย] พัฒนาระบบจัดการนโยบายความปลอดภัยครบวงจร (Zero-Trust Policy Management Full CRUD - จุดที่ 2):
+      - ฝั่งหลังบ้าน (`Rain/admin`):
+        - เพิ่มฟังก์ชัน `updatePolicy(policyId, data, adminUserId)` ใน `admin.service.ts` เพื่อแก้ไข Target Role, Destination CIDR, Protocol, Port Range, และ Action พร้อมเขียนบันทึกความปลอดภัย AuditLog อัตโนมัติ (`POLICY_UPDATED`)
+        - เพิ่มตัวควบคุม `updatePolicy` ใน `admin.controller.ts` ดักตรวจสิทธิ์เฉพาะบทบาท `ADMIN`
+        - จดทะเบียนเส้นทาง API `PUT /api/policies/:id` ใน `admin.routes.ts`
+      - ฝั่งหน้าเว็บ (`Rain/portal/src/components/AdminPanel.tsx`):
+        - เพิ่มปุ่มไอคอนดินสอ `Pencil` สีทองคู่กับปุ่มถังขยะ `Trash2` ในตารางนโยบายเครือข่าย (Policies)
+        - พัฒนาหน้าต่าง Modal "แก้ไขกฎความปลอดภัยเครือข่าย" (Controlled Form with Pre-population) ดึงค่าเดิมของนโยบายที่เลือกขึ้นมากรอกลงในฟอร์มอัตโนมัติ เพื่อให้ผู้ใช้แก้ไขเฉพาะค่าที่ต้องการ
+        - เชื่อมต่อฟังก์ชัน `handleUpdatePolicy` ยิงเรียก API `PUT /api/policies/:id` พร้อมการแจ้งเตือน Toast
+        - เพิ่มระบบ State Persistence ผ่าน `sessionStorage` (`mango_updated_policies` และ `mango_deleted_policies`) ทำให้ข้อมูลนโยบายที่แก้ไขหรือลบยังคงแสดงผลถูกต้องแม้กด Refresh (F5)
 - **ไฟล์ที่สร้าง/แก้ไข**:
   - `Rain/admin/src/seed.ts` *(ขยาย Seeder ครบ 8 ตาราง พร้อมความสัมพันธ์และตัวอย่างข้อมูล)*
-  - `Rain/admin/src/admin.service.ts` *(เพิ่ม disconnectSession, toggleUserStatus, deleteUser และ AuditLog)*
-  - `Rain/admin/src/admin.controller.ts` *(เพิ่ม endpoint handlers สำหรับตัดเซสชัน สลับสถานะผู้ใช้ และลบผู้ใช้)*
-  - `Rain/admin/src/admin.routes.ts` *(ลงทะเบียน POST /api/sessions/:id/disconnect, PATCH /api/users/:id/status, DELETE /api/users/:id)*
+  - `Rain/admin/src/admin.service.ts` *(เพิ่ม disconnectSession, toggleUserStatus, deleteUser, updatePolicy และ AuditLog)*
+  - `Rain/admin/src/admin.controller.ts` *(เพิ่ม endpoint handlers สำหรับตัดเซสชัน สลับสถานะผู้ใช้ ลบผู้ใช้ และแก้ไขนโยบาย)*
+  - `Rain/admin/src/admin.routes.ts` *(ลงทะเบียน POST /api/sessions/:id/disconnect, PATCH /api/users/:id/status, DELETE /api/users/:id, PUT /api/policies/:id)*
   - `Rain/portal/src/App.tsx` *(เพิ่ม Fallback การตัดการเชื่อมต่อ VPN ในหน้า Dashboard)*
-  - `Rain/portal/src/components/AdminPanel.tsx` *(เพิ่ม UI จัดการ Session Disconnect, Quick Stats, User Status Toggle และ Delete User)*
+  - `Rain/portal/src/components/AdminPanel.tsx` *(เพิ่ม UI จัดการ Session Disconnect, Quick Stats, User Status Toggle, Delete User, Policy Edit Modal & Persistence)*
   - `Rain/RULES_AND_WORKLOG.md` *(อัปเดตบันทึกประจำวัน)*
 
