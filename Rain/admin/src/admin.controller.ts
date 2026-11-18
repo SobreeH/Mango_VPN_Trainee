@@ -1,5 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { AdminService } from './admin.service.js';
+import { AdminService, CreateUserDto, CreatePolicyDto } from './admin.service.js';
 
 const adminService = new AdminService();
 
@@ -82,6 +82,160 @@ export class AdminController {
       return reply.status(500).send({
         success: false,
         error: { code: 'SERVER_ERROR', message: err.message },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  async getUsers(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const user = (request as any).user;
+      if (user?.role !== 'ADMIN') {
+        return reply.status(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'Admin access required' } });
+      }
+
+      const users = await adminService.getUsers();
+      return reply.status(200).send({
+        success: true,
+        data: users,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      return reply.status(500).send({
+        success: false,
+        error: { code: 'SERVER_ERROR', message: err.message },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  async getPolicies(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const user = (request as any).user;
+      if (user?.role !== 'ADMIN') {
+        return reply.status(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'Admin access required' } });
+      }
+
+      const policies = await adminService.getPolicies();
+      return reply.status(200).send({
+        success: true,
+        data: policies,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      return reply.status(500).send({
+        success: false,
+        error: { code: 'SERVER_ERROR', message: err.message },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  async deleteDevice(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
+    try {
+      const user = (request as any).user;
+      if (user?.role !== 'ADMIN') {
+        return reply.status(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'Admin access required' } });
+      }
+
+      const { id } = request.params;
+      await adminService.revokeDevice(id);
+      return reply.status(200).send({
+        success: true,
+        message: 'Device revoked successfully',
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      return reply.status(err.message === 'Device not found' ? 404 : 500).send({
+        success: false,
+        error: { code: err.message === 'Device not found' ? 'NOT_FOUND' : 'SERVER_ERROR', message: err.message },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  async createUser(request: FastifyRequest<{ Body: CreateUserDto }>, reply: FastifyReply) {
+    try {
+      const user = (request as any).user;
+      if (user?.role !== 'ADMIN') {
+        return reply.status(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'Admin access required' } });
+      }
+
+      const body = request.body;
+      if (!body?.username || !body?.phoneNumber || !body?.roleName) {
+        return reply.status(400).send({
+          success: false,
+          error: { code: 'BAD_REQUEST', message: 'Missing required user fields' },
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      const newUser = await adminService.createUser(body);
+      return reply.status(201).send({
+        success: true,
+        data: newUser,
+        message: 'User created successfully',
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      return reply.status(500).send({
+        success: false,
+        error: { code: 'SERVER_ERROR', message: err.message },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  async createPolicy(request: FastifyRequest<{ Body: CreatePolicyDto }>, reply: FastifyReply) {
+    try {
+      const user = (request as any).user;
+      if (user?.role !== 'ADMIN') {
+        return reply.status(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'Admin access required' } });
+      }
+
+      const body = request.body;
+      if (!body?.roleName || !body?.destinationCidr) {
+        return reply.status(400).send({
+          success: false,
+          error: { code: 'BAD_REQUEST', message: 'Missing required policy fields' },
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      const newPolicy = await adminService.createPolicy(body);
+      return reply.status(201).send({
+        success: true,
+        data: newPolicy,
+        message: 'Policy created successfully',
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      return reply.status(500).send({
+        success: false,
+        error: { code: 'SERVER_ERROR', message: err.message },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  async deletePolicy(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
+    try {
+      const user = (request as any).user;
+      if (user?.role !== 'ADMIN') {
+        return reply.status(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'Admin access required' } });
+      }
+
+      const { id } = request.params;
+      await adminService.deletePolicy(id);
+      return reply.status(200).send({
+        success: true,
+        message: 'Policy deleted successfully',
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      return reply.status(err.message === 'Policy not found' ? 404 : 500).send({
+        success: false,
+        error: { code: err.message === 'Policy not found' ? 'NOT_FOUND' : 'SERVER_ERROR', message: err.message },
         timestamp: new Date().toISOString(),
       });
     }

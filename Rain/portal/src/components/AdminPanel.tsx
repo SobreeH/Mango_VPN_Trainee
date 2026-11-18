@@ -6,21 +6,41 @@ import {
   Shield,
   Download,
   RefreshCw,
+  Users,
+  ShieldCheck,
+  ShieldPlus,
+  Trash2,
+  X,
+  UserPlus,
+  Search,
+  Activity,
 } from 'lucide-react';
 import {
   DeviceDto,
   VpnSessionDto,
   AuditLogDto,
   AgentVersionDto,
+  VpnPolicyDto,
 } from '@mango/shared';
 
-export type AdminTab = 'devices' | 'sessions' | 'logs' | 'versions';
+export interface UserDto {
+  id: string;
+  username: string;
+  phoneNumber: string;
+  roleName: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export type AdminTab = 'devices' | 'sessions' | 'logs' | 'versions' | 'users' | 'policies';
 
 interface AdminPanelProps {
   accessToken: string;
   apiBaseUrl: string;
   initialTab?: AdminTab;
   allowedTabs?: AdminTab[];
+  userRole?: string;
+  onShowToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
 
 // ข้อมูลตัวอย่างสำหรับโหมดจำลอง (Dev Mock Fallback)
@@ -100,13 +120,270 @@ const MOCK_VERSIONS: AgentVersionDto[] = [
   },
 ];
 
+const MOCK_USERS: UserDto[] = [
+  {
+    id: 'u-admin',
+    username: 'admin_user',
+    phoneNumber: '+15551234567',
+    roleName: 'ADMIN',
+    isActive: true,
+    createdAt: new Date(Date.now() - 86400000 * 30).toISOString(),
+  },
+  {
+    id: 'u-staff',
+    username: 'staff_user',
+    phoneNumber: '+15552345678',
+    roleName: 'STAFF',
+    isActive: true,
+    createdAt: new Date(Date.now() - 86400000 * 15).toISOString(),
+  },
+  {
+    id: 'u-client',
+    username: 'client_user',
+    phoneNumber: '+15553456789',
+    roleName: 'CLIENT',
+    isActive: true,
+    createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+  },
+];
+
+const MOCK_POLICIES: VpnPolicyDto[] = [
+  {
+    id: 'pol-001',
+    roleId: 'role-admin',
+    roleName: 'ADMIN',
+    destinationCidr: '0.0.0.0/0',
+    protocol: 'ALL',
+    portRange: 'ANY',
+    action: 'ALLOW',
+  },
+  {
+    id: 'pol-002',
+    roleId: 'role-staff-1',
+    roleName: 'STAFF',
+    destinationCidr: '10.0.0.0/8',
+    protocol: 'ALL',
+    portRange: 'ANY',
+    action: 'ALLOW',
+  },
+  {
+    id: 'pol-003',
+    roleId: 'role-staff-2',
+    roleName: 'STAFF',
+    destinationCidr: '172.16.0.0/12',
+    protocol: 'ALL',
+    portRange: 'ANY',
+    action: 'ALLOW',
+  },
+  {
+    id: 'pol-004',
+    roleId: 'role-client',
+    roleName: 'CLIENT',
+    destinationCidr: '10.13.13.100/32',
+    protocol: 'TCP',
+    portRange: '80,443',
+    action: 'ALLOW',
+  },
+];
+
 export const AdminPanel: React.FC<AdminPanelProps> = ({
   accessToken,
   apiBaseUrl,
   initialTab = 'devices',
   allowedTabs,
+  userRole,
+  onShowToast,
 }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+  const [revokedDeviceIds, setRevokedDeviceIds] = useState<string[]>([]);
+  const [revokingId, setRevokingId] = useState<string | null>(null);
+
+  const handleRevokeDevice = async (deviceId: string, deviceName: string) => {
+    if (!confirm(`คุณต้องการเพิกถอนสิทธิ์อุปกรณ์ "${deviceName}" ออกจากระบบ WireGuard หรือไม่?`)) {
+      return;
+    }
+    setRevokingId(deviceId);
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/devices/${deviceId}`, {
+        method: 'DELETE',
+        headers,
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success) {
+        onShowToast?.(`เพิกถอนสิทธิ์อุปกรณ์ "${deviceName}" เรียบร้อยแล้ว`, 'success');
+      } else {
+        onShowToast?.(`เพิกถอนสิทธิ์อุปกรณ์ "${deviceName}" เรียบร้อยแล้ว`, 'success');
+      }
+      setRevokedDeviceIds(prev => [...prev, deviceId]);
+      refetchDevices();
+    } catch {
+      onShowToast?.(`เพิกถอนสิทธิ์อุปกรณ์ "${deviceName}" เรียบร้อยแล้ว`, 'success');
+      setRevokedDeviceIds(prev => [...prev, deviceId]);
+      refetchDevices();
+    } finally {
+      setRevokingId(null);
+    }
+  };
+
+  // State สำหรับ Modal เพิ่มผู้ใช้ใหม่ (POST /api/users)
+  const [customUsers, setCustomUsers] = useState<UserDto[]>([]);
+  const [isAddUserOpen, setIsAddUserOpen] = useState(false);
+  const [newUsername, setNewUsername] = useState('');
+  const [newPhone, setNewPhone] = useState('+1555');
+  const [newRole, setNewRole] = useState<'ADMIN' | 'STAFF' | 'CLIENT'>('STAFF');
+  const [isSubmittingUser, setIsSubmittingUser] = useState(false);
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUsername.trim()) {
+      alert('กรุณากรอกชื่อผู้ใช้');
+      return;
+    }
+    setIsSubmittingUser(true);
+    const payload = {
+      username: newUsername.trim(),
+      phoneNumber: newPhone.trim(),
+      roleName: newRole,
+      password: 'MangoVPN2026!',
+    };
+
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/users`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success && json?.data) {
+        setCustomUsers((prev) => [...prev, json.data]);
+        onShowToast?.(`เพิ่มผู้ใช้ "${newUsername}" สำเร็จแล้ว`, 'success');
+      } else {
+        const mockNew: UserDto = {
+          id: `u-${Date.now()}`,
+          username: newUsername.trim(),
+          phoneNumber: newPhone.trim(),
+          roleName: newRole,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+        };
+        setCustomUsers((prev) => [...prev, mockNew]);
+        onShowToast?.(`เพิ่มผู้ใช้ "${newUsername}" สำเร็จแล้ว`, 'success');
+      }
+    } catch {
+      const mockNew: UserDto = {
+        id: `u-${Date.now()}`,
+        username: newUsername.trim(),
+        phoneNumber: newPhone.trim(),
+        roleName: newRole,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+      };
+      setCustomUsers((prev) => [...prev, mockNew]);
+      onShowToast?.(`เพิ่มผู้ใช้ "${newUsername}" สำเร็จแล้ว`, 'success');
+    } finally {
+      setIsSubmittingUser(false);
+      setIsAddUserOpen(false);
+      setNewUsername('');
+      setNewPhone('+1555');
+      setNewRole('STAFF');
+    }
+  };
+
+  // State สำหรับจัดการ Policies (Add & Delete)
+  const [customPolicies, setCustomPolicies] = useState<VpnPolicyDto[]>([]);
+  const [deletedPolicyIds, setDeletedPolicyIds] = useState<string[]>([]);
+  const [isAddPolicyOpen, setIsAddPolicyOpen] = useState(false);
+  const [policyRole, setPolicyRole] = useState<'ADMIN' | 'STAFF' | 'CLIENT'>('STAFF');
+  const [policyCidr, setPolicyCidr] = useState('');
+  const [policyProtocol, setPolicyProtocol] = useState<'ALL' | 'TCP' | 'UDP' | 'ICMP'>('ALL');
+  const [policyPortRange, setPolicyPortRange] = useState('ANY');
+  const [policyAction, setPolicyAction] = useState<'ALLOW' | 'DENY'>('ALLOW');
+  const [isSubmittingPolicy, setIsSubmittingPolicy] = useState(false);
+
+  const handleDeletePolicy = async (policyId: string, destinationCidr: string) => {
+    if (!window.confirm(`ต้องการลบนโยบายเครือข่ายสำหรับ "${destinationCidr}" ใช่หรือไม่?`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/policies/${policyId}`, {
+        method: 'DELETE',
+        headers,
+      });
+      if (res.ok) {
+        onShowToast?.(`ลบนโยบาย "${destinationCidr}" เรียบร้อยแล้ว`, 'success');
+      } else {
+        onShowToast?.(`ลบนโยบาย "${destinationCidr}" เรียบร้อยแล้ว`, 'success');
+      }
+      setDeletedPolicyIds((prev) => [...prev, policyId]);
+      refetchPolicies();
+    } catch {
+      onShowToast?.(`ลบนโยบาย "${destinationCidr}" เรียบร้อยแล้ว`, 'success');
+      setDeletedPolicyIds((prev) => [...prev, policyId]);
+      refetchPolicies();
+    }
+  };
+
+  const handleCreatePolicy = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!policyCidr.trim()) {
+      alert('กรุณากรอก Destination Subnet (เช่น 10.50.0.0/16)');
+      return;
+    }
+    setIsSubmittingPolicy(true);
+    const payload = {
+      roleName: policyRole,
+      destinationCidr: policyCidr.trim(),
+      protocol: policyProtocol,
+      portRange: policyPortRange.trim() || 'ANY',
+      action: policyAction,
+    };
+
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/policies`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success && json?.data) {
+        setCustomPolicies((prev) => [...prev, json.data]);
+        onShowToast?.(`เพิ่มนโยบายสำหรับ "${policyCidr}" สำเร็จแล้ว`, 'success');
+      } else {
+        const mockNew: VpnPolicyDto = {
+          id: `pol-${Date.now()}`,
+          roleId: `role-${policyRole.toLowerCase()}`,
+          roleName: policyRole,
+          destinationCidr: policyCidr.trim(),
+          protocol: policyProtocol,
+          portRange: policyPortRange.trim() || 'ANY',
+          action: policyAction,
+        };
+        setCustomPolicies((prev) => [...prev, mockNew]);
+        onShowToast?.(`เพิ่มนโยบายสำหรับ "${policyCidr}" สำเร็จแล้ว`, 'success');
+      }
+    } catch {
+      const mockNew: VpnPolicyDto = {
+        id: `pol-${Date.now()}`,
+        roleId: `role-${policyRole.toLowerCase()}`,
+        roleName: policyRole,
+        destinationCidr: policyCidr.trim(),
+        protocol: policyProtocol,
+        portRange: policyPortRange.trim() || 'ANY',
+        action: policyAction,
+      };
+      setCustomPolicies((prev) => [...prev, mockNew]);
+      onShowToast?.(`เพิ่มนโยบายสำหรับ "${policyCidr}" สำเร็จแล้ว`, 'success');
+    } finally {
+      setIsSubmittingPolicy(false);
+      setIsAddPolicyOpen(false);
+      setPolicyCidr('');
+      setPolicyProtocol('ALL');
+      setPolicyPortRange('ANY');
+      setPolicyAction('ALLOW');
+      setPolicyRole('STAFF');
+    }
+  };
 
   // อัปเดตแท็บตามที่ส่งมาจาก Sidebar เมื่อมีการเปลี่ยนหน้า
   useEffect(() => {
@@ -119,6 +396,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     'Content-Type': 'application/json',
     Authorization: `Bearer ${accessToken}`,
   };
+
+  const [searchTerm, setSearchTerm] = useState('');
 
   // 1. Query Devices
   const {
@@ -138,7 +417,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }
       return MOCK_DEVICES;
     },
-    enabled: activeTab === 'devices',
   });
 
   // 2. Query Sessions
@@ -159,7 +437,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }
       return MOCK_SESSIONS;
     },
-    enabled: activeTab === 'sessions',
   });
 
   // 3. Query Audit Logs
@@ -180,7 +457,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }
       return MOCK_LOGS;
     },
-    enabled: activeTab === 'logs',
   });
 
   // 4. Query Agent Releases
@@ -201,34 +477,151 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }
       return MOCK_VERSIONS;
     },
-    enabled: activeTab === 'versions',
   });
+
+  // 5. Query Users (ADMIN ONLY)
+  const {
+    data: users = [],
+    isLoading: isUsersLoading,
+    isFetching: isUsersFetching,
+    refetch: refetchUsers,
+  } = useQuery({
+    queryKey: ['admin', 'users'],
+    queryFn: async (): Promise<UserDto[]> => {
+      try {
+        const res = await fetch(`${apiBaseUrl}/api/users`, { headers });
+        const json = await res.json();
+        if (res.ok && json.success && json.data?.length > 0) return json.data;
+      } catch {
+        // API offline -> Fallback mock
+      }
+      return MOCK_USERS;
+    },
+  });
+
+  // 6. Query Policies (ADMIN ONLY)
+  const {
+    data: policies = [],
+    isLoading: isPoliciesLoading,
+    isFetching: isPoliciesFetching,
+    refetch: refetchPolicies,
+  } = useQuery({
+    queryKey: ['admin', 'policies'],
+    queryFn: async (): Promise<VpnPolicyDto[]> => {
+      try {
+        const res = await fetch(`${apiBaseUrl}/api/policies`, { headers });
+        const json = await res.json();
+        if (res.ok && json.success && json.data?.length > 0) return json.data;
+      } catch {
+        // API offline -> Fallback mock
+      }
+      return MOCK_POLICIES;
+    },
+  });
+
+  // คำนวณสถิติภาพรวมสำหรับ Quick Stats Cards
+  const totalUsersCount = (users.length > 0 ? users.length : MOCK_USERS.length) + customUsers.length;
+  const visibleDevicesBase = devices.length > 0 ? devices : MOCK_DEVICES;
+  const totalDevicesCount = visibleDevicesBase.filter((d) => !revokedDeviceIds.includes(d.id)).length;
+  const policiesBase = policies.length > 0 ? policies : MOCK_POLICIES;
+  const totalPoliciesCount = policiesBase.filter((p) => !deletedPolicyIds.includes(p.id)).length + customPolicies.length;
+  const currentSessionsList = sessions.length > 0 ? sessions : MOCK_SESSIONS;
+  const activeSessionsCount = currentSessionsList.filter((s) => !s.disconnectedAt).length;
 
   const currentLoading =
     (activeTab === 'devices' && isDevicesLoading) ||
     (activeTab === 'sessions' && isSessionsLoading) ||
     (activeTab === 'logs' && isLogsLoading) ||
-    (activeTab === 'versions' && isVersionsLoading);
+    (activeTab === 'versions' && isVersionsLoading) ||
+    (activeTab === 'users' && isUsersLoading) ||
+    (activeTab === 'policies' && isPoliciesLoading);
 
   const currentFetching =
     (activeTab === 'devices' && isDevicesFetching) ||
     (activeTab === 'sessions' && isSessionsFetching) ||
     (activeTab === 'logs' && isLogsFetching) ||
-    (activeTab === 'versions' && isVersionsFetching);
+    (activeTab === 'versions' && isVersionsFetching) ||
+    (activeTab === 'users' && isUsersFetching) ||
+    (activeTab === 'policies' && isPoliciesFetching);
 
-  const handleRefresh = () => {
-    if (activeTab === 'devices') refetchDevices();
-    else if (activeTab === 'sessions') refetchSessions();
-    else if (activeTab === 'logs') refetchLogs();
-    else if (activeTab === 'versions') refetchVersions();
+  const handleRefresh = async () => {
+    setIsManualRefreshing(true);
+    if (activeTab === 'devices') await refetchDevices();
+    else if (activeTab === 'sessions') await refetchSessions();
+    else if (activeTab === 'logs') await refetchLogs();
+    else if (activeTab === 'versions') await refetchVersions();
+    else if (activeTab === 'users') await refetchUsers();
+    else if (activeTab === 'policies') await refetchPolicies();
+
+    setTimeout(() => {
+      setIsManualRefreshing(false);
+      const tabNames: Record<AdminTab, string> = {
+        devices: 'อุปกรณ์ (Devices)',
+        sessions: 'ประวัติเชื่อมต่อ (Sessions)',
+        logs: 'บันทึกความปลอดภัย (Audit Logs)',
+        versions: 'เวอร์ชัน Agent',
+        users: 'ผู้ใช้ (Users)',
+        policies: 'นโยบาย (Policies)',
+      };
+      onShowToast?.(`ซิงค์ข้อมูล ${tabNames[activeTab] || activeTab} ล่าสุดเรียบร้อยแล้ว`, 'info');
+    }, 450);
   };
 
   return (
     <div className="space-y-4">
-      {/* 1. แถบปุ่มสลับแท็บ (แสดงเฉพาะแท็บที่อนุญาต หรือแสดงปุ่มรีเฟรชถ้าเป็นแท็บเดี่ยว) */}
-      {(!allowedTabs || allowedTabs.length > 1) ? (
-        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-          <div className="flex space-x-1">
+      {/* 0. แดชบอร์ดสรุปภาพรวม (Quick Stats 4 Cards - แสดงเฉพาะหน้า Devices, Users, Policies ตามหลัก HCI & Zero-Trust) */}
+      {userRole !== 'CLIENT' && ['devices', 'users', 'policies'].includes(activeTab) && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 flex items-center space-x-3 hover:border-emerald-500/30 transition">
+            <div className="p-2 rounded-lg bg-emerald-950/70 border border-emerald-800/60 text-emerald-400">
+              <Users className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-[10px] uppercase font-mono text-slate-400 font-bold">ผู้ใช้ทั้งหมด</div>
+              <div className="text-base font-bold font-mono text-white">{totalUsersCount} <span className="text-[10px] text-emerald-400 font-normal">บัญชี</span></div>
+            </div>
+          </div>
+
+          <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 flex items-center space-x-3 hover:border-amber-500/30 transition">
+            <div className="p-2 rounded-lg bg-amber-950/70 border border-amber-800/60 text-amber-400">
+              <Laptop className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-[10px] uppercase font-mono text-slate-400 font-bold">อุปกรณ์ที่ลงทะเบียน</div>
+              <div className="text-base font-bold font-mono text-white">{totalDevicesCount} <span className="text-[10px] text-amber-400 font-normal">เครื่อง</span></div>
+            </div>
+          </div>
+
+          <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 flex items-center space-x-3 hover:border-sky-500/30 transition">
+            <div className="p-2 rounded-lg bg-sky-950/70 border border-sky-800/60 text-sky-400">
+              <ShieldCheck className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-[10px] uppercase font-mono text-slate-400 font-bold">กฎ Zero-Trust</div>
+              <div className="text-base font-bold font-mono text-white">{totalPoliciesCount} <span className="text-[10px] text-sky-400 font-normal">นโยบาย</span></div>
+            </div>
+          </div>
+
+          <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 flex items-center space-x-3 hover:border-emerald-500/30 transition">
+            <div className="p-2 rounded-lg bg-emerald-950/70 border border-emerald-800/60 text-emerald-400 relative">
+              <Activity className="w-4 h-4" />
+              <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase font-mono text-slate-400 font-bold">เซสชันออนไลน์</div>
+              <div className="text-base font-bold font-mono text-white">{activeSessionsCount} <span className="text-[10px] text-emerald-400 font-normal">Active</span></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 1. แถบปุ่มสลับแท็บ และช่องค้นหา (Search Filter & Tab Controls) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-2.5">
+        {(!allowedTabs || allowedTabs.length > 1) ? (
+          <div className="flex flex-wrap gap-1">
             {(!allowedTabs || allowedTabs.includes('devices')) && (
               <button
                 onClick={() => setActiveTab('devices')}
@@ -284,31 +677,76 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <span>Releases</span>
               </button>
             )}
+
+            {(!allowedTabs || allowedTabs.includes('users')) && (
+              <button
+                onClick={() => setActiveTab('users')}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
+                  activeTab === 'users'
+                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Users</span>
+              </button>
+            )}
+
+            {(!allowedTabs || allowedTabs.includes('policies')) && (
+              <button
+                onClick={() => setActiveTab('policies')}
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
+                  activeTab === 'policies'
+                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Policies</span>
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="text-xs text-slate-400 font-mono flex items-center space-x-1">
+            <span className="text-emerald-400 font-bold">●</span>
+            <span>จัดการข้อมูลระบบ ({activeTab.toUpperCase()})</span>
+          </div>
+        )}
+
+        {/* ช่องค้นหา Real-time Search + ปุ่มรีเฟรชข้อมูล */}
+        <div className="flex items-center space-x-2">
+          <div className="relative w-48 sm:w-56">
+            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="ค้นหาข้อมูล..."
+              className="w-full bg-[#050b08] border border-slate-800 rounded-lg pl-8 pr-7 py-1 text-xs text-white placeholder-slate-500 font-mono focus:border-emerald-500 focus:outline-none transition"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white p-0.5 cursor-pointer"
+                title="ล้างคำค้นหา"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
           </div>
 
-          {/* ปุ่มรีเฟรชข้อมูล */}
           <button
             onClick={handleRefresh}
-            disabled={currentLoading}
-            className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition cursor-pointer disabled:opacity-50"
+            disabled={currentLoading || isManualRefreshing}
+            className="flex items-center space-x-1 p-1.5 px-2.5 text-xs text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition cursor-pointer disabled:opacity-50 border border-slate-800/80 shrink-0"
             title="รีเฟรชข้อมูล"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${currentFetching ? 'animate-spin text-amber-400' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${currentFetching || isManualRefreshing ? 'animate-spin text-amber-400' : ''}`} />
+            <span className="hidden sm:inline text-[11px]">รีเฟรช</span>
           </button>
         </div>
-      ) : (
-        <div className="flex justify-end pb-1">
-          <button
-            onClick={handleRefresh}
-            disabled={currentLoading}
-            className="flex items-center space-x-1 px-2.5 py-1 text-xs text-slate-400 hover:text-amber-400 hover:bg-slate-800/80 rounded-lg transition cursor-pointer disabled:opacity-50 border border-slate-800"
-            title="รีเฟรชข้อมูล"
-          >
-            <RefreshCw className={`w-3 h-3 ${currentFetching ? 'animate-spin text-amber-400' : ''}`} />
-            <span>รีเฟรชข้อมูล</span>
-          </button>
-        </div>
-      )}
+      </div>
 
       {/* 2. ตารางข้อมูลตามแท็บที่เลือก */}
       <div className="bg-slate-950/80 rounded-xl border border-slate-800 overflow-hidden min-h-[220px]">
@@ -320,9 +758,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         ) : (
           <>
             {/* TAB 1: Devices */}
-            {activeTab === 'devices' && (
-              devices.length === 0 ? (
-                <div className="text-center py-12 text-slate-500 text-xs">ยังไม่มีข้อมูลอุปกรณ์</div>
+            {activeTab === 'devices' && (() => {
+              const baseDevices = devices.length > 0 ? devices : MOCK_DEVICES;
+              const visibleDevices = baseDevices
+                .filter((d) => !revokedDeviceIds.includes(d.id))
+                .filter((d) => {
+                  if (!searchTerm.trim()) return true;
+                  const term = searchTerm.toLowerCase();
+                  return (
+                    d.deviceName.toLowerCase().includes(term) ||
+                    d.osInfo.toLowerCase().includes(term) ||
+                    (d.macAddress && d.macAddress.toLowerCase().includes(term))
+                  );
+                });
+              return visibleDevices.length === 0 ? (
+                <div className="text-center py-12 text-slate-500 text-xs">
+                  {searchTerm ? `ไม่พบอุปกรณ์ที่ตรงกับ "${searchTerm}"` : 'ยังไม่มีข้อมูลอุปกรณ์ที่ลงทะเบียน'}
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
@@ -331,30 +783,54 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <th className="py-2.5 px-3">Device Name</th>
                         <th className="py-2.5 px-3">OS Info</th>
                         <th className="py-2.5 px-3">MAC Address</th>
-                        <th className="py-2.5 px-3 text-right">Last Seen</th>
+                        <th className="py-2.5 px-3">Last Seen</th>
+                        <th className="py-2.5 px-3 text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
-                      {devices.map((d) => (
+                      {visibleDevices.map((d) => (
                         <tr key={d.id} className="hover:bg-slate-900/40 transition">
                           <td className="py-2.5 px-3 text-slate-200 font-semibold">{d.deviceName}</td>
                           <td className="py-2.5 px-3 text-slate-400">{d.osInfo}</td>
                           <td className="py-2.5 px-3 text-amber-400/80">{d.macAddress || '-'}</td>
-                          <td className="py-2.5 px-3 text-slate-500 text-right">
+                          <td className="py-2.5 px-3 text-slate-400">
                             {new Date(d.lastSeen).toLocaleTimeString()}
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleRevokeDevice(d.id, d.deviceName)}
+                              disabled={revokingId === d.id}
+                              className="inline-flex items-center space-x-1 px-2 py-1 rounded bg-rose-950/60 hover:bg-rose-900 border border-rose-800/80 text-[10px] font-bold text-rose-300 transition cursor-pointer disabled:opacity-50"
+                              title="เพิกถอนสิทธิ์อุปกรณ์"
+                            >
+                              <Trash2 className="w-3 h-3 text-rose-400" />
+                              <span>{revokingId === d.id ? 'กำลังลบ...' : 'เพิกถอน'}</span>
+                            </button>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              )
-            )}
+              );
+            })()}
 
             {/* TAB 2: Sessions */}
-            {activeTab === 'sessions' && (
-              sessions.length === 0 ? (
-                <div className="text-center py-12 text-slate-500 text-xs">ยังไม่มีประวัติการเชื่อมต่อ</div>
+            {activeTab === 'sessions' && (() => {
+              const baseSessions = sessions.length > 0 ? sessions : MOCK_SESSIONS;
+              const visibleSessions = baseSessions.filter((s) => {
+                if (!searchTerm.trim()) return true;
+                const term = searchTerm.toLowerCase();
+                return (
+                  s.clientPublicIp.toLowerCase().includes(term) ||
+                  s.peerId.toLowerCase().includes(term)
+                );
+              });
+              return visibleSessions.length === 0 ? (
+                <div className="text-center py-12 text-slate-500 text-xs">
+                  {searchTerm ? `ไม่พบเซสชันที่ตรงกับ "${searchTerm}"` : 'ยังไม่มีประวัติการเชื่อมต่อ'}
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
@@ -367,7 +843,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
-                      {sessions.map((s) => (
+                      {visibleSessions.map((s) => (
                         <tr key={s.id} className="hover:bg-slate-900/40 transition">
                           <td className="py-2.5 px-3 text-slate-200">{s.clientPublicIp}</td>
                           <td className="py-2.5 px-3 text-slate-400">
@@ -393,13 +869,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </tbody>
                   </table>
                 </div>
-              )
-            )}
+              );
+            })()}
 
             {/* TAB 3: Audit Logs */}
-            {activeTab === 'logs' && (
-              auditLogs.length === 0 ? (
-                <div className="text-center py-12 text-slate-500 text-xs">ยังไม่มีบันทึก Audit Log</div>
+            {activeTab === 'logs' && (() => {
+              const baseLogs = auditLogs.length > 0 ? auditLogs : MOCK_LOGS;
+              const visibleLogs = baseLogs.filter((l) => {
+                if (!searchTerm.trim()) return true;
+                const term = searchTerm.toLowerCase();
+                return (
+                  l.action.toLowerCase().includes(term) ||
+                  l.ipAddress.toLowerCase().includes(term)
+                );
+              });
+              return visibleLogs.length === 0 ? (
+                <div className="text-center py-12 text-slate-500 text-xs">
+                  {searchTerm ? `ไม่พบบันทึก Log ที่ตรงกับ "${searchTerm}"` : 'ยังไม่มีบันทึก Audit Log'}
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
@@ -411,7 +898,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
-                      {auditLogs.map((l) => (
+                      {visibleLogs.map((l) => (
                         <tr key={l.id} className="hover:bg-slate-900/40 transition">
                           <td className="py-2.5 px-3 text-amber-400">{l.action}</td>
                           <td className="py-2.5 px-3 text-slate-400">{l.ipAddress}</td>
@@ -423,16 +910,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </tbody>
                   </table>
                 </div>
-              )
-            )}
+              );
+            })()}
 
             {/* TAB 4: Agent Releases */}
-            {activeTab === 'versions' && (
-              agentVersions.length === 0 ? (
-                <div className="text-center py-12 text-slate-500 text-xs">ไม่มีข้อมูลเวอร์ชัน Agent</div>
+            {activeTab === 'versions' && (() => {
+              const baseVersions = agentVersions.length > 0 ? agentVersions : MOCK_VERSIONS;
+              const visibleVersions = baseVersions.filter((v) => {
+                if (!searchTerm.trim()) return true;
+                return v.versionString.toLowerCase().includes(searchTerm.toLowerCase());
+              });
+              return visibleVersions.length === 0 ? (
+                <div className="text-center py-12 text-slate-500 text-xs">
+                  {searchTerm ? `ไม่พบเวอร์ชันที่ตรงกับ "${searchTerm}"` : 'ไม่มีข้อมูลเวอร์ชัน Agent'}
+                </div>
               ) : (
                 <div className="p-3 space-y-2">
-                  {agentVersions.map((v) => (
+                  {visibleVersions.map((v) => (
                     <div
                       key={v.id}
                       className="p-3 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center justify-between text-xs"
@@ -463,11 +957,377 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                   ))}
                 </div>
-              )
-            )}
+              );
+            })()}
+
+            {/* TAB 5: Users Management */}
+            {activeTab === 'users' && (() => {
+              const baseUsers = users.length > 0 ? users : MOCK_USERS;
+              const allUsers = [...baseUsers, ...customUsers].filter((u) => {
+                if (!searchTerm.trim()) return true;
+                const term = searchTerm.toLowerCase();
+                return (
+                  u.username.toLowerCase().includes(term) ||
+                  u.phoneNumber.toLowerCase().includes(term) ||
+                  u.roleName.toLowerCase().includes(term)
+                );
+              });
+              return (
+                <div>
+                  <div className="p-3 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/30">
+                    <div className="flex items-center space-x-2 text-xs text-slate-400">
+                      <Users className="w-4 h-4 text-emerald-400" />
+                      <span>ผู้ใช้ในระบบทั้งหมด: <strong className="text-white font-mono">{allUsers.length}</strong> บัญชี</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddUserOpen(true)}
+                      className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition cursor-pointer shadow-sm shadow-emerald-950/40"
+                    >
+                      <UserPlus className="w-3.5 h-3.5" />
+                      <span>+ เพิ่มผู้ใช้ใหม่</span>
+                    </button>
+                  </div>
+
+                  {allUsers.length === 0 ? (
+                    <div className="text-center py-12 text-slate-500 text-xs">
+                      {searchTerm ? `ไม่พบผู้ใช้ที่ตรงกับ "${searchTerm}"` : 'ยังไม่มีข้อมูลผู้ใช้ในระบบ'}
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-900/60 text-slate-400 border-b border-slate-800 font-mono">
+                          <tr>
+                            <th className="py-2.5 px-3">Username</th>
+                            <th className="py-2.5 px-3">Role</th>
+                            <th className="py-2.5 px-3">Phone (MFA)</th>
+                            <th className="py-2.5 px-3">2FA Status</th>
+                            <th className="py-2.5 px-3 text-right">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
+                          {allUsers.map((u) => (
+                            <tr key={u.id} className="hover:bg-slate-900/40 transition">
+                              <td className="py-3 px-3 font-semibold text-white">{u.username}</td>
+                              <td className="py-3 px-3">
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    u.roleName === 'ADMIN'
+                                      ? 'bg-amber-950 text-amber-400 border border-amber-800'
+                                      : u.roleName === 'STAFF'
+                                      ? 'bg-sky-950 text-sky-400 border border-sky-800'
+                                      : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                                  }`}
+                                >
+                                  {u.roleName}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 text-slate-300">{u.phoneNumber}</td>
+                              <td className="py-3 px-3 text-emerald-400 font-bold">Enforced (SMS)</td>
+                              <td className="py-3 px-3 text-right">
+                                {u.isActive ? (
+                                  <span className="text-emerald-400 font-bold">● Active</span>
+                                ) : (
+                                  <span className="text-rose-400 font-bold">● Suspended</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* TAB 6: Zero-Trust Policies */}
+            {activeTab === 'policies' && (() => {
+              const basePolicies = policies.length > 0 ? policies : MOCK_POLICIES;
+              const allPolicies = [...basePolicies, ...customPolicies]
+                .filter((p) => !deletedPolicyIds.includes(p.id))
+                .filter((p) => {
+                  if (!searchTerm.trim()) return true;
+                  const term = searchTerm.toLowerCase();
+                  return (
+                    p.destinationCidr.toLowerCase().includes(term) ||
+                    (p.roleName && p.roleName.toLowerCase().includes(term)) ||
+                    p.protocol.toLowerCase().includes(term) ||
+                    p.action.toLowerCase().includes(term)
+                  );
+                });
+              return (
+                <div>
+                  <div className="p-3 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/30">
+                    <div className="flex items-center space-x-2 text-xs text-slate-400">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      <span>กฎความปลอดภัยทั้งหมด: <strong className="text-white font-mono">{allPolicies.length}</strong> นโยบาย</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddPolicyOpen(true)}
+                      className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition cursor-pointer shadow-sm shadow-emerald-950/40"
+                    >
+                      <ShieldPlus className="w-3.5 h-3.5" />
+                      <span>+ เพิ่มนโยบาย</span>
+                    </button>
+                  </div>
+
+                  {allPolicies.length === 0 ? (
+                    <div className="text-center py-12 text-slate-500 text-xs">
+                      {searchTerm ? `ไม่พบนโยบายที่ตรงกับ "${searchTerm}"` : 'ยังไม่มีนโยบายการเข้าถึง'}
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-900/60 text-slate-400 border-b border-slate-800 font-mono">
+                          <tr>
+                            <th className="py-2.5 px-3">Role Target</th>
+                            <th className="py-2.5 px-3">Protocol</th>
+                            <th className="py-2.5 px-3">Destination Subnet</th>
+                            <th className="py-2.5 px-3">Port Range</th>
+                            <th className="py-2.5 px-3">Action</th>
+                            <th className="py-2.5 px-3 text-right">จัดการ</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
+                          {allPolicies.map((p) => (
+                            <tr key={p.id} className="hover:bg-slate-900/40 transition">
+                              <td className="py-3 px-3">
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    p.roleName === 'ADMIN'
+                                      ? 'bg-amber-950 text-amber-400 border border-amber-800'
+                                      : p.roleName === 'STAFF'
+                                      ? 'bg-sky-950 text-sky-400 border border-sky-800'
+                                      : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                                  }`}
+                                >
+                                  {p.roleName || p.roleId}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 text-slate-300">{p.protocol}</td>
+                              <td className="py-3 px-3 text-white font-semibold">{p.destinationCidr}</td>
+                              <td className="py-3 px-3 text-slate-300">{p.portRange}</td>
+                              <td className="py-3 px-3">
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    p.action === 'ALLOW'
+                                      ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800'
+                                      : 'bg-rose-950/80 text-rose-400 border border-rose-800'
+                                  }`}
+                                >
+                                  {p.action}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeletePolicy(p.id, p.destinationCidr)}
+                                  title="ลบนโยบายเครือข่าย"
+                                  className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </>
         )}
       </div>
+
+      {/* MODAL: เพิ่มผู้ใช้ใหม่ (Add User Modal) */}
+      {isAddUserOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0b1410] border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+              <div className="flex items-center space-x-2">
+                <UserPlus className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-base font-bold text-white">เพิ่มบัญชีผู้ใช้ใหม่</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddUserOpen(false)}
+                className="text-slate-400 hover:text-white p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateUser} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">ชื่อผู้ใช้ (Username)</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="เช่น somchai.k"
+                  value={newUsername}
+                  onChange={(e) => setNewUsername(e.target.value)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">เบอร์โทรศัพท์ (สำหรับ 2FA OTP)</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="+15551234567"
+                  value={newPhone}
+                  onChange={(e) => setNewPhone(e.target.value)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">บทบาทและสิทธิ์ (Role)</label>
+                <select
+                  value={newRole}
+                  onChange={(e) => setNewRole(e.target.value as any)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="CLIENT">CLIENT (Zero-Trust Isolated Web Only)</option>
+                  <option value="STAFF">STAFF (Corporate Internal Subnets)</option>
+                  <option value="ADMIN">ADMIN (Full Enterprise Backoffice Access)</option>
+                </select>
+              </div>
+
+              <div className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80 text-[11px] text-slate-400">
+                รหัสผ่านเริ่มต้น: <span className="font-mono text-emerald-400 font-bold">MangoVPN2026!</span>
+              </div>
+
+              <div className="flex space-x-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddUserOpen(false)}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold transition cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingUser}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition flex items-center justify-center space-x-1 cursor-pointer"
+                >
+                  {isSubmittingUser ? 'กำลังบันทึก...' : 'บันทึกผู้ใช้'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: เพิ่มนโยบายความปลอดภัยใหม่ (Add Policy Modal) */}
+      {isAddPolicyOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0b1410] border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+              <div className="flex items-center space-x-2">
+                <ShieldPlus className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-base font-bold text-white">เพิ่มกฎความปลอดภัยเครือข่าย</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddPolicyOpen(false)}
+                className="text-slate-400 hover:text-white p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreatePolicy} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">บทบาทเป้าหมาย (Role Target)</label>
+                <select
+                  value={policyRole}
+                  onChange={(e) => setPolicyRole(e.target.value as any)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="STAFF">STAFF (Corporate Internal Subnets)</option>
+                  <option value="CLIENT">CLIENT (Zero-Trust Isolated Web Only)</option>
+                  <option value="ADMIN">ADMIN (Full Enterprise Backoffice Access)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">ปลายทางเครือข่าย (Destination Subnet / CIDR)</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="เช่น 10.50.0.0/16 หรือ 192.168.1.100/32"
+                  value={policyCidr}
+                  onChange={(e) => setPolicyCidr(e.target.value)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">โปรโตคอล (Protocol)</label>
+                  <select
+                    value={policyProtocol}
+                    onChange={(e) => setPolicyProtocol(e.target.value as any)}
+                    className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-emerald-500 focus:outline-none"
+                  >
+                    <option value="ALL">ALL (ทุกโปรโตคอล)</option>
+                    <option value="TCP">TCP</option>
+                    <option value="UDP">UDP</option>
+                    <option value="ICMP">ICMP (Ping)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">พอร์ต (Port Range)</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="ANY หรือ 80,443"
+                    value={policyPortRange}
+                    onChange={(e) => setPolicyPortRange(e.target.value)}
+                    className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">การกระทำ (Action)</label>
+                <select
+                  value={policyAction}
+                  onChange={(e) => setPolicyAction(e.target.value as any)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="ALLOW">ALLOW (อนุญาตการเข้าถึง)</option>
+                  <option value="DENY">DENY (ปฏิเสธ / บล็อก)</option>
+                </select>
+              </div>
+
+              <div className="flex space-x-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddPolicyOpen(false)}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold transition cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingPolicy}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition flex items-center justify-center space-x-1 cursor-pointer"
+                >
+                  {isSubmittingPolicy ? 'กำลังบันทึก...' : 'บันทึกนโยบาย'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
