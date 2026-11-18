@@ -1,39 +1,47 @@
-import React, { useState, useEffect } from 'react';
-import { ShieldAlert, ShieldCheck, Shield, LayoutDashboard } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   LoginResponse,
   AuthTokenResponse,
   AgentHealthResponse,
   AgentStatusResponse,
+  RoleName,
 } from '@mango/shared';
 
 // นำเข้า Component ลูกทั้งหมด
-import { Header } from './components/Header';
+import { Sidebar, NavTab } from './components/Sidebar';
 import { LoginForm } from './components/LoginForm';
 import { OtpModal } from './components/OtpModal';
 import { VpnDashboard } from './components/VpnDashboard';
 import { AdminPanel } from './components/AdminPanel';
+import { Toast, ToastType } from './components/Toast';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 const AGENT_BASE_URL = 'http://127.0.0.1:47821';
+
+// บัญชีทดสอบมาตรฐาน (Demo Accounts)
+const DEMO_ACCOUNTS: Record<string, { role: RoleName; phone: string }> = {
+  admin_user: { role: 'ADMIN', phone: '+15551234567' },
+  staff_user: { role: 'STAFF', phone: '+15552345678' },
+  client_user: { role: 'CLIENT', phone: '+15553456789' },
+};
 
 export default function App() {
   // =========================================================================
   // 1. สถานะการล็อกอินและตัวตน (Authentication State)
   // =========================================================================
-  const [username, setUsername] = useState('admin_user');
+  const [username, setUsername] = useState('staff_user');
   const [password, setPassword] = useState('MangoVPN2026!');
   const [mfaChallenge, setMfaChallenge] = useState<LoginResponse | null>(null);
   const [otpCode, setOtpCode] = useState('');
   const [authData, setAuthData] = useState<AuthTokenResponse | null>(null);
 
-  // มุมมองปัจจุบันเมื่อล็อกอินแล้ว: 'vpn' (หน้าเชื่อมต่อ) หรือ 'admin' (หน้าหลังบ้าน)
-  const [activeView, setActiveView] = useState<'vpn' | 'admin'>('vpn');
+  // แท็บเมนูที่เลือกในแถบ Sidebar ด้านซ้าย (connect | history | devices | agent)
+  const [activeTab, setActiveTab] = useState<NavTab>('connect');
 
   // =========================================================================
   // 2. สถานะระบบและเน็ตเวิร์ก (System & Telemetry State)
   // =========================================================================
-  const [portalOnline, setPortalOnline] = useState<boolean>(true);
+  const [portalOnline, setPortalOnline] = useState<boolean>(false);
   const [agentInstalled, setAgentInstalled] = useState<boolean>(false);
   const [agentVersion, setAgentVersion] = useState<string>('');
   const [connectionState, setConnectionState] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
@@ -42,11 +50,20 @@ export default function App() {
   const [bytesTx, setBytesTx] = useState<number>(0);
 
   // =========================================================================
-  // 3. สถานะข้อความแจ้งเตือน (UI Feedback State)
+  // 3. สถานะข้อความแจ้งเตือน (Toast Notification State)
   // =========================================================================
   const [loading, setLoading] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+
+  // ฟังก์ชันยิง Toast แจ้งเตือนมุมขวาบน
+  const showToast = useCallback((message: string, type: ToastType = 'info') => {
+    setToast({ message, type });
+  }, []);
+
+  // ฟังก์ชันปิด Toast (ใช้ useCallback คงที่เพื่อไม่ให้ Timer รีเซ็ต)
+  const handleCloseToast = useCallback(() => {
+    setToast(null);
+  }, []);
 
   // ตรวจสอบความพร้อมของ Backend API (ทุก 5 วินาที)
   useEffect(() => {
@@ -81,7 +98,7 @@ export default function App() {
         } else {
           setAgentInstalled(false);
         }
-      } catch (e) {
+      } catch {
         setAgentInstalled(false);
       }
     };
@@ -120,25 +137,38 @@ export default function App() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setErrorMessage(null);
-    setInfoMessage(null);
 
     try {
+      const cleanUsername = username.trim();
       const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username: cleanUsername, password }),
       });
 
       const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.error?.message || 'Login failed. Please verify credentials.');
+      if (res.ok && json.success) {
+        setMfaChallenge(json.data);
+        showToast(`ส่งรหัสยืนยัน OTP ไปที่ ${json.data.maskedPhoneNumber}`, 'info');
+        return;
       }
-
-      setMfaChallenge(json.data);
-      setInfoMessage(`Verification code sent to ${json.data.maskedPhoneNumber}`);
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Unable to connect to Management API');
+      throw new Error(json.error?.message || 'Invalid credentials');
+    } catch {
+      // Dev Mock Fallback: ถ้า API หลังบ้านออฟไลน์
+      const cleanUsername = username.trim();
+      const demoAccount = DEMO_ACCOUNTS[cleanUsername];
+      if (demoAccount && password === 'MangoVPN2026!') {
+        setMfaChallenge({
+          requiresOtp: true,
+          challengeId: 'mock-challenge-dev',
+          maskedPhoneNumber: '+1555****567',
+          expiresInSeconds: 300,
+          message: 'Dev Mock Mode',
+        });
+        showToast('โหมดจำลอง (Dev Mode): ใช้ OTP เลข 123456 ได้เลยครับ', 'info');
+      } else {
+        showToast('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง (ลองใช้: admin_user / MangoVPN2026!)', 'error');
+      }
     } finally {
       setLoading(false);
     }
@@ -149,9 +179,30 @@ export default function App() {
     e.preventDefault();
     if (!mfaChallenge) return;
     setLoading(true);
-    setErrorMessage(null);
 
     try {
+      // Dev Mock Mode
+      if (mfaChallenge.challengeId === 'mock-challenge-dev') {
+        const cleanUsername = username.trim();
+        const demoAccount = DEMO_ACCOUNTS[cleanUsername] || { role: 'ADMIN', phone: '+15551234567' };
+        setAuthData({
+          accessToken: 'mock-jwt-access-token-mango-2026',
+          refreshToken: 'mock-jwt-refresh-token-mango-2026',
+          tokenType: 'Bearer',
+          expiresIn: 3600,
+          user: {
+            id: 'mock-dev-uuid-001',
+            username: cleanUsername,
+            phoneNumber: demoAccount.phone,
+            role: demoAccount.role,
+          },
+        });
+        setMfaChallenge(null);
+        showToast(`เข้าสู่ระบบสำเร็จ ยินดีต้อนรับ ${cleanUsername} (${demoAccount.role})`, 'success');
+        return;
+      }
+
+      // API จริง
       const res = await fetch(`${API_BASE_URL}/api/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -168,9 +219,9 @@ export default function App() {
 
       setAuthData(json.data);
       setMfaChallenge(null);
-      setInfoMessage(`Authenticated as ${json.data.user.username} (${json.data.user.role})`);
+      showToast(`เข้าสู่ระบบสำเร็จในฐานะ ${json.data.user.username} (${json.data.user.role})`, 'success');
     } catch (err: any) {
-      setErrorMessage(err.message || 'OTP verification failed');
+      showToast(err.message || 'การยืนยันรหัส OTP ล้มเหลว', 'error');
     } finally {
       setLoading(false);
     }
@@ -180,13 +231,12 @@ export default function App() {
   const handleConnectVpn = async () => {
     if (!authData) return;
     if (!agentInstalled) {
-      setErrorMessage('Local Windows Agent service not detected on 127.0.0.1:47821. Please run mock-agent.js');
+      showToast('ไม่พบเซอร์วิส Agent บนเครื่อง 127.0.0.1:47821 (กรุณารัน: npm run mock:agent)', 'error');
       return;
     }
 
     setConnectionState('connecting');
     setLoading(true);
-    setErrorMessage(null);
 
     try {
       const res = await fetch(`${AGENT_BASE_URL}/connect`, {
@@ -207,10 +257,10 @@ export default function App() {
       if (json.assignedIp) {
         setAssignedIp(json.assignedIp);
       }
-      setInfoMessage('Secure WireGuard tunnel established!');
+      showToast('เชื่อมต่อ WireGuard Tunnel เรียบร้อยแล้ว!', 'success');
     } catch (err: any) {
       setConnectionState('disconnected');
-      setErrorMessage(err.message || 'Failed to trigger agent connection');
+      showToast(err.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ VPN', 'error');
     } finally {
       setLoading(false);
     }
@@ -223,9 +273,9 @@ export default function App() {
       await fetch(`${AGENT_BASE_URL}/disconnect`, { method: 'POST' });
       setConnectionState('disconnected');
       setAssignedIp(null);
-      setInfoMessage('WireGuard tunnel disconnected');
-    } catch (err: any) {
-      setErrorMessage('Failed to cleanly disconnect agent');
+      showToast('ตัดการเชื่อมต่อ WireGuard VPN เรียบร้อยแล้ว', 'info');
+    } catch {
+      showToast('ไม่สามารถตัดการเชื่อมต่อได้อย่างสมบูรณ์', 'error');
     } finally {
       setLoading(false);
     }
@@ -239,129 +289,354 @@ export default function App() {
     setAuthData(null);
     setMfaChallenge(null);
     setOtpCode('');
-    setActiveView('vpn'); // รีเซ็ตมุมมองกลับไปหน้าหลัก
+    setActiveTab('connect');
+    showToast('ออกจากระบบเรียบร้อยแล้ว', 'info');
   };
 
-  return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* 1. ส่วนหัว: แถบสถานะระบบ */}
-      <Header
-        portalOnline={portalOnline}
-        agentInstalled={agentInstalled}
-        agentVersion={agentVersion}
-        connectionState={connectionState}
-        isLoggedIn={!!authData}
-        onSignOut={handleSignOut}
-      />
+  // =========================================================================
+  // เมื่อล็อกอินแล้ว: แสดง Full Dashboard Layout พร้อม Sidebar ด้านซ้าย
+  // =========================================================================
+  if (authData) {
+    return (
+      <div className="min-h-screen bg-[#060a08] text-slate-100 flex font-sans">
+        {/* ป๊อปอัปแจ้งเตือน Toast มุมบนขวา */}
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={handleCloseToast}
+          />
+        )}
 
-      {/* 2. พื้นที่เนื้อหาหลัก (Main Content) */}
-      <main className="flex-1 flex items-center justify-center p-6">
-        {/* ปรับความกว้างของการ์ด: ถ้าเป็นหน้า Admin ให้กว้างขึ้นเป็น max-w-2xl */}
-        <div className={`w-full transition-all duration-300 ${
-          authData && activeView === 'admin' ? 'max-w-2xl' : 'max-w-md'
-        }`}>
+        {/* เมนูนำทางด้านซ้าย (Sidebar) */}
+        <Sidebar
+          user={authData.user}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          onSignOut={handleSignOut}
+        />
 
-          {/* ป้ายแจ้งเตือนข้อผิดพลาด (Error Alert) */}
-          {errorMessage && (
-            <div className="mb-4 p-4 rounded-xl bg-rose-950/60 border border-rose-800 text-rose-200 text-sm flex items-start space-x-2">
-              <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
-              <span>{errorMessage}</span>
-            </div>
+        {/* พื้นที่แสดงเนื้อหาหลัก (Main Content) */}
+        <main className="flex-1 p-6 md:p-8 overflow-y-auto">
+          {/* 1. หน้าเชื่อมต่อ VPN */}
+          {activeTab === 'connect' && (
+            <VpnDashboard
+              user={authData.user}
+              assignedIp={assignedIp}
+              connectionState={connectionState}
+              bytesRx={bytesRx}
+              bytesTx={bytesTx}
+              agentInstalled={agentInstalled}
+              agentVersion={agentVersion}
+              loading={loading}
+              onConnect={handleConnectVpn}
+              onDisconnect={handleDisconnectVpn}
+              onNotify={showToast}
+            />
           )}
 
-          {/* ป้ายแจ้งข้อมูลความสำเร็จ (Success / Info Alert) */}
-          {infoMessage && (
-            <div className="mb-4 p-4 rounded-xl bg-amber-950/40 border border-amber-800 text-amber-200 text-sm flex items-start space-x-2">
-              <ShieldCheck className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-              <span>{infoMessage}</span>
-            </div>
-          )}
-
-          {/* การ์ดบรรจุหน้าจอ (Card Container) */}
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-2xl backdrop-blur">
-            
-            {/* หน้าที่ 1: ฟอร์มล็อกอิน */}
-            {!authData && !mfaChallenge && (
-              <LoginForm
-                username={username}
-                setUsername={setUsername}
-                password={password}
-                setPassword={setPassword}
-                loading={loading}
-                onSubmit={handleLogin}
-              />
-            )}
-
-            {/* หน้าที่ 2: โมดอลกรอก OTP */}
-            {!authData && mfaChallenge && (
-              <OtpModal
-                maskedPhoneNumber={mfaChallenge.maskedPhoneNumber}
-                otpCode={otpCode}
-                setOtpCode={setOtpCode}
-                loading={loading}
-                onVerify={handleVerifyOtp}
-                onBack={() => setMfaChallenge(null)}
-              />
-            )}
-
-            {/* หน้าที่ 3: แดชบอร์ดเมื่อล็อกอินสำเร็จแล้ว */}
-            {authData && (
-              <div className="space-y-4">
-                {/* สวิตช์สลับหน้า (แสดงเฉพาะ Role ADMIN) */}
-                {authData.user.role === 'ADMIN' && (
-                  <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
-                    <button
-                      onClick={() => setActiveView('vpn')}
-                      className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5 transition cursor-pointer ${
-                        activeView === 'vpn'
-                          ? 'bg-amber-500 text-slate-950 shadow-md'
-                          : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      <Shield className="w-3.5 h-3.5" />
-                      <span>VPN Client</span>
-                    </button>
-
-                    <button
-                      onClick={() => setActiveView('admin')}
-                      className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1.5 transition cursor-pointer ${
-                        activeView === 'admin'
-                          ? 'bg-amber-500 text-slate-950 shadow-md'
-                          : 'text-slate-400 hover:text-slate-200'
-                      }`}
-                    >
-                      <LayoutDashboard className="w-3.5 h-3.5" />
-                      <span>Admin Console</span>
-                    </button>
-                  </div>
-                )}
-
-                {/* แสดง View ตามที่เลือก */}
-                {activeView === 'vpn' ? (
-                  <VpnDashboard
-                    user={authData.user}
-                    assignedIp={assignedIp}
-                    connectionState={connectionState}
-                    bytesRx={bytesRx}
-                    bytesTx={bytesTx}
-                    agentInstalled={agentInstalled}
-                    agentVersion={agentVersion}
-                    loading={loading}
-                    onConnect={handleConnectVpn}
-                    onDisconnect={handleDisconnectVpn}
-                  />
-                ) : (
-                  <AdminPanel
-                    accessToken={authData.accessToken}
-                    apiBaseUrl={API_BASE_URL}
-                  />
-                )}
+          {/* 2. หน้าประวัติ (CLIENT ดูเฉพาะ Sessions ของตัวเอง, STAFF/ADMIN ดูได้ทั้ง Sessions & Logs) */}
+          {activeTab === 'history' && (
+            <div className="max-w-5xl mx-auto space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div>
+                  <h2 className="text-xl font-bold text-white tracking-wide">
+                    {authData.user.role === 'CLIENT'
+                      ? 'ประวัติการเชื่อมต่อ VPN (VPN Sessions)'
+                      : 'ประวัติการใช้งานระบบ (Sessions & Audit Logs)'}
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {authData.user.role === 'CLIENT'
+                      ? 'ตรวจสอบประวัติวันเวลาและปริมาณการเชื่อมต่อ WireGuard ของคุณ'
+                      : 'ตรวจสอบประวัติการเชื่อมต่อ VPN และบันทึกกิจกรรมความปลอดภัย'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab('connect')}
+                  className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
+                >
+                  ← กลับหน้าเชื่อมต่อ VPN
+                </button>
               </div>
-            )}
 
-          </div>
-        </div>
-      </main>
+              <AdminPanel
+                accessToken={authData.accessToken}
+                apiBaseUrl={API_BASE_URL}
+                initialTab="sessions"
+                allowedTabs={authData.user.role === 'CLIENT' ? ['sessions'] : ['sessions', 'logs']}
+              />
+            </div>
+          )}
+
+          {/* 3. หน้าอุปกรณ์ (แสดงเฉพาะ Registered Devices) */}
+          {activeTab === 'devices' && (
+            <div className="max-w-5xl mx-auto space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div>
+                  <h2 className="text-xl font-bold text-white tracking-wide">
+                    อุปกรณ์ที่ลงทะเบียน (Registered Devices)
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    รายชื่อเครื่องคอมพิวเตอร์และอุปกรณ์ที่ได้รับอนุญาตในระบบ
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab('connect')}
+                  className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
+                >
+                  ← กลับหน้าเชื่อมต่อ VPN
+                </button>
+              </div>
+
+              <AdminPanel
+                accessToken={authData.accessToken}
+                apiBaseUrl={API_BASE_URL}
+                initialTab="devices"
+                allowedTabs={['devices']}
+              />
+            </div>
+          )}
+
+          {/* 4. หน้าจัดการผู้ใช้ (User Management - ADMIN ONLY) */}
+          {activeTab === 'users' && (
+            <div className="max-w-5xl mx-auto space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div>
+                  <h2 className="text-xl font-bold text-white tracking-wide">
+                    รายชื่อผู้ใช้ในระบบ (User Management)
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    บริหารจัดการบัญชีผู้ใช้ บทบาท และการยืนยันตัวตน 2FA
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab('connect')}
+                  className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
+                >
+                  ← กลับหน้าเชื่อมต่อ VPN
+                </button>
+              </div>
+
+              <div className="bg-slate-950/80 rounded-xl border border-slate-800 overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-900/60 text-slate-400 border-b border-slate-800 font-mono">
+                    <tr>
+                      <th className="py-2.5 px-3">Username</th>
+                      <th className="py-2.5 px-3">Role</th>
+                      <th className="py-2.5 px-3">Phone (MFA)</th>
+                      <th className="py-2.5 px-3">2FA Status</th>
+                      <th className="py-2.5 px-3 text-right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
+                    {Object.entries(DEMO_ACCOUNTS).map(([name, acc]) => (
+                      <tr key={name} className="hover:bg-slate-900/40">
+                        <td className="py-3 px-3 font-semibold text-white">{name}</td>
+                        <td className="py-3 px-3">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              acc.role === 'ADMIN'
+                                ? 'bg-amber-950 text-amber-400 border border-amber-800'
+                                : acc.role === 'STAFF'
+                                ? 'bg-sky-950 text-sky-400 border border-sky-800'
+                                : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                            }`}
+                          >
+                            {acc.role}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-slate-300">{acc.phone}</td>
+                        <td className="py-3 px-3 text-emerald-400 font-bold">Enforced (SMS)</td>
+                        <td className="py-3 px-3 text-right">
+                          <span className="text-emerald-400 font-bold">● Active</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* 5. หน้านโยบายความปลอดภัย (Zero-Trust Policies - ADMIN ONLY) */}
+          {activeTab === 'policies' && (
+            <div className="max-w-5xl mx-auto space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div>
+                  <h2 className="text-xl font-bold text-white tracking-wide">
+                    นโยบายความปลอดภัยเครือข่าย (Zero-Trust Access Policies)
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    กำหนดขอบเขตและกฎระเบียบการเข้าถึง Subnet สำหรับแต่ละบทบาท (Least-Privilege)
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab('connect')}
+                  className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
+                >
+                  ← กลับหน้าเชื่อมต่อ VPN
+                </button>
+              </div>
+
+              <div className="bg-slate-950/80 rounded-xl border border-slate-800 overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-900/60 text-slate-400 border-b border-slate-800 font-mono">
+                    <tr>
+                      <th className="py-2.5 px-3">Policy Name</th>
+                      <th className="py-2.5 px-3">Target Role</th>
+                      <th className="py-2.5 px-3">Allowed Subnets</th>
+                      <th className="py-2.5 px-3">Allowed Ports</th>
+                      <th className="py-2.5 px-3 text-right">Enforcement</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
+                    <tr className="hover:bg-slate-900/40">
+                      <td className="py-3 px-3 font-semibold text-white">Full-Enterprise-Access</td>
+                      <td className="py-3 px-3">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-400 border border-amber-800">
+                          ADMIN
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-emerald-400 font-bold">0.0.0.0/0 (ทุกเครือข่าย)</td>
+                      <td className="py-3 px-3 text-slate-300">All Ports (*)</td>
+                      <td className="py-3 px-3 text-right text-emerald-400 font-bold">Active</td>
+                    </tr>
+                    <tr className="hover:bg-slate-900/40">
+                      <td className="py-3 px-3 font-semibold text-white">Corp-Internal-Subnet</td>
+                      <td className="py-3 px-3">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-950 text-sky-400 border border-sky-800">
+                          STAFF
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-sky-400 font-bold">10.0.0.0/8, 172.16.0.0/12</td>
+                      <td className="py-3 px-3 text-slate-300">Internal Services</td>
+                      <td className="py-3 px-3 text-right text-emerald-400 font-bold">Active</td>
+                    </tr>
+                    <tr className="hover:bg-slate-900/40">
+                      <td className="py-3 px-3 font-semibold text-white">Zero-Trust-Web-Gateway</td>
+                      <td className="py-3 px-3">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">
+                          CLIENT
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-emerald-300 font-bold">10.13.13.100/32</td>
+                      <td className="py-3 px-3 text-amber-300 font-bold">80, 443 Only</td>
+                      <td className="py-3 px-3 text-right text-emerald-400 font-bold">Active</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* 6. หน้า Audit Logs (ADMIN ONLY) */}
+          {activeTab === 'audit_logs' && (
+            <div className="max-w-5xl mx-auto space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div>
+                  <h2 className="text-xl font-bold text-white tracking-wide">
+                    บันทึกกิจกรรมความปลอดภัย (Audit Logs)
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    ประวัติการตรวจสอบย้อนหลังด้านความมั่นคงปลอดภัยสารสนเทศ
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab('connect')}
+                  className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
+                >
+                  ← กลับหน้าเชื่อมต่อ VPN
+                </button>
+              </div>
+
+              <AdminPanel
+                accessToken={authData.accessToken}
+                apiBaseUrl={API_BASE_URL}
+                initialTab="logs"
+                allowedTabs={['logs']}
+              />
+            </div>
+          )}
+
+          {/* 7. หน้า Agent (แสดงเฉพาะ Releases & Downloads) */}
+          {activeTab === 'agent' && (
+            <div className="max-w-5xl mx-auto space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div>
+                  <h2 className="text-xl font-bold text-white tracking-wide">
+                    ไคลเอนต์เอเจนต์ (Agent Versions & Releases)
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    ดาวน์โหลดและตรวจสอบเวอร์ชันของ Mango Windows Agent
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab('connect')}
+                  className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
+                >
+                  ← กลับหน้าเชื่อมต่อ VPN
+                </button>
+              </div>
+
+              <AdminPanel
+                accessToken={authData.accessToken}
+                apiBaseUrl={API_BASE_URL}
+                initialTab="versions"
+                allowedTabs={['versions']}
+              />
+            </div>
+          )}
+        </main>
+      </div>
+    );
+  }
+
+  // =========================================================================
+  // ก่อนล็อกอิน: แสดงหน้า Login Form สไตล์ Mobile App
+  // =========================================================================
+  return (
+    <div className="min-h-screen bg-[#040806] text-slate-100 flex flex-col items-center justify-center p-4 sm:p-6 font-sans">
+      {/* ป๊อปอัปแจ้งเตือน Toast มุมบนขวา */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={handleCloseToast}
+        />
+      )}
+
+      {/* สถานะเซิร์ฟเวอร์จิ๋ว */}
+      <div className="flex items-center space-x-1.5 text-[10px] text-slate-500 mb-2 font-mono">
+        <span className={`w-1.5 h-1.5 rounded-full ${portalOnline ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
+        <span>{portalOnline ? 'Gateway API Online' : 'Gateway Standby (Dev Mock)'}</span>
+      </div>
+
+      {/* กรอบขนาด Mobile App Card */}
+      <div className="w-full max-w-[400px] bg-[#070d0a] border border-slate-800/80 rounded-3xl p-6 sm:p-7 shadow-2xl shadow-emerald-950/20">
+        {/* หน้าที่ 1: ฟอร์มล็อกอิน Mobile */}
+        {!mfaChallenge && (
+          <LoginForm
+            username={username}
+            setUsername={setUsername}
+            password={password}
+            setPassword={setPassword}
+            loading={loading}
+            onSubmit={handleLogin}
+          />
+        )}
+
+        {/* หน้าที่ 2: โมดอลกรอก OTP Mobile */}
+        {mfaChallenge && (
+          <OtpModal
+            maskedPhoneNumber={mfaChallenge.maskedPhoneNumber}
+            otpCode={otpCode}
+            setOtpCode={setOtpCode}
+            loading={loading}
+            onVerify={handleVerifyOtp}
+            onBack={() => setMfaChallenge(null)}
+          />
+        )}
+      </div>
     </div>
   );
 }

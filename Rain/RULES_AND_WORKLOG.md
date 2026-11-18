@@ -164,3 +164,66 @@
   - `Rain/portal/src/components/OtpModal.tsx`
   - `Rain/portal/src/components/Header.tsx`
   - `Rain/portal/src/components/VpnDashboard.tsx`
+
+---
+
+### 📅 วันที่: 2026-11-16 (เช้า - บ่าย)
+- **Branch**: `feature/ui`
+- **สิ่งที่ทำ**:
+  1. **ช่วงเช้า**:
+     - สร้าง Mock Auth & Offline Fallback ให้ `App.tsx` และ `AdminPanel.tsx` รองรับการทดสอบหน้าเว็บได้ครบทุก Role แม้ไม่มี Docker / PostgreSQL
+     - แก้ไขปัญหา Trim Whitespace ใน Zod Validation Schema และฟอร์ม ทำให้รองรับการ Copy-paste รหัสผ่านและ Username โดยไม่ติด Error
+     - ทดสอบระบบ Role-Based Dashboard ผ่านฉลุยทั้ง 3 บทบาท (`admin_user`, `staff_user`, `client_user`)
+  2. **ช่วงบ่าย (UI/UX Polish & Modern Enterprise Transformation)**:
+     - สร้าง Component `Toast.tsx` ระบบแจ้งเตือนลอยมุมขวาบน รองรับ 3 สถานะ (`success`, `error`, `info`) มีระบบ Auto-dismiss อัตโนมัติหลัง 3.5 วินาที พร้อมปุ่มปิดกากบาท
+     - ปรับปรุง `VpnDashboard.tsx` เพิ่มปุ่ม Quick Copy สำหรับคัดลอก Assigned VPN IP และ Endpoint พร้อมไอคอน Checkmark แสดงผล 2 วินาที และยิงแจ้งเตือนผ่าน Toast
+     - เพิ่มไอคอนสถานะการรับ-ส่งข้อมูล (RX/TX Download/Upload) ใน Telemetry Box
+     - ประกอบ `Toast` และฟังก์ชัน `showToast` เข้ากับ `App.tsx` เชื่อมต่อแจ้งเตือนเมื่อ Login, Logout และคัดลอก IP/Endpoint
+     - ปรับโฉมหน้า Dashboard ฝั่ง Staff/Client ให้เป็นสไตล์ **Enterprise Modern Dark Layout**:
+       - สร้าง Component `Sidebar.tsx` แถบเมนูด้านซ้าย รองรับ 4 แท็บ (`เชื่อมต่อ`, `ประวัติ`, `อุปกรณ์`, `Agent`) พร้อมโปรไฟล์และปุ่ม Logout
+       - ยกเครื่อง `VpnDashboard.tsx` ใหม่ตามแบบดีไซน์:
+         - แถบ Breadcrumb `// CONNECT` พร้อมป้าย `● เชื่อมต่อแล้ว` และ `โหมดมืด`
+         - แผนภาพ **Secure Tunnel Diagram**: `เครื่องของคุณ` ─── [🔒] ─── `Private Network` เรืองแสงสีเขียว
+         - ปุ่มสลับการเชื่อมต่อ `ตัดการเชื่อมต่อ` / `เชื่อมต่อ VPN` พร้อม WireGuard Endpoint
+         - การ์ดสถิติ 4 ช่อง (4 Metrics Grid): VPN IP (พร้อมปุ่ม Copy), RX, TX, และตัวนับเวลาเชื่อมต่อจริง (HH:MM:SS)
+         - แผงคอนโซล 2 คอลัมน์ด้านล่าง: `CONNECTION LOG` สไตล์ Terminal สีเขียว และกล่องเครือข่ายที่เข้าถึงได้ (`10.0.0.0/8, 172.16.0.0/12`) + Curve25519 Public Key
+       - ปรับปรุง `App.tsx` เชื่อมโยงระบบแสดงผลเต็มจอเมื่อล็อกอิน และคงหน้า Login กึ่งกลางจอก่อนล็อกอิน
+       - แยกหน้าแดชบอร์ดตามเมนู Sidebar ให้เป็นอิสระต่อกัน:
+         - ปรับปรุง `AdminPanel.tsx` ให้รองรับ `initialTab` และ `allowedTabs` ป้องกันปัญหาหน้า History แสดงตาราง Devices
+         - เมื่อคลิกเมนู `ประวัติ`: แสดงเฉพาะข้อมูล **Sessions & Audit Logs** เท่านั้น
+         - เมื่อคลิกเมนู `อุปกรณ์`: แสดงเฉพาะตาราง **Registered Devices** พร้อมซ่อนแท็บส่วนเกิน
+         - เมื่อคลิกเมนู `Agent`: แสดงเฉพาะตาราง **Releases / Versions** พร้อมซ่อนแท็บส่วนเกิน
+       - แก้ไขปัญหา Toast Notification ค้างไม่ยอมปิดตัวเองอัตโนมัติ:
+         - เกิดจาก `useEffect` ใน `Toast.tsx` มี dependency ผูกกับ `onClose` ที่ถูกสร้างใหม่ทุกครั้งที่มีการ Re-render (จากลูปเช็คสถานะ Polling ทุก 1-3 วินาที) ทำให้ `clearTimeout` ถูกเรียกยกเลิกเวลาซ้ำๆ
+         - แก้ไขด้วยการใช้ `useRef` เก็บฟังก์ชัน callback และใช้ `useCallback` ใน `App.tsx` ทำให้ Toast นับเวลาถอยหลัง 3.5 วินาทีและปิดตัวเองได้ 100%
+        - ปรับแต่งหน้าแดชบอร์ดฝั่ง Client (`client_user`) ให้ตรงตามหลัก Zero-Trust และรูปภาพดีไซน์อ้างอิง:
+          - ใน `Sidebar.tsx`: ซ่อนเมนู **"อุปกรณ์"** สำหรับผู้ใช้บทบาท `CLIENT` เพื่อจำกัดสิทธิ์ (เหลือ 3 เมนู: เชื่อมต่อ, ประวัติ, Agent)
+          - ใน `VpnDashboard.tsx`: แสดง **เครือข่ายที่เข้าถึงได้** แบบ Least-Privilege เฉพาะพอร์ต 80, 443 (`10.13.13.100/32 : 80, 443`) สำหรับ CLIENT
+          - ใน `App.tsx`: หน้าประวัติของ CLIENT แสดงเฉพาะตาราง Sessions ของตัวเอง ซ่อน Audit Logs ตามสิทธิ์
+        - ยกระดับหน้าแดชบอร์ดฝั่ง Admin (`admin_user`) ครบเครื่องตามภาพดีไซน์อ้างอิง:
+          - ใน `Sidebar.tsx`: เพิ่มเมนูสำหรับ Admin ครบทั้ง 7 เมนู (เชื่อมต่อ, ประวัติ, อุปกรณ์, ผู้ใช้, นโยบาย, Audit Logs, Agent)
+          - ใน `VpnDashboard.tsx`: แสดง **เครือข่ายที่เข้าถึงได้** เป็น `0.0.0.0/0 (ทุกเครือข่าย)` แบบ Full Corporate Access
+          - ใน `App.tsx`: เพิ่มหน้าจอระบบ **User Management** (จัดการบัญชีและ 2FA) และหน้า **Zero-Trust Access Policies** (กฎความปลอดภัยการเข้าถึง Subnet) รองรับการคลิกดูข้อมูลจาก Sidebar ได้จริง
+        - ยกระดับหน้าจอ Login & OTP Verification:
+          - ใน `LoginForm.tsx`: เพิ่มปุ่ม 1-Click Role Switcher (`👑 Admin`, `👔 Staff`, `👤 Client`) กรอกข้อมูลพร้อมรหัสผ่านให้อัตโนมัติในคลิกเดียว
+          - เพิ่มปุ่มเปิด/ปิดตาดูรหัสผ่าน (`Eye` / `EyeOff`) สลับระหว่าง text และ password
+          - ใน `OtpModal.tsx`: เพิ่มปุ่ม Auto-fill Demo OTP (`123456`) อำนวยความสะดวกในการทดสอบอย่างรวดเร็ว
+        - ปรับดีไซน์หน้า Login & OTP ให้เป็นแบบ **Mobile Application Style** ตามรูปภาพอ้างอิง:
+          - ใน `LoginForm.tsx`: วางโครงสร้างแบบ Mobile App พร้อมโลโก้ MANGO VPN สีเขียว, แถบสถานะ TLS 1.3, หัวข้อ 'เข้าสู่ระบบ VPN', แถบ Progress Bar 3 ท่อน (ขั้นตอนที่ 1 จาก 3), ช่อง Username/Password พร้อมปุ่มกด 'แสดง'/'ซ่อน', และลิงก์ดาวน์โหลด Agent / ติดต่อ Admin
+          - ใน `OtpModal.tsx`: ออกแบบหน้า OTP ให้เข้าชุดกันเป็นขั้นตอนที่ 2 จาก 3 (แถบ Progress 2 ท่อนสีเขียว)
+          - ใน `App.tsx`: ปรับกรอบแสดงผลหน้า Login ให้อยู่ในสัดส่วน Mobile App Card (`max-w-[400px]`) รองรับ Responsive แสดงผลสวยงามทั้งบนมือถือและจอคอมพิวเตอร์
+        - พัฒนาหน้าจอ OTP Verification สไตล์ Mobile 6 ช่องแยกตามภาพดีไซน์อ้างอิง:
+          - ใน `OtpModal.tsx`: สร้างช่องกรอกตัวเลข 6 ช่องแยกอิสระ (Individual 6-Digit Boxes) มีระบบกระโดดไปช่องถัดไปอัตโนมัติเมื่อพิมพ์ และถอยกลับเมื่อกด Backspace พร้อมรองรับการ Paste ข้อความ 6 ตัวรวดเดียว
+          - เพิ่มตัวนับเวลา 'รหัสหมดอายุใน 4:32 นาที' นับถอยหลังแบบเรียลไทม์
+          - ปุ่มยืนยันสถานะปิดการใช้งาน (Disabled) 'ยืนยัน' จนกว่าจะกรอกครบ 6 หลัก และสลับเป็นสีเขียวทันที
+          - ลิงก์ 'รหัสหมดอายุ? เข้าสู่ระบบใหม่' ด้านล่างสุด
+      - ทดสอบการคอมไพล์ด้วย TypeScript และ Vite Build ผ่าน 100% ไม่มีข้อผิดพลาด
+- **ไฟล์ที่สร้าง/แก้ไข**:
+  - `Rain/portal/src/components/Sidebar.tsx` *(รองรับเมนูตามบทบาท RBAC ครบทั้ง 3 บทบาท)*
+  - `Rain/portal/src/components/Toast.tsx` *(แก้บั๊ก Auto-dismiss ด้วย useRef)*
+  - `Rain/portal/src/components/VpnDashboard.tsx` *(แสดงเครือข่าย 0.0.0.0/0 (ทุกเครือข่าย) สำหรับ ADMIN)*
+  - `Rain/portal/src/components/AdminPanel.tsx` *(รองรับ initialTab และ allowedTabs แยกหน้าเป็นอิสระ)*
+  - `Rain/portal/src/App.tsx` *(เชื่อมต่อ User Management, Policies และแยกหน้าจอตามแท็บ Sidebar ครบวงจร)*
+  - `Rain/portal/src/components/LoginForm.tsx` *(เพิ่มปุ่ม 1-Click Role Fill และปุ่มเปิด/ปิดตาดูรหัสผ่าน)*
+  - `Rain/portal/src/components/OtpModal.tsx` *(เพิ่มปุ่ม Auto-fill Demo OTP)*
+  - `Rain/RULES_AND_WORKLOG.md` *(อัปเดตบันทึกประจำวัน)*

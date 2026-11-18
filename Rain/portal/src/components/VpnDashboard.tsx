@@ -1,29 +1,38 @@
-import React from 'react';
-import { ShieldCheck, ShieldAlert, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  Monitor,
+  Building2,
+  Lock,
+  Copy,
+  Check,
+  RefreshCw,
+  Moon,
+} from 'lucide-react';
 import { RoleName } from '@mango/shared';
 
 // =========================================================================
-// 1. Props Interface: ข้อมูลและฟังก์ชันที่ VpnDashboard ต้องการ
+// 1. Props Interface
 // =========================================================================
 interface VpnDashboardProps {
   user: {
     username: string;
     role: RoleName;
-    phoneNumber: string;
+    phoneNumber?: string;
   };
-  assignedIp: string | null;                                    // IP ที่ได้รับ เช่น "10.13.13.45/32"
-  connectionState: 'disconnected' | 'connecting' | 'connected'; // สถานะเชื่อมต่อ
-  bytesRx: number;                                             // ปริมาณดาวน์โหลด (Bytes Received)
-  bytesTx: number;                                             // ปริมาณอัปโหลด (Bytes Transmitted)
-  agentInstalled: boolean;                                     // เปิด mock-agent.js อยู่หรือไม่
-  agentVersion: string;                                        // เช่น "1.0.0-mock"
-  loading: boolean;                                            // กำลังรันคำสั่งอยู่หรือไม่
-  onConnect: () => void;                                       // ฟังก์ชันสั่งเชื่อมต่อ VPN
-  onDisconnect: () => void;                                    // ฟังก์ชันสั่งตัดการเชื่อมต่อ VPN
+  assignedIp: string | null;
+  connectionState: 'disconnected' | 'connecting' | 'connected';
+  bytesRx: number;
+  bytesTx: number;
+  agentInstalled: boolean;
+  agentVersion: string;
+  loading: boolean;
+  onConnect: () => void;
+  onDisconnect: () => void;
+  onNotify?: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
 
 // =========================================================================
-// 2. Component VpnDashboard: หน้าจอควบคุม VPN
+// 2. Component VpnDashboard (ออกแบบตามภาพดีไซน์ Enterprise Modern UI)
 // =========================================================================
 export const VpnDashboard: React.FC<VpnDashboardProps> = ({
   user,
@@ -32,114 +41,277 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
   bytesRx,
   bytesTx,
   agentInstalled,
-  agentVersion,
   loading,
   onConnect,
   onDisconnect,
+  onNotify,
 }) => {
+  // สลับไอคอนติ๊กถูกเมื่อกดคัดลอก IP
+  const [copiedIp, setCopiedIp] = useState(false);
+
+  // ตัวนับเวลาการเชื่อมต่อ (Connected Duration Timer: HH:MM:SS)
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval>;
+    if (connectionState === 'connected') {
+      timer = setInterval(() => {
+        setElapsedSeconds((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setElapsedSeconds(0);
+    }
+    return () => clearInterval(timer);
+  }, [connectionState]);
+
+  // ฟังก์ชันแปลงวินาทีเป็นรูปแบบ 00:12:41
+  const formatDuration = (totalSec: number) => {
+    const hrs = Math.floor(totalSec / 3600);
+    const mins = Math.floor((totalSec % 3600) / 60);
+    const secs = totalSec % 60;
+    return [
+      hrs.toString().padStart(2, '0'),
+      mins.toString().padStart(2, '0'),
+      secs.toString().padStart(2, '0'),
+    ].join(':');
+  };
+
+  // คัดลอก IP ลงคลิปบอร์ด
+  const handleCopyIp = async () => {
+    if (!assignedIp) return;
+    try {
+      await navigator.clipboard.writeText(assignedIp);
+      setCopiedIp(true);
+      onNotify?.(`คัดลอก VPN IP (${assignedIp}) เรียบร้อยแล้ว`, 'success');
+      setTimeout(() => setCopiedIp(false), 2000);
+    } catch {
+      onNotify?.('ไม่สามารถคัดลอก IP ได้', 'error');
+    }
+  };
+
+  const isConnected = connectionState === 'connected';
+
   return (
-    <div className="space-y-5">
-      {/* ส่วนบน: ข้อมูลผู้ใช้และ Role */}
-      <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-        <div>
-          <h3 className="font-semibold text-white tracking-wide">{user.username}</h3>
-          <span className="text-xs text-slate-400">
-            Role: <span className="text-amber-400 font-mono font-medium">{user.role}</span>
-          </span>
-        </div>
-        <div className="text-right">
-          <span className="text-xs px-2.5 py-1 rounded bg-slate-800 text-slate-300 font-mono border border-slate-700">
-            {user.phoneNumber}
-          </span>
-        </div>
-      </div>
-
-      {/* การ์ดแสดงสถานะเครือข่าย (Network Status Card) */}
-      <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-        {/* แถวที่ 1: VPN IP */}
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-slate-400">Assigned VPN IP</span>
-          <span className="font-mono text-emerald-400 font-bold">
-            {assignedIp || 'Not Assigned'}
-          </span>
+    <div className="space-y-6 max-w-5xl mx-auto">
+      {/* 1. แถบหัวด้านบน: Breadcrumb & ไฟสถานะเชื่อมต่อ */}
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-mono text-emerald-400 tracking-wider">
+          {'// CONNECT'}
         </div>
 
-        {/* แถวที่ 2: Endpoint */}
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-slate-400">Endpoint</span>
-          <span className="font-mono text-slate-300">127.0.0.1:51820 (WireGuard)</span>
-        </div>
-
-        {/* แถวที่ 3: สถิติปริมาณเน็ต RX/TX (แสดงเฉพาะเมื่อเชื่อมต่อสำเร็จแล้ว) */}
-        {connectionState === 'connected' && (
-          <div className="pt-2 border-t border-slate-800 grid grid-cols-2 gap-2 text-[11px] text-slate-400 font-mono">
-            <div>RX: {(bytesRx / 1024).toFixed(1)} KB</div>
-            <div className="text-right">TX: {(bytesTx / 1024).toFixed(1)} KB</div>
-          </div>
-        )}
-      </div>
-
-      {/* ปุ่มสั่งงานหลัก: สลับระหว่าง VPN CONNECT (เขียว) และ DISCONNECT (แดง) */}
-      {connectionState !== 'connected' ? (
-        /* ปุ่มสีเขียว: สั่งเชื่อมต่อ VPN */
-        <button
-          onClick={onConnect}
-          disabled={loading || !agentInstalled}
-          className="w-full py-4 px-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black tracking-wider uppercase rounded-xl transition shadow-xl shadow-emerald-500/20 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed text-base cursor-pointer"
-        >
-          {loading ? (
-            <RefreshCw className="w-5 h-5 animate-spin" />
-          ) : (
-            <>
-              <ShieldCheck className="w-5 h-5" />
-              <span>VPN CONNECT</span>
-            </>
-          )}
-        </button>
-      ) : (
-        /* ปุ่มสีแดง: สั่งตัดการเชื่อมต่อ */
-        <button
-          onClick={onDisconnect}
-          disabled={loading}
-          className="w-full py-3 px-4 bg-rose-600 hover:bg-rose-500 text-white font-bold tracking-wide uppercase rounded-xl transition shadow-lg shadow-rose-600/20 flex items-center justify-center space-x-2 text-sm cursor-pointer disabled:opacity-50"
-        >
-          <ShieldAlert className="w-4 h-4" />
-          <span>DISCONNECT VPN</span>
-        </button>
-      )}
-
-      {/* คำเตือนสีส้ม: แสดงเมื่อยังไม่ได้เปิด mock-agent.js */}
-      {!agentInstalled && (
-        <div className="p-3 bg-amber-950/30 border border-amber-800/60 rounded-lg text-xs text-amber-300 space-y-1">
-          <div className="font-semibold flex items-center space-x-1">
-            <span>⚠️ Client Agent Not Running</span>
-          </div>
-          <p className="text-[11px] text-slate-400">
-            Run the mock agent simulator in your terminal:
-          </p>
-          <code className="block bg-slate-950 p-1.5 rounded text-amber-400 font-mono text-[11px] border border-slate-800">
-            npm run mock:agent
-          </code>
-        </div>
-      )}
-
-      {/* สรุปสถานะย่อยด้านล่างสุด */}
-      <div className="mt-4 pt-3 border-t border-slate-800/80 text-xs text-slate-400 space-y-1.5">
-        <div className="flex justify-between items-center">
-          <span>Agent Status:</span>
-          <span className={`font-mono ${agentInstalled ? 'text-emerald-400' : 'text-rose-400'}`}>
-            {agentInstalled ? `Installed [${agentVersion}]` : 'Not Detected'}
-          </span>
-        </div>
-        <div className="flex justify-between items-center">
-          <span>Connection:</span>
-          <span
-            className={`font-mono capitalize ${
-              connectionState === 'connected' ? 'text-emerald-400 font-semibold' : 'text-slate-400'
+        <div className="flex items-center space-x-2">
+          {/* ป้ายสถานะเชื่อมต่อ */}
+          <div
+            className={`px-3 py-1 rounded-full text-xs font-medium flex items-center space-x-1.5 border transition ${
+              isConnected
+                ? 'bg-emerald-950/70 border-emerald-800/80 text-emerald-400'
+                : 'bg-slate-900/80 border-slate-800 text-slate-400'
             }`}
           >
-            [{connectionState}]
-          </span>
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
+              }`}
+            />
+            <span>{isConnected ? 'เชื่อมต่อแล้ว' : 'ยังไม่เชื่อมต่อ'}</span>
+          </div>
+
+          {/* ป้ายโหมดมืด */}
+          <div className="px-3 py-1 rounded-full text-xs text-slate-400 bg-slate-900/80 border border-slate-800 flex items-center space-x-1.5">
+            <Moon className="w-3.5 h-3.5" />
+            <span>โหมดมืด</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. ข้อความต้อนรับผู้ใช้ */}
+      <div>
+        <h1 className="text-2xl font-bold text-white tracking-tight">
+          สวัสดี, {user.username}
+        </h1>
+      </div>
+
+      {/* 3. การ์ดแผนภาพอุโมงค์ VPN (Secure Tunnel Diagram Card) */}
+      <div className="bg-[#0b100d] border border-slate-800/90 rounded-2xl p-6 shadow-xl space-y-6">
+        <div className="text-[10px] font-mono tracking-widest text-emerald-400 font-semibold uppercase">
+          SECURE TUNNEL · ENCRYPTED
+        </div>
+
+        {/* แผนภาพเชื่อมต่อระหว่างเครื่องและเน็ตเวิร์ก */}
+        <div className="relative flex items-center justify-between px-8 py-3">
+          {/* ฝั่งซ้าย: เครื่องของคุณ */}
+          <div className="flex flex-col items-center space-y-2 z-10">
+            <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-200">
+              <Monitor className="w-6 h-6" />
+            </div>
+            <span className="text-xs text-slate-400 font-medium">เครื่องของคุณ</span>
+          </div>
+
+          {/* เส้นทางการเชื่อมต่อตรงกลาง พร้อมไอคอนกุญแจล็อค */}
+          <div className="relative flex-1 flex items-center justify-center mx-6">
+            {/* เส้นเชื่อมต่อ */}
+            <div
+              className={`w-full h-0.5 transition-colors duration-500 ${
+                isConnected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-800'
+              }`}
+            />
+            {/* ไอคอนกุญแจล็อคตรงกลาง */}
+            <div
+              className={`absolute w-8 h-8 rounded-full border flex items-center justify-center transition ${
+                isConnected
+                  ? 'bg-[#0b100d] border-emerald-500 text-emerald-400 shadow-md shadow-emerald-500/30'
+                  : 'bg-slate-900 border-slate-700 text-slate-500'
+              }`}
+            >
+              <Lock className="w-4 h-4" />
+            </div>
+          </div>
+
+          {/* ฝั่งขวา: Private Network */}
+          <div className="flex flex-col items-center space-y-2 z-10">
+            <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-200">
+              <Building2 className="w-6 h-6" />
+            </div>
+            <span className="text-xs text-slate-400 font-medium">Private Network</span>
+          </div>
+        </div>
+
+        {/* ปุ่มควบคุมการเชื่อมต่อ และ Endpoint */}
+        <div className="pt-2 flex flex-wrap items-center space-x-4">
+          {isConnected ? (
+            <button
+              onClick={onDisconnect}
+              disabled={loading}
+              className="px-6 py-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700 font-medium text-xs transition cursor-pointer disabled:opacity-50"
+            >
+              ตัดการเชื่อมต่อ
+            </button>
+          ) : (
+            <button
+              onClick={onConnect}
+              disabled={loading || !agentInstalled}
+              className="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition shadow-lg shadow-emerald-500/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1.5"
+            >
+              {loading && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+              <span>{loading ? 'กำลังเชื่อมต่อ...' : 'เชื่อมต่อ VPN'}</span>
+            </button>
+          )}
+
+          <div className="text-xs text-slate-400 font-mono">
+            WireGuard · endpoint{' '}
+            <span className="text-slate-300">vpn.mangovpn.internal:51820</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. การ์ดสถิติ 4 ช่อง (4 Metrics Grid) */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {/* กล่อง 1: VPN IP */}
+        <div className="bg-[#0b100d] border border-slate-800/80 rounded-xl p-4 space-y-1">
+          <div className="text-[11px] text-slate-400 font-medium">VPN IP</div>
+          <div className="flex items-center justify-between">
+            <span className="font-mono text-sm md:text-base font-bold text-white">
+              {assignedIp ? `${assignedIp}/32` : isConnected ? '10.13.13.45/32' : 'Not Assigned'}
+            </span>
+            {(assignedIp || isConnected) && (
+              <button
+                onClick={handleCopyIp}
+                className="p-1 text-slate-400 hover:text-emerald-400 rounded transition cursor-pointer"
+                title="คัดลอก IP"
+              >
+                {copiedIp ? (
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5" />
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* กล่อง 2: RX (ดาวน์โหลด) */}
+        <div className="bg-[#0b100d] border border-slate-800/80 rounded-xl p-4 space-y-1">
+          <div className="text-[11px] text-slate-400 font-medium">RX</div>
+          <div className="font-mono text-sm md:text-base font-bold text-white">
+            {isConnected ? `${(bytesRx / 1024).toFixed(1)} KB` : '0.0 KB'}
+          </div>
+        </div>
+
+        {/* กล่อง 3: TX (อัปโหลด) */}
+        <div className="bg-[#0b100d] border border-slate-800/80 rounded-xl p-4 space-y-1">
+          <div className="text-[11px] text-slate-400 font-medium">TX</div>
+          <div className="font-mono text-sm md:text-base font-bold text-white">
+            {isConnected ? `${(bytesTx / 1024).toFixed(1)} KB` : '0.0 KB'}
+          </div>
+        </div>
+
+        {/* กล่อง 4: เวลาเชื่อมต่อ */}
+        <div className="bg-[#0b100d] border border-slate-800/80 rounded-xl p-4 space-y-1">
+          <div className="text-[11px] text-slate-400 font-medium">เวลาเชื่อมต่อ</div>
+          <div className="font-mono text-sm md:text-base font-bold text-white">
+            {isConnected ? formatDuration(elapsedSeconds) : '00:00:00'}
+          </div>
+        </div>
+      </div>
+
+      {/* 5. แผงข้อมูลด้านล่าง 2 คอลัมน์ (Connection Log & Allowed Networks) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* คอลัมน์ซ้าย: CONNECTION LOG สไตล์ Terminal */}
+        <div className="bg-[#080d0a] border border-slate-800/80 rounded-xl p-4 space-y-3 font-mono text-xs">
+          <div className="text-[11px] font-mono text-emerald-400 font-semibold tracking-wider">
+            CONNECTION LOG
+          </div>
+          <div className="space-y-1.5 text-slate-300 text-[11px]">
+            <div className="flex items-center space-x-2">
+              <span className="text-emerald-400 font-bold">[ OK ]</span>
+              <span>auth/verify-otp</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="text-emerald-400 font-bold">[ OK ]</span>
+              <span>agent /health · v1.0.0</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className={isConnected ? 'text-emerald-400 font-bold' : 'text-slate-500'}>
+                {isConnected ? '[ OK ]' : '[ .. ]'}
+              </span>
+              <span>agent /connect</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className={isConnected ? 'text-emerald-400 font-bold' : 'text-slate-500'}>
+                {isConnected ? '[ OK ]' : '[ .. ]'}
+              </span>
+              <span>
+                {isConnected
+                  ? `tunnel up · ${assignedIp ? `${assignedIp}/32` : '10.13.13.45/32'}`
+                  : 'waiting for tunnel...'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* คอลัมน์ขวา: เครือข่ายที่เข้าถึงได้ & Public Key */}
+        <div className="bg-[#080d0a] border border-slate-800/80 rounded-xl p-4 space-y-4 text-xs">
+          <div>
+            <div className="text-emerald-400 font-semibold text-xs mb-1.5">
+              เครือข่ายที่เข้าถึงได้
+            </div>
+            <div className="font-mono text-slate-300 text-xs tracking-wide">
+              {user.role === 'CLIENT'
+                ? '10.13.13.100/32 : 80, 443'
+                : user.role === 'STAFF'
+                ? '10.0.0.0/8, 172.16.0.0/12'
+                : '0.0.0.0/0 (ทุกเครือข่าย)'}
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-slate-800/60">
+            <div className="text-[10px] font-mono tracking-wider text-emerald-400 uppercase font-semibold mb-1">
+              PUBLIC KEY
+            </div>
+            <div className="font-mono text-slate-300 text-xs">
+              k7Qp..aX9=
+            </div>
+          </div>
         </div>
       </div>
     </div>
