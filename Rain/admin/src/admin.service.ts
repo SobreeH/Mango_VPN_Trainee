@@ -208,7 +208,7 @@ export class AdminService {
     }
 
     let roleId = existing.roleId;
-    if (data.roleName && data.roleName !== existing.role.name) {
+    if (data.roleName && data.roleName !== existing.role?.name) {
       const role = await prisma.role.findUnique({ where: { name: data.roleName } });
       if (!role) {
         throw new Error(`Role ${data.roleName} not found`);
@@ -228,14 +228,15 @@ export class AdminService {
       include: { role: true },
     });
 
+    // บันทึกความปลอดภัย Audit Log ทุกครั้งที่มีการแก้ไขนโยบาย Zero-Trust
     await prisma.auditLog.create({
       data: {
         userId: adminUserId || null,
-        action: 'VPN_POLICY_UPDATED',
+        action: 'POLICY_UPDATED',
         ipAddress: '127.0.0.1',
         metadataJson: {
           policyId: updated.id,
-          role: updated.role.name,
+          role: updated.role?.name,
           destinationCidr: updated.destinationCidr,
           protocol: updated.protocol,
           portRange: updated.portRange,

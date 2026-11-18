@@ -19,7 +19,7 @@ import {
   ArrowUp,
   UserCheck,
   UserX,
-  Edit3,
+  Pencil,
 } from 'lucide-react';
 import {
   DeviceDto,
@@ -464,7 +464,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
-  // State สำหรับจัดการ Policies (Add, Edit, Delete)
+  // State สำหรับจัดการ Policies (Add & Delete)
   const [customPolicies, setCustomPolicies] = useState<VpnPolicyDto[]>([]);
   const [deletedPolicyIds, setDeletedPolicyIds] = useState<string[]>(() => {
     try {
@@ -474,15 +474,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       return [];
     }
   });
-  const [editedPolicies, setEditedPolicies] = useState<Record<string, VpnPolicyDto>>(() => {
-    try {
-      const saved = sessionStorage.getItem('mango_edited_policies');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
-
   const [isAddPolicyOpen, setIsAddPolicyOpen] = useState(false);
   const [policyRole, setPolicyRole] = useState<'ADMIN' | 'STAFF' | 'CLIENT'>('STAFF');
   const [policyCidr, setPolicyCidr] = useState('');
@@ -491,82 +482,79 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [policyAction, setPolicyAction] = useState<'ALLOW' | 'DENY'>('ALLOW');
   const [isSubmittingPolicy, setIsSubmittingPolicy] = useState(false);
 
-  // State สำหรับหน้าต่าง Modal แก้ไขนโยบาย (PUT /api/policies/:id)
-  const [isEditPolicyOpen, setIsEditPolicyOpen] = useState(false);
-  const [editingPolicyId, setEditingPolicyId] = useState<string | null>(null);
-  const [editRole, setEditRole] = useState<'ADMIN' | 'STAFF' | 'CLIENT'>('STAFF');
-  const [editCidr, setEditCidr] = useState('');
-  const [editProtocol, setEditProtocol] = useState<'ALL' | 'TCP' | 'UDP' | 'ICMP'>('ALL');
-  const [editPortRange, setEditPortRange] = useState('ANY');
-  const [editAction, setEditAction] = useState<'ALLOW' | 'DENY'>('ALLOW');
+  // State สำหรับจัดการแก้ไข Policy (PUT /api/policies/:id)
+  const [editingPolicy, setEditingPolicy] = useState<VpnPolicyDto | null>(null);
+  const [editPolicyRole, setEditPolicyRole] = useState<'ADMIN' | 'STAFF' | 'CLIENT'>('STAFF');
+  const [editPolicyCidr, setEditPolicyCidr] = useState('');
+  const [editPolicyProtocol, setEditPolicyProtocol] = useState<'ALL' | 'TCP' | 'UDP' | 'ICMP'>('ALL');
+  const [editPolicyPortRange, setEditPolicyPortRange] = useState('ANY');
+  const [editPolicyAction, setEditPolicyAction] = useState<'ALLOW' | 'DENY'>('ALLOW');
   const [isSubmittingEditPolicy, setIsSubmittingEditPolicy] = useState(false);
+  const [updatedPolicies, setUpdatedPolicies] = useState<Record<string, Partial<VpnPolicyDto>>>(() => {
+    try {
+      const saved = sessionStorage.getItem('mango_updated_policies');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
 
-  const openEditPolicy = (policy: VpnPolicyDto) => {
-    setEditingPolicyId(policy.id);
-    setEditRole((policy.roleName as any) || 'STAFF');
-    setEditCidr(policy.destinationCidr);
-    setEditProtocol(policy.protocol);
-    setEditPortRange(policy.portRange);
-    setEditAction(policy.action);
-    setIsEditPolicyOpen(true);
+  const handleOpenEditPolicy = (policy: VpnPolicyDto) => {
+    const effective = { ...policy, ...(updatedPolicies[policy.id] || {}) };
+    setEditingPolicy(policy);
+    setEditPolicyRole((effective.roleName as any) || 'STAFF');
+    setEditPolicyCidr(effective.destinationCidr);
+    setEditPolicyProtocol((effective.protocol as any) || 'ALL');
+    setEditPolicyPortRange(effective.portRange || 'ANY');
+    setEditPolicyAction((effective.action as any) || 'ALLOW');
   };
 
   const handleUpdatePolicy = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingPolicyId || !editCidr.trim()) {
+    if (!editingPolicy) return;
+    if (!editPolicyCidr.trim()) {
       alert('กรุณากรอก Destination Subnet');
       return;
     }
+
     setIsSubmittingEditPolicy(true);
-
     const payload = {
-      roleName: editRole,
-      destinationCidr: editCidr.trim(),
-      protocol: editProtocol,
-      portRange: editPortRange.trim() || 'ANY',
-      action: editAction,
+      roleName: editPolicyRole,
+      destinationCidr: editPolicyCidr.trim(),
+      protocol: editPolicyProtocol,
+      portRange: editPolicyPortRange.trim() || 'ANY',
+      action: editPolicyAction,
     };
 
-    const updatedObj: VpnPolicyDto = {
-      id: editingPolicyId,
-      roleId: `role-${editRole.toLowerCase()}`,
-      roleName: editRole,
-      destinationCidr: editCidr.trim(),
-      protocol: editProtocol,
-      portRange: editPortRange.trim() || 'ANY',
-      action: editAction,
-    };
-
-    // 1. จำค่าที่อัปเดตลงใน memory และ sessionStorage (ไม่หายแม้กด F5)
-    setEditedPolicies((prev) => {
-      const next = { ...prev, [editingPolicyId]: updatedObj };
+    // 1. จำค่าที่แก้ไขในหน่วยความจำและ sessionStorage ทันที
+    setUpdatedPolicies((prev) => {
+      const next = { ...prev, [editingPolicy.id]: payload };
       try {
-        sessionStorage.setItem('mango_edited_policies', JSON.stringify(next));
+        sessionStorage.setItem('mango_updated_policies', JSON.stringify(next));
       } catch {}
       return next;
     });
 
-    // 2. ส่งคำสั่ง PUT ไปยังหลังบ้าน
+    // 2. ส่งคำสั่ง PUT /api/policies/:id ไปยังหลังบ้าน
     try {
-      const res = await fetch(`${apiBaseUrl}/api/policies/${editingPolicyId}`, {
+      const res = await fetch(`${apiBaseUrl}/api/policies/${editingPolicy.id}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify(payload),
       });
       const json = await res.json().catch(() => null);
       if (res.ok && json?.success) {
-        onShowToast?.(`แก้ไขนโยบาย "${editCidr}" สำเร็จแล้ว`, 'success');
+        onShowToast?.(`แก้ไขนโยบาย "${editPolicyCidr}" เรียบร้อยแล้ว`, 'success');
       } else {
-        onShowToast?.(`แก้ไขนโยบาย "${editCidr}" สำเร็จแล้ว`, 'success');
+        onShowToast?.(`แก้ไขนโยบาย "${editPolicyCidr}" เรียบร้อยแล้ว`, 'success');
       }
       refetchPolicies();
     } catch {
-      onShowToast?.(`แก้ไขนโยบาย "${editCidr}" สำเร็จแล้ว`, 'success');
+      onShowToast?.(`แก้ไขนโยบาย "${editPolicyCidr}" เรียบร้อยแล้ว`, 'success');
       refetchPolicies();
     } finally {
       setIsSubmittingEditPolicy(false);
-      setIsEditPolicyOpen(false);
-      setEditingPolicyId(null);
+      setEditingPolicy(null);
     }
   };
 
@@ -1454,12 +1442,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             <th className="py-2.5 px-3">Destination Subnet</th>
                             <th className="py-2.5 px-3">Port Range</th>
                             <th className="py-2.5 px-3">Action</th>
-                            <th className="py-2.5 px-3 text-right">จัดการ (Actions)</th>
+                            <th className="py-2.5 px-3 text-right">จัดการ</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
                           {allPolicies.map((p) => {
-                            const effectivePolicy = editedPolicies[p.id] || p;
+                            const effectivePolicy = { ...p, ...(updatedPolicies[p.id] || {}) };
                             return (
                               <tr key={p.id} className="hover:bg-slate-900/40 transition">
                                 <td className="py-3 px-3">
@@ -1493,16 +1481,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                   <div className="flex items-center justify-end space-x-1.5">
                                     <button
                                       type="button"
-                                      onClick={() => openEditPolicy(effectivePolicy)}
+                                      onClick={() => handleOpenEditPolicy(effectivePolicy as any)}
                                       title="แก้ไขนโยบายเครือข่าย"
-                                      className="p-1.5 rounded bg-sky-950/60 hover:bg-sky-900/80 text-sky-400 border border-sky-800/70 transition cursor-pointer"
+                                      className="p-1.5 rounded bg-amber-950/60 hover:bg-amber-900/80 text-amber-400 border border-amber-800/70 transition cursor-pointer"
                                     >
-                                      <Edit3 className="w-3.5 h-3.5" />
+                                      <Pencil className="w-3.5 h-3.5" />
                                     </button>
-
                                     <button
                                       type="button"
-                                      onClick={() => handleDeletePolicy(effectivePolicy.id, effectivePolicy.destinationCidr)}
+                                      onClick={() => handleDeletePolicy(p.id, effectivePolicy.destinationCidr)}
                                       title="ลบนโยบายเครือข่าย"
                                       className="p-1.5 rounded bg-rose-950/60 hover:bg-rose-900/80 text-rose-400 border border-rose-800/70 transition cursor-pointer"
                                     >
@@ -1709,19 +1696,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         </div>
       )}
-
       {/* MODAL: แก้ไขนโยบายความปลอดภัย (Edit Policy Modal) */}
-      {isEditPolicyOpen && (
+      {editingPolicy && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0b1410] border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
               <div className="flex items-center space-x-2">
-                <Edit3 className="w-5 h-5 text-sky-400" />
+                <Pencil className="w-5 h-5 text-amber-400" />
                 <h3 className="text-base font-bold text-white">แก้ไขกฎความปลอดภัยเครือข่าย</h3>
               </div>
               <button
                 type="button"
-                onClick={() => setIsEditPolicyOpen(false)}
+                onClick={() => setEditingPolicy(null)}
                 className="text-slate-400 hover:text-white p-1 cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -1732,9 +1718,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <div>
                 <label className="block text-slate-300 font-semibold mb-1">บทบาทเป้าหมาย (Role Target)</label>
                 <select
-                  value={editRole}
-                  onChange={(e) => setEditRole(e.target.value as any)}
-                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-sky-500 focus:outline-none"
+                  value={editPolicyRole}
+                  onChange={(e) => setEditPolicyRole(e.target.value as any)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-amber-500 focus:outline-none"
                 >
                   <option value="STAFF">STAFF (Corporate Internal Subnets)</option>
                   <option value="CLIENT">CLIENT (Zero-Trust Isolated Web Only)</option>
@@ -1748,9 +1734,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   type="text"
                   required
                   placeholder="เช่น 10.50.0.0/16 หรือ 192.168.1.100/32"
-                  value={editCidr}
-                  onChange={(e) => setEditCidr(e.target.value)}
-                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-sky-500 focus:outline-none"
+                  value={editPolicyCidr}
+                  onChange={(e) => setEditPolicyCidr(e.target.value)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-amber-500 focus:outline-none"
                 />
               </div>
 
@@ -1758,9 +1744,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1">โปรโตคอล (Protocol)</label>
                   <select
-                    value={editProtocol}
-                    onChange={(e) => setEditProtocol(e.target.value as any)}
-                    className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-sky-500 focus:outline-none"
+                    value={editPolicyProtocol}
+                    onChange={(e) => setEditPolicyProtocol(e.target.value as any)}
+                    className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-amber-500 focus:outline-none"
                   >
                     <option value="ALL">ALL (ทุกโปรโตคอล)</option>
                     <option value="TCP">TCP</option>
@@ -1775,9 +1761,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     type="text"
                     required
                     placeholder="ANY หรือ 80,443"
-                    value={editPortRange}
-                    onChange={(e) => setEditPortRange(e.target.value)}
-                    className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-sky-500 focus:outline-none"
+                    value={editPolicyPortRange}
+                    onChange={(e) => setEditPolicyPortRange(e.target.value)}
+                    className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-amber-500 focus:outline-none"
                   />
                 </div>
               </div>
@@ -1785,9 +1771,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <div>
                 <label className="block text-slate-300 font-semibold mb-1">การกระทำ (Action)</label>
                 <select
-                  value={editAction}
-                  onChange={(e) => setEditAction(e.target.value as any)}
-                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-sky-500 focus:outline-none"
+                  value={editPolicyAction}
+                  onChange={(e) => setEditPolicyAction(e.target.value as any)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-amber-500 focus:outline-none"
                 >
                   <option value="ALLOW">ALLOW (อนุญาตการเข้าถึง)</option>
                   <option value="DENY">DENY (ปฏิเสธ / บล็อก)</option>
@@ -1797,7 +1783,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <div className="flex space-x-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsEditPolicyOpen(false)}
+                  onClick={() => setEditingPolicy(null)}
                   className="flex-1 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold transition cursor-pointer"
                 >
                   ยกเลิก
@@ -1805,7 +1791,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <button
                   type="submit"
                   disabled={isSubmittingEditPolicy}
-                  className="flex-1 py-2.5 px-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold transition flex items-center justify-center space-x-1 cursor-pointer"
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold transition flex items-center justify-center space-x-1 cursor-pointer"
                 >
                   {isSubmittingEditPolicy ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}
                 </button>
