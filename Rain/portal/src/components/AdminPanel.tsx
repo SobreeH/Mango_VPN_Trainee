@@ -323,6 +323,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       return next;
     });
 
+    // ลบออกจาก customUsers ด้วยถ้ามี
+    setCustomUsers((prev) => {
+      const next = prev.filter((u) => u.id !== userId);
+      try {
+        sessionStorage.setItem('mango_custom_users', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
     // 2. เรียกหลังบ้าน DELETE /api/users/:id
     try {
       const res = await fetch(`${apiBaseUrl}/api/users/${userId}`, {
@@ -401,7 +410,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   // State สำหรับ Modal เพิ่มผู้ใช้ใหม่ (POST /api/users)
-  const [customUsers, setCustomUsers] = useState<UserDto[]>([]);
+  const [customUsers, setCustomUsers] = useState<UserDto[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('mango_custom_users');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [newUsername, setNewUsername] = useState('');
   const [newPhone, setNewPhone] = useState('+1555');
@@ -422,6 +438,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       password: 'MangoVPN2026!',
     };
 
+    let userToSave: UserDto = {
+      id: `u-${Date.now()}`,
+      username: newUsername.trim(),
+      phoneNumber: newPhone.trim(),
+      roleName: newRole,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+    };
+
     try {
       const res = await fetch(`${apiBaseUrl}/api/users`, {
         method: 'POST',
@@ -430,42 +455,39 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       });
       const json = await res.json().catch(() => null);
       if (res.ok && json?.success && json?.data) {
-        setCustomUsers((prev) => [...prev, json.data]);
-        onShowToast?.(`เพิ่มผู้ใช้ "${newUsername}" สำเร็จแล้ว`, 'success');
-      } else {
-        const mockNew: UserDto = {
-          id: `u-${Date.now()}`,
-          username: newUsername.trim(),
-          phoneNumber: newPhone.trim(),
-          roleName: newRole,
-          isActive: true,
-          createdAt: new Date().toISOString(),
-        };
-        setCustomUsers((prev) => [...prev, mockNew]);
-        onShowToast?.(`เพิ่มผู้ใช้ "${newUsername}" สำเร็จแล้ว`, 'success');
+        userToSave = json.data;
       }
     } catch {
-      const mockNew: UserDto = {
-        id: `u-${Date.now()}`,
-        username: newUsername.trim(),
-        phoneNumber: newPhone.trim(),
-        roleName: newRole,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-      };
-      setCustomUsers((prev) => [...prev, mockNew]);
-      onShowToast?.(`เพิ่มผู้ใช้ "${newUsername}" สำเร็จแล้ว`, 'success');
-    } finally {
-      setIsSubmittingUser(false);
-      setIsAddUserOpen(false);
-      setNewUsername('');
-      setNewPhone('+1555');
-      setNewRole('STAFF');
+      // API Offline -> ใช้ userToSave จำลอง
     }
+
+    setCustomUsers((prev) => {
+      const next = [...prev, userToSave];
+      try {
+        sessionStorage.setItem('mango_custom_users', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    onShowToast?.(`เพิ่มผู้ใช้ "${newUsername}" สำเร็จแล้ว`, 'success');
+    refetchUsers();
+
+    setIsSubmittingUser(false);
+    setIsAddUserOpen(false);
+    setNewUsername('');
+    setNewPhone('+1555');
+    setNewRole('STAFF');
   };
 
   // State สำหรับจัดการ Policies (Add & Delete)
-  const [customPolicies, setCustomPolicies] = useState<VpnPolicyDto[]>([]);
+  const [customPolicies, setCustomPolicies] = useState<VpnPolicyDto[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('mango_custom_policies');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [deletedPolicyIds, setDeletedPolicyIds] = useState<string[]>(() => {
     try {
       const saved = sessionStorage.getItem('mango_deleted_policies');
@@ -570,6 +592,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       return next;
     });
 
+    // ลบออกจาก customPolicies ด้วยถ้ามี
+    setCustomPolicies((prev) => {
+      const next = prev.filter((p) => p.id !== policyId);
+      try {
+        sessionStorage.setItem('mango_custom_policies', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
     try {
       const res = await fetch(`${apiBaseUrl}/api/policies/${policyId}`, {
         method: 'DELETE',
@@ -602,6 +633,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       action: policyAction,
     };
 
+    let policyToSave: VpnPolicyDto = {
+      id: `pol-${Date.now()}`,
+      roleId: `role-${policyRole.toLowerCase()}`,
+      roleName: policyRole,
+      destinationCidr: policyCidr.trim(),
+      protocol: policyProtocol,
+      portRange: policyPortRange.trim() || 'ANY',
+      action: policyAction,
+    };
+
     try {
       const res = await fetch(`${apiBaseUrl}/api/policies`, {
         method: 'POST',
@@ -610,42 +651,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       });
       const json = await res.json().catch(() => null);
       if (res.ok && json?.success && json?.data) {
-        setCustomPolicies((prev) => [...prev, json.data]);
-        onShowToast?.(`เพิ่มนโยบายสำหรับ "${policyCidr}" สำเร็จแล้ว`, 'success');
-      } else {
-        const mockNew: VpnPolicyDto = {
-          id: `pol-${Date.now()}`,
-          roleId: `role-${policyRole.toLowerCase()}`,
-          roleName: policyRole,
-          destinationCidr: policyCidr.trim(),
-          protocol: policyProtocol,
-          portRange: policyPortRange.trim() || 'ANY',
-          action: policyAction,
-        };
-        setCustomPolicies((prev) => [...prev, mockNew]);
-        onShowToast?.(`เพิ่มนโยบายสำหรับ "${policyCidr}" สำเร็จแล้ว`, 'success');
+        policyToSave = json.data;
       }
     } catch {
-      const mockNew: VpnPolicyDto = {
-        id: `pol-${Date.now()}`,
-        roleId: `role-${policyRole.toLowerCase()}`,
-        roleName: policyRole,
-        destinationCidr: policyCidr.trim(),
-        protocol: policyProtocol,
-        portRange: policyPortRange.trim() || 'ANY',
-        action: policyAction,
-      };
-      setCustomPolicies((prev) => [...prev, mockNew]);
-      onShowToast?.(`เพิ่มนโยบายสำหรับ "${policyCidr}" สำเร็จแล้ว`, 'success');
-    } finally {
-      setIsSubmittingPolicy(false);
-      setIsAddPolicyOpen(false);
-      setPolicyCidr('');
-      setPolicyProtocol('ALL');
-      setPolicyPortRange('ANY');
-      setPolicyAction('ALLOW');
-      setPolicyRole('STAFF');
+      // API Offline -> ใช้ mock
     }
+
+    setCustomPolicies((prev) => {
+      const next = [...prev, policyToSave];
+      try {
+        sessionStorage.setItem('mango_custom_policies', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    onShowToast?.(`เพิ่มนโยบายสำหรับ "${policyCidr}" สำเร็จแล้ว`, 'success');
+    refetchPolicies();
+
+    setIsSubmittingPolicy(false);
+    setIsAddPolicyOpen(false);
+    setPolicyCidr('');
+    setPolicyProtocol('ALL');
+    setPolicyPortRange('ANY');
+    setPolicyAction('ALLOW');
+    setPolicyRole('STAFF');
   };
 
   // อัปเดตแท็บตามที่ส่งมาจาก Sidebar เมื่อมีการเปลี่ยนหน้า
