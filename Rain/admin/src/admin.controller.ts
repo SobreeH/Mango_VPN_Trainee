@@ -218,6 +218,34 @@ export class AdminController {
     }
   }
 
+  async updatePolicy(
+    request: FastifyRequest<{ Params: { id: string }; Body: Partial<CreatePolicyDto> }>,
+    reply: FastifyReply
+  ) {
+    try {
+      const user = (request as any).user;
+      if (user?.role !== 'ADMIN') {
+        return reply.status(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'Admin access required' } });
+      }
+
+      const { id } = request.params;
+      const body = request.body;
+      const updated = await adminService.updatePolicy(id, body, user.userId);
+      return reply.status(200).send({
+        success: true,
+        data: updated,
+        message: 'Policy updated successfully',
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      return reply.status(err.message === 'Policy not found' ? 404 : 500).send({
+        success: false,
+        error: { code: err.message === 'Policy not found' ? 'NOT_FOUND' : 'SERVER_ERROR', message: err.message },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
   async deletePolicy(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
     try {
       const user = (request as any).user;

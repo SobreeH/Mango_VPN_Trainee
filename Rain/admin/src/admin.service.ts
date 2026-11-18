@@ -197,6 +197,64 @@ export class AdminService {
     };
   }
 
+  async updatePolicy(policyId: string, data: Partial<CreatePolicyDto>, adminUserId?: string): Promise<VpnPolicyDto> {
+    const existing = await prisma.vpnPolicy.findUnique({
+      where: { id: policyId },
+      include: { role: true },
+    });
+
+    if (!existing) {
+      throw new Error('Policy not found');
+    }
+
+    let roleId = existing.roleId;
+    if (data.roleName && data.roleName !== existing.role.name) {
+      const role = await prisma.role.findUnique({ where: { name: data.roleName } });
+      if (!role) {
+        throw new Error(`Role ${data.roleName} not found`);
+      }
+      roleId = role.id;
+    }
+
+    const updated = await prisma.vpnPolicy.update({
+      where: { id: policyId },
+      data: {
+        roleId,
+        destinationCidr: data.destinationCidr ?? existing.destinationCidr,
+        protocol: data.protocol ?? existing.protocol,
+        portRange: data.portRange ?? existing.portRange,
+        action: data.action ?? existing.action,
+      },
+      include: { role: true },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: adminUserId || null,
+        action: 'VPN_POLICY_UPDATED',
+        ipAddress: '127.0.0.1',
+        metadataJson: {
+          policyId: updated.id,
+          role: updated.role.name,
+          destinationCidr: updated.destinationCidr,
+          protocol: updated.protocol,
+          portRange: updated.portRange,
+          action: updated.action,
+        },
+      },
+    });
+
+    return {
+      id: updated.id,
+      roleId: updated.roleId,
+      roleName: updated.role?.name,
+      destinationCidr: updated.destinationCidr,
+      protocol: updated.protocol as any,
+      portRange: updated.portRange,
+      action: updated.action as any,
+    };
+  }
+
   async deletePolicy(policyId: string): Promise<boolean> {
     const existing = await prisma.vpnPolicy.findUnique({ where: { id: policyId } });
     if (!existing) {

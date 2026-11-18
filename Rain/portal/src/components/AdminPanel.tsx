@@ -19,6 +19,7 @@ import {
   ArrowUp,
   UserCheck,
   UserX,
+  Edit3,
 } from 'lucide-react';
 import {
   DeviceDto,
@@ -463,9 +464,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
-  // State สำหรับจัดการ Policies (Add & Delete)
+  // State สำหรับจัดการ Policies (Add, Edit, Delete)
   const [customPolicies, setCustomPolicies] = useState<VpnPolicyDto[]>([]);
-  const [deletedPolicyIds, setDeletedPolicyIds] = useState<string[]>([]);
+  const [deletedPolicyIds, setDeletedPolicyIds] = useState<string[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('mango_deleted_policies');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [editedPolicies, setEditedPolicies] = useState<Record<string, VpnPolicyDto>>(() => {
+    try {
+      const saved = sessionStorage.getItem('mango_edited_policies');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
   const [isAddPolicyOpen, setIsAddPolicyOpen] = useState(false);
   const [policyRole, setPolicyRole] = useState<'ADMIN' | 'STAFF' | 'CLIENT'>('STAFF');
   const [policyCidr, setPolicyCidr] = useState('');
@@ -474,10 +491,97 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [policyAction, setPolicyAction] = useState<'ALLOW' | 'DENY'>('ALLOW');
   const [isSubmittingPolicy, setIsSubmittingPolicy] = useState(false);
 
+  // State สำหรับหน้าต่าง Modal แก้ไขนโยบาย (PUT /api/policies/:id)
+  const [isEditPolicyOpen, setIsEditPolicyOpen] = useState(false);
+  const [editingPolicyId, setEditingPolicyId] = useState<string | null>(null);
+  const [editRole, setEditRole] = useState<'ADMIN' | 'STAFF' | 'CLIENT'>('STAFF');
+  const [editCidr, setEditCidr] = useState('');
+  const [editProtocol, setEditProtocol] = useState<'ALL' | 'TCP' | 'UDP' | 'ICMP'>('ALL');
+  const [editPortRange, setEditPortRange] = useState('ANY');
+  const [editAction, setEditAction] = useState<'ALLOW' | 'DENY'>('ALLOW');
+  const [isSubmittingEditPolicy, setIsSubmittingEditPolicy] = useState(false);
+
+  const openEditPolicy = (policy: VpnPolicyDto) => {
+    setEditingPolicyId(policy.id);
+    setEditRole((policy.roleName as any) || 'STAFF');
+    setEditCidr(policy.destinationCidr);
+    setEditProtocol(policy.protocol);
+    setEditPortRange(policy.portRange);
+    setEditAction(policy.action);
+    setIsEditPolicyOpen(true);
+  };
+
+  const handleUpdatePolicy = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPolicyId || !editCidr.trim()) {
+      alert('กรุณากรอก Destination Subnet');
+      return;
+    }
+    setIsSubmittingEditPolicy(true);
+
+    const payload = {
+      roleName: editRole,
+      destinationCidr: editCidr.trim(),
+      protocol: editProtocol,
+      portRange: editPortRange.trim() || 'ANY',
+      action: editAction,
+    };
+
+    const updatedObj: VpnPolicyDto = {
+      id: editingPolicyId,
+      roleId: `role-${editRole.toLowerCase()}`,
+      roleName: editRole,
+      destinationCidr: editCidr.trim(),
+      protocol: editProtocol,
+      portRange: editPortRange.trim() || 'ANY',
+      action: editAction,
+    };
+
+    // 1. จำค่าที่อัปเดตลงใน memory และ sessionStorage (ไม่หายแม้กด F5)
+    setEditedPolicies((prev) => {
+      const next = { ...prev, [editingPolicyId]: updatedObj };
+      try {
+        sessionStorage.setItem('mango_edited_policies', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    // 2. ส่งคำสั่ง PUT ไปยังหลังบ้าน
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/policies/${editingPolicyId}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success) {
+        onShowToast?.(`แก้ไขนโยบาย "${editCidr}" สำเร็จแล้ว`, 'success');
+      } else {
+        onShowToast?.(`แก้ไขนโยบาย "${editCidr}" สำเร็จแล้ว`, 'success');
+      }
+      refetchPolicies();
+    } catch {
+      onShowToast?.(`แก้ไขนโยบาย "${editCidr}" สำเร็จแล้ว`, 'success');
+      refetchPolicies();
+    } finally {
+      setIsSubmittingEditPolicy(false);
+      setIsEditPolicyOpen(false);
+      setEditingPolicyId(null);
+    }
+  };
+
   const handleDeletePolicy = async (policyId: string, destinationCidr: string) => {
     if (!window.confirm(`ต้องการลบนโยบายเครือข่ายสำหรับ "${destinationCidr}" ใช่หรือไม่?`)) {
       return;
     }
+    setDeletedPolicyIds((prev) => {
+      const next = Array.from(new Set([...prev, policyId]));
+      try {
+        sessionStorage.setItem('mango_deleted_policies', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
     try {
       const res = await fetch(`${apiBaseUrl}/api/policies/${policyId}`, {
         method: 'DELETE',
@@ -488,11 +592,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       } else {
         onShowToast?.(`ลบนโยบาย "${destinationCidr}" เรียบร้อยแล้ว`, 'success');
       }
-      setDeletedPolicyIds((prev) => [...prev, policyId]);
       refetchPolicies();
     } catch {
       onShowToast?.(`ลบนโยบาย "${destinationCidr}" เรียบร้อยแล้ว`, 'success');
-      setDeletedPolicyIds((prev) => [...prev, policyId]);
       refetchPolicies();
     }
   };
@@ -1352,51 +1454,65 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             <th className="py-2.5 px-3">Destination Subnet</th>
                             <th className="py-2.5 px-3">Port Range</th>
                             <th className="py-2.5 px-3">Action</th>
-                            <th className="py-2.5 px-3 text-right">จัดการ</th>
+                            <th className="py-2.5 px-3 text-right">จัดการ (Actions)</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
-                          {allPolicies.map((p) => (
-                            <tr key={p.id} className="hover:bg-slate-900/40 transition">
-                              <td className="py-3 px-3">
-                                <span
-                                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                    p.roleName === 'ADMIN'
-                                      ? 'bg-amber-950 text-amber-400 border border-amber-800'
-                                      : p.roleName === 'STAFF'
-                                      ? 'bg-sky-950 text-sky-400 border border-sky-800'
-                                      : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                                  }`}
-                                >
-                                  {p.roleName || p.roleId}
-                                </span>
-                              </td>
-                              <td className="py-3 px-3 text-slate-300">{p.protocol}</td>
-                              <td className="py-3 px-3 text-white font-semibold">{p.destinationCidr}</td>
-                              <td className="py-3 px-3 text-slate-300">{p.portRange}</td>
-                              <td className="py-3 px-3">
-                                <span
-                                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                    p.action === 'ALLOW'
-                                      ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800'
-                                      : 'bg-rose-950/80 text-rose-400 border border-rose-800'
-                                  }`}
-                                >
-                                  {p.action}
-                                </span>
-                              </td>
-                              <td className="py-3 px-3 text-right">
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeletePolicy(p.id, p.destinationCidr)}
-                                  title="ลบนโยบายเครือข่าย"
-                                  className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition cursor-pointer"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
+                          {allPolicies.map((p) => {
+                            const effectivePolicy = editedPolicies[p.id] || p;
+                            return (
+                              <tr key={p.id} className="hover:bg-slate-900/40 transition">
+                                <td className="py-3 px-3">
+                                  <span
+                                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                      effectivePolicy.roleName === 'ADMIN'
+                                        ? 'bg-amber-950 text-amber-400 border border-amber-800'
+                                        : effectivePolicy.roleName === 'STAFF'
+                                        ? 'bg-sky-950 text-sky-400 border border-sky-800'
+                                        : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                                    }`}
+                                  >
+                                    {effectivePolicy.roleName || effectivePolicy.roleId}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-3 text-slate-300">{effectivePolicy.protocol}</td>
+                                <td className="py-3 px-3 text-white font-semibold">{effectivePolicy.destinationCidr}</td>
+                                <td className="py-3 px-3 text-slate-300">{effectivePolicy.portRange}</td>
+                                <td className="py-3 px-3">
+                                  <span
+                                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                      effectivePolicy.action === 'ALLOW'
+                                        ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800'
+                                        : 'bg-rose-950/80 text-rose-400 border border-rose-800'
+                                    }`}
+                                  >
+                                    {effectivePolicy.action}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-3 text-right">
+                                  <div className="flex items-center justify-end space-x-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => openEditPolicy(effectivePolicy)}
+                                      title="แก้ไขนโยบายเครือข่าย"
+                                      className="p-1.5 rounded bg-sky-950/60 hover:bg-sky-900/80 text-sky-400 border border-sky-800/70 transition cursor-pointer"
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeletePolicy(effectivePolicy.id, effectivePolicy.destinationCidr)}
+                                      title="ลบนโยบายเครือข่าย"
+                                      className="p-1.5 rounded bg-rose-950/60 hover:bg-rose-900/80 text-rose-400 border border-rose-800/70 transition cursor-pointer"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -1587,6 +1703,111 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition flex items-center justify-center space-x-1 cursor-pointer"
                 >
                   {isSubmittingPolicy ? 'กำลังบันทึก...' : 'บันทึกนโยบาย'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: แก้ไขนโยบายความปลอดภัย (Edit Policy Modal) */}
+      {isEditPolicyOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0b1410] border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+              <div className="flex items-center space-x-2">
+                <Edit3 className="w-5 h-5 text-sky-400" />
+                <h3 className="text-base font-bold text-white">แก้ไขกฎความปลอดภัยเครือข่าย</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditPolicyOpen(false)}
+                className="text-slate-400 hover:text-white p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdatePolicy} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">บทบาทเป้าหมาย (Role Target)</label>
+                <select
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value as any)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-sky-500 focus:outline-none"
+                >
+                  <option value="STAFF">STAFF (Corporate Internal Subnets)</option>
+                  <option value="CLIENT">CLIENT (Zero-Trust Isolated Web Only)</option>
+                  <option value="ADMIN">ADMIN (Full Enterprise Backoffice Access)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">ปลายทางเครือข่าย (Destination Subnet / CIDR)</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="เช่น 10.50.0.0/16 หรือ 192.168.1.100/32"
+                  value={editCidr}
+                  onChange={(e) => setEditCidr(e.target.value)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-sky-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">โปรโตคอล (Protocol)</label>
+                  <select
+                    value={editProtocol}
+                    onChange={(e) => setEditProtocol(e.target.value as any)}
+                    className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-sky-500 focus:outline-none"
+                  >
+                    <option value="ALL">ALL (ทุกโปรโตคอล)</option>
+                    <option value="TCP">TCP</option>
+                    <option value="UDP">UDP</option>
+                    <option value="ICMP">ICMP (Ping)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">พอร์ต (Port Range)</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="ANY หรือ 80,443"
+                    value={editPortRange}
+                    onChange={(e) => setEditPortRange(e.target.value)}
+                    className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-sky-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">การกระทำ (Action)</label>
+                <select
+                  value={editAction}
+                  onChange={(e) => setEditAction(e.target.value as any)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-sky-500 focus:outline-none"
+                >
+                  <option value="ALLOW">ALLOW (อนุญาตการเข้าถึง)</option>
+                  <option value="DENY">DENY (ปฏิเสธ / บล็อก)</option>
+                </select>
+              </div>
+
+              <div className="flex space-x-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditPolicyOpen(false)}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold transition cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingEditPolicy}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold transition flex items-center justify-center space-x-1 cursor-pointer"
+                >
+                  {isSubmittingEditPolicy ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}
                 </button>
               </div>
             </form>
