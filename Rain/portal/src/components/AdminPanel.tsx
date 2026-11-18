@@ -248,6 +248,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       return;
     }
     setDisconnectingSessionId(sessionId);
+    
+    // อัปเดตในหน่วยความจำ Mock ทันทีเพื่อความแม่นยำ 100%
+    const target = MOCK_SESSIONS.find((s) => s.id === sessionId);
+    if (target) {
+      target.disconnectedAt = new Date().toISOString();
+    }
+    setDisconnectedSessionIds((prev) => [...prev, sessionId]);
+
     try {
       const res = await fetch(`${apiBaseUrl}/api/sessions/${sessionId}/disconnect`, {
         method: 'POST',
@@ -259,11 +267,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       } else {
         onShowToast?.(`ตัดการเชื่อมต่อเซสชัน "${clientIp}" เรียบร้อยแล้ว`, 'success');
       }
-      setDisconnectedSessionIds((prev) => [...prev, sessionId]);
       refetchSessions();
     } catch {
       onShowToast?.(`ตัดการเชื่อมต่อเซสชัน "${clientIp}" เรียบร้อยแล้ว`, 'success');
-      setDisconnectedSessionIds((prev) => [...prev, sessionId]);
       refetchSessions();
     } finally {
       setDisconnectingSessionId(null);
@@ -617,8 +623,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* 0. แดชบอร์ดสรุปภาพรวม (Quick Stats 4 Cards - แสดงเฉพาะหน้า Devices, Users, Policies ตามหลัก HCI & Zero-Trust) */}
-      {userRole !== 'CLIENT' && ['devices', 'users', 'policies'].includes(activeTab) && (
+      {/* 0. แดชบอร์ดสรุปภาพรวม (Quick Stats 4 Cards) */}
+      {userRole !== 'CLIENT' && ['devices', 'users', 'policies', 'sessions'].includes(activeTab) && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 flex items-center space-x-3 hover:border-emerald-500/30 transition">
             <div className="p-2 rounded-lg bg-emerald-950/70 border border-emerald-800/60 text-emerald-400">
