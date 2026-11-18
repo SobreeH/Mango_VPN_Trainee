@@ -294,6 +294,8 @@
   - `2ab8383` (`feat(portal): implement user status toggle and deletion in admin panel`)
   - `29aa551` (`feat(portal): implement zero-trust policy update modal and api integration`)
   - `43f658d` (`feat(portal): refine policy update modal and state persistence`)
+  - `9448002` (`docs(rain): update worklog with zero-trust policy edit implementation`)
+  - `f1a46cc` (`fix(portal): persist customUsers and customPolicies in sessionStorage`)
 - **สิ่งที่ทำ**:
   1. [ช่วงเช้า] จัดทำและอนุมัติแผนปฏิบัติงานประจำวัน (18 พ.ย. 2569) และสรุปหัวข้อโครงงานสหกิจศึกษา 3.2 ลงในเล่มรายงาน
   2. [ช่วงเช้า] ตรวจสอบสถาปัตยกรรมโมเดลฐานข้อมูล 8 ตารางหลักใน Prisma ORM (`roles`, `users`, `devices`, `vpn_peers`, `vpn_sessions`, `vpn_policies`, `audit_logs`, `agent_versions`)
@@ -349,6 +351,10 @@
         - พัฒนาหน้าต่าง Modal "แก้ไขกฎความปลอดภัยเครือข่าย" (Controlled Form with Pre-population) ดึงค่าเดิมของนโยบายที่เลือกขึ้นมากรอกลงในฟอร์มอัตโนมัติ เพื่อให้ผู้ใช้แก้ไขเฉพาะค่าที่ต้องการ
         - เชื่อมต่อฟังก์ชัน `handleUpdatePolicy` ยิงเรียก API `PUT /api/policies/:id` พร้อมการแจ้งเตือน Toast
         - เพิ่มระบบ State Persistence ผ่าน `sessionStorage` (`mango_updated_policies` และ `mango_deleted_policies`) ทำให้ข้อมูลนโยบายที่แก้ไขหรือลบยังคงแสดงผลถูกต้องแม้กด Refresh (F5)
+  12. [ช่วงบ่าย] แก้ไขปัญหาข้อมูลผู้ใช้และนโยบายที่สร้างใหม่สูญหายเมื่อรีเฟรชหน้าเว็บ (Create Persistence Fix):
+      - ตรวจพบสาเหตุ (Root Cause): State `customUsers` และ `customPolicies` เดิมถูกประกาศเป็น `useState([])` ในหน่วยความจำชั่วคราวเท่านั้น เมื่อผู้ใช้กด Refresh (F5) หรือเกิด Vite HMR (Hot Module Reload) ตัวแปรจะถูกรีเซ็ตกลับเป็น Array ว่างเปล่าทันที
+      - ดำเนินการแก้ไข: ผูก `customUsers` เข้ากับ `sessionStorage.getItem('mango_custom_users')` และ `customPolicies` เข้ากับ `sessionStorage.getItem('mango_custom_policies')`
+      - ปรับฟังก์ชัน `handleCreateUser`, `handleDeleteUser`, `handleCreatePolicy`, `handleDeletePolicy` ให้ซิงค์ข้อมูลลงใน Storage แบบ Real-time ทำให้ข้อมูลที่เพิ่มใหม่คงอยู่ถาวรตลอดเซสชันของเบราว์เซอร์
 - **ไฟล์ที่สร้าง/แก้ไข**:
   - `Rain/admin/src/seed.ts` *(ขยาย Seeder ครบ 8 ตาราง พร้อมความสัมพันธ์และตัวอย่างข้อมูล)*
   - `Rain/admin/src/admin.service.ts` *(เพิ่ม disconnectSession, toggleUserStatus, deleteUser, updatePolicy และ AuditLog)*
