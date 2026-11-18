@@ -277,3 +277,30 @@
   - `Rain/portal/src/components/AdminPanel.tsx` *(เพิ่มแท็บและ useQuery สำหรับ users & policies, ปุ่ม Revoke Device, Modal Add User, Modal Add Policy, ปุ่ม Delete Policy, Toast Refresh)*
   - `Rain/portal/src/App.tsx` *(เชื่อมโยง Component AdminPanel และส่งฟังก์ชัน showToast)*
   - `Rain/RULES_AND_WORKLOG.md` *(อัปเดตบันทึกประจำวัน)*
+
+---
+
+### 📅 วันที่: 2026-11-18
+- **Branch**: `feature/rain-db-seeder`
+- **Commits**:
+  - `8683070` (`feat(admin): complete database seeder for all 8 prisma tables`)
+- **สิ่งที่ทำ**:
+  1. [ช่วงเช้า] จัดทำและอนุมัติแผนปฏิบัติงานประจำวัน (18 พ.ย. 2569) และสรุปหัวข้อโครงงานสหกิจศึกษา 3.2 ลงในเล่มรายงาน
+  2. [ช่วงเช้า] ตรวจสอบสถาปัตยกรรมโมเดลฐานข้อมูล 8 ตารางหลักใน Prisma ORM (`roles`, `users`, `devices`, `vpn_peers`, `vpn_sessions`, `vpn_policies`, `audit_logs`, `agent_versions`)
+  3. [ช่วงเช้า] พัฒนาขยายสคริปต์จำลองข้อมูลตั้งต้น Database Seeder (`Rain/admin/src/seed.ts`):
+     - ปรับโครงสร้าง Seeder ให้รองรับความสัมพันธ์ของทั้ง 8 ตารางอย่างสมบูรณ์แบบ
+     - สร้าง Roles 3 ระดับ (ADMIN, STAFF, CLIENT)
+     - สร้าง Zero-Trust Firewall Policies ตามสิทธิ์ของแต่ละบทบาท
+     - สร้าง Users พร้อมแฮชรหัสผ่านความปลอดภัยสูงด้วย `bcryptjs`
+     - สร้าง Devices จำลองอุปกรณ์คอมพิวเตอร์และมือถือของผู้ใช้แต่ละราย
+     - สร้าง WireGuard VPN Peers พร้อม Curve25519 Public Keys และ Assigned IPs (`10.13.13.x/32`)
+     - สร้าง VPN Sessions จำลองทราฟฟิกข้อมูล Rx/Tx และสถานะ Active Online / Closed
+     - สร้าง Audit Logs จำลองประวัติกิจกรรมด้านความปลอดภัย เช่น การล็อกอิน การยืนยัน 2FA และการตั้งค่าระบบ
+     - บันทึกเวอร์ชัน Agent ล่าสุด (1.0.0 และ 1.1.0-beta)
+  4. ทดสอบคอมไพล์ระบบ TypeScript:
+     - `npm --workspace=@mango/rain-admin run build` (ผ่านฉลุย 100%)
+  5. ดำเนินการ Git Commit & Push ขึ้น Branch `feature/rain-db-seeder` เรียบร้อย
+- **ไฟล์ที่สร้าง/แก้ไข**:
+  - `Rain/admin/src/seed.ts` *(ขยาย Seeder ครบ 8 ตาราง พร้อมความสัมพันธ์และตัวอย่างข้อมูล)*
+  - `Rain/RULES_AND_WORKLOG.md` *(อัปเดตบันทึกประจำวัน)*
+
