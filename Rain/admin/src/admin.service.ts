@@ -205,5 +205,54 @@ export class AdminService {
     await prisma.vpnPolicy.delete({ where: { id: policyId } });
     return true;
   }
+
+  async disconnectSession(sessionId: string, adminUserId?: string): Promise<boolean> {
+    const session = await prisma.vpnSession.findUnique({
+      where: { id: sessionId },
+      include: {
+        peer: {
+          include: {
+            user: true,
+            device: true,
+          },
+        },
+      },
+    });
+
+    if (!session) {
+      throw new Error('Session not found');
+    }
+
+    if (session.disconnectedAt) {
+      return true; // Already disconnected
+    }
+
+    // Mark session as disconnected
+    await prisma.vpnSession.update({
+      where: { id: sessionId },
+      data: { disconnectedAt: new Date() },
+    });
+
+    // Write immutable security audit log
+    await prisma.auditLog.create({
+      data: {
+        userId: adminUserId || null,
+        action: 'VPN_SESSION_DISCONNECTED',
+        ipAddress: session.clientPublicIp,
+        metadataJson: {
+          sessionId: session.id,
+          peerId: session.peerId,
+          targetUsername: session.peer?.user?.username,
+          deviceName: session.peer?.device?.deviceName,
+          assignedIp: session.peer?.assignedIp,
+          terminatedBy: 'ADMIN_KICK',
+          bytesRx: Number(session.bytesRx),
+          bytesTx: Number(session.bytesTx),
+        },
+      },
+    });
+
+    return true;
+  }
 }
 
