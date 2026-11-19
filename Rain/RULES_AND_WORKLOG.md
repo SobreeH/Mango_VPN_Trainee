@@ -370,6 +370,7 @@
 - **Branch**: `feature/rain-fullstack-integration`
 - **Commits**:
   - `8395479` (`feat(portal): implement audit log detail inspector modal and rich metadata view`)
+  - `a59c364` (`feat(devices): implement device posture inspector modal and registration with session persistence`)
 - **สิ่งที่ทำ**:
   1. [ช่วงเช้า] ตรวจสอบ Git Status และดึงโค้ดล่าสุดจากรีโมท จากนั้นแตก Branch ใหม่ `feature/rain-fullstack-integration` เพื่อเริ่มต้นงานตามแผนงานที่ได้รับอนุมัติ
   2. [ช่วงเช้า] พัฒนาระบบตรวจสอบบันทึกความปลอดภัยเชิงลึก (Audit Log Detail Inspector) ใน `Rain/portal/src/components/AdminPanel.tsx`:
@@ -378,9 +379,23 @@
      - สร้างหน้าต่าง Modal แสดงข้อมูลสรุปกิจกรรมความปลอดภัย พร้อมอ่านฟิลด์ `metadataJson` มาแจกแจงเป็นตาราง Key-Value ที่อ่านเข้าใจง่าย
      - เพิ่มฟังก์ชันสลับมุมมอง "ดู Raw JSON" สำหรับผู้ดูแลระบบในการตรวจสอบโครงสร้างข้อมูลดิบ
      - ปรับปรุงข้อมูลจำลอง `MOCK_LOGS` ให้มี Metadata ด้านความปลอดภัยสมจริงตามการกระทำ CRUD ทั้งหมด
-  3. ทดสอบคอมไพล์ระบบ TypeScript และ Vite (`npm --workspace=@mango/portal run build`) ผ่านฉลุย 100%
-  4. ดำเนินการ Git Commit & Push ขึ้น Branch `feature/rain-fullstack-integration` เรียบร้อย
+  3. [ช่วงเช้า] พัฒนาระบบบริหารจัดการอุปกรณ์และความปลอดภัยเชิงลึก (Device Management & Posture Inspector) ครบวงจร Full-Stack:
+     - **ฝั่งหลังบ้าน (`Rain/admin`)**:
+       - เพิ่มฟังก์ชัน `createDevice(data)` ใน `admin.service.ts` สำหรับบันทึกอุปกรณ์ลงในฐานข้อมูลผ่าน Prisma และเชื่อมโยงกับบัญชีผู้ใช้
+       - เพิ่มตัวจัดการ `createDevice` ใน `admin.controller.ts` ตรวจสอบสิทธิ์เฉพาะผู้ดูแลระบบ (`ADMIN`)
+       - จดทะเบียนเส้นทาง API `POST /api/devices` ใน `admin.routes.ts`
+     - **ฝั่งหน้าเว็บ (`Rain/portal/src/components/AdminPanel.tsx`)**:
+       - เพิ่มหน้าต่าง Modal **ลงทะเบียนอุปกรณ์ใหม่ (`+ ลงทะเบียนอุปกรณ์`)**: รองรับการกรอก Device Name, เลือกระบบปฏิบัติการ (OS Dropdown), MAC Address, และ Owner User ID
+       - เพิ่มหน้าต่าง Modal **ตรวจสอบสถานะความปลอดภัยอุปกรณ์ (Device Posture Inspector)**: แสดงสเปกฮาร์ดแวร์, เจ้าของเครื่อง, พร้อมผลการประเมินความปลอดภัย Zero-Trust (OS Patch, BitLocker Encryption, Antivirus/EDR, WireGuard Health) และปุ่มสั่งเพิกถอนสิทธิ์จากใน Modal
+       - ออกแบบระบบ State Persistence ผ่าน `sessionStorage` (`mango_revoked_devices` และ `mango_custom_devices`) เพื่อให้การลงทะเบียนอุปกรณ์และการเพิกถอนสิทธิ์คงอยู่ถาวรแม้ผู้ใช้กด Refresh (F5) หรือเกิด Vite HMR
+       - ปรับปรุงตารางใน Tab 1 (Devices): เพิ่มแถบเครื่องมือด้านบนพร้อมปุ่ม `+ ลงทะเบียนอุปกรณ์`, คอลัมน์แสดง Owner ID, ปุ่มตรวจสอบสถานะ (ไอคอน `Eye`), และปุ่มเพิกถอนสิทธิ์ (ไอคอน `Trash2`)
+       - อัปเดตการคำนวณ Quick Stats Card รวมอุปกรณ์ที่เพิ่มใหม่และหักลบอุปกรณ์ที่ถูกเพิกถอนออกทันทีแบบ Real-time
+  4. ทดสอบคอมไพล์ระบบ TypeScript และ Vite ทั้ง `@mango/portal` และ `@mango/rain-admin` ผ่านฉลุย 100%
+  5. ดำเนินการ Git Commit & Push ขึ้น Branch `feature/rain-fullstack-integration` เรียบร้อย
 - **ไฟล์ที่สร้าง/แก้ไข**:
-  - `Rain/portal/src/components/AdminPanel.tsx` *(เพิ่ม Audit Log Detail Inspector Modal, Eye button, และ metadataJson viewer)*
+  - `Rain/admin/src/admin.service.ts` *(เพิ่ม CreateDeviceDto และ ฟังก์ชัน createDevice)*
+  - `Rain/admin/src/admin.controller.ts` *(เพิ่ม createDevice endpoint handler)*
+  - `Rain/admin/src/admin.routes.ts` *(จดทะเบียน POST /api/devices)*
+  - `Rain/portal/src/components/AdminPanel.tsx` *(เพิ่ม Device Posture Inspector, Register Device Modal, Table Toolbar, และ Session Persistence)*
   - `Rain/RULES_AND_WORKLOG.md` *(อัปเดตบันทึกประจำวัน)*
 
