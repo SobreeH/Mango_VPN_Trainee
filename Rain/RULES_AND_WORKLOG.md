@@ -372,6 +372,7 @@
   - `8395479` (`feat(portal): implement audit log detail inspector modal and rich metadata view`)
   - `a59c364` (`feat(devices): implement device posture inspector modal and registration with session persistence`)
   - `c6079bb` (`feat(versions): implement agent releases manager with publishing modal and session persistence`)
+  - `153066a` (`fix(portal): enforce RBAC on agent releases, device management, and session disconnection`)
 - **สิ่งที่ทำ**:
   1. [ช่วงเช้า] ตรวจสอบ Git Status และดึงโค้ดล่าสุดจากรีโมท จากนั้นแตก Branch ใหม่ `feature/rain-fullstack-integration` เพื่อเริ่มต้นงานตามแผนงานที่ได้รับอนุมัติ
   2. [ช่วงเช้า] พัฒนาระบบตรวจสอบบันทึกความปลอดภัยเชิงลึก (Audit Log Detail Inspector) ใน `Rain/portal/src/components/AdminPanel.tsx`:
@@ -401,12 +402,15 @@
        - ยกระดับ UI ในแท็บ Releases: เพิ่มแถบ Header สรุปจำนวนเวอร์ชันทั้งหมด, แสดง Badge สถานะ "Latest Stable" สำหรับเวอร์ชันล่าสุด, แยก Badge "Mandatory Update" (สีแดง) หรือ "Optional Update" (สีฟ้า)
        - เพิ่มปุ่มลบ/เพิกถอนเวอร์ชันเก่าหรือเวอร์ชันที่มีช่องโหว่ความปลอดภัย (`Trash2`)
        - ออกแบบ State Persistence ด้วย `sessionStorage` (`mango_custom_versions` และ `mango_deleted_versions`) ป้องกันข้อมูลสูญหายเมื่อรีเฟรชหน้าเว็บ
-  5. ทดสอบคอมไพล์ระบบ TypeScript และ Vite ทั้ง `@mango/portal` และ `@mango/rain-admin` ผ่านฉลุย 100%
-  6. ดำเนินการ Git Commit & Push ขึ้น Branch `feature/rain-fullstack-integration` เรียบร้อย
+  5. [ช่วงเช้า] ตรวจพบและแก้ไขบั๊กการควบคุมสิทธิ์บนหน้าเว็บ (UI Authorization / RBAC Bug Fix):
+     - **สาเหตุ (Root Cause)**: Rain ทำการทดสอบและตรวจพบว่าผู้ใช้บทบาท `CLIENT` และ `STAFF` เมื่อเปิดเข้ามายังหน้าดาวน์โหลด Agent สามารถมองเห็นและคลิกปุ่ม `+ ปล่อยเวอร์ชันใหม่` และปุ่มถังขยะเพิกถอนเวอร์ชันได้ ซึ่งแม้หลังบ้านจะมีตัวดัก `403 Forbidden` อยู่แล้ว แต่หน้าเว็บไม่ได้ใส่เงื่อนไขดักสิทธิ์การแสดงผล
+     - **การแก้ไข**: เพิ่มเงื่อนไข `{userRole === 'ADMIN' && ...}` ครอบปุ่ม `+ ปล่อยเวอร์ชันใหม่` และปุ่มลบเวอร์ชันในแท็บ Releases รวมถึงปุ่ม `+ ลงทะเบียนอุปกรณ์` และปุ่มเพิกถอนอุปกรณ์ในแท็บ Devices และปุ่มตัดการเชื่อมต่อในแท็บ Sessions ส่งผลให้ `CLIENT` และ `STAFF` มีสิทธิ์เป็นแบบ Read-Only / Download Only ตามมาตรฐานความปลอดภัย Zero-Trust
+  6. ทดสอบคอมไพล์ระบบ TypeScript และ Vite ทั้ง `@mango/portal` และ `@mango/rain-admin` ผ่านฉลุย 100%
+  7. ดำเนินการ Git Commit & Push ขึ้น Branch `feature/rain-fullstack-integration` เรียบร้อย
 - **ไฟล์ที่สร้าง/แก้ไข**:
   - `Rain/admin/src/admin.service.ts` *(เพิ่ม CreateDeviceDto, CreateAgentVersionDto, createDevice, createAgentVersion, deleteAgentVersion)*
   - `Rain/admin/src/admin.controller.ts` *(เพิ่ม createDevice, createAgentVersion, deleteAgentVersion endpoint handlers)*
   - `Rain/admin/src/admin.routes.ts` *(จดทะเบียน POST /api/devices, POST /api/agent-versions, DELETE /api/agent-versions/:id)*
-  - `Rain/portal/src/components/AdminPanel.tsx` *(เพิ่ม Agent Releases Manager, Modal ปล่อยเวอร์ชันใหม่, Posture Inspector, Table Toolbar, และ Session Persistence)*
+  - `Rain/portal/src/components/AdminPanel.tsx` *(เพิ่ม Agent Releases Manager, Modal ปล่อยเวอร์ชันใหม่, Posture Inspector, Table Toolbar, และแก้ไขสิทธิ์ RBAC ทุกแท็บ)*
   - `Rain/RULES_AND_WORKLOG.md` *(อัปเดตบันทึกประจำวัน)*
 
