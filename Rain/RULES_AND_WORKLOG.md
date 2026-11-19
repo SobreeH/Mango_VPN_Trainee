@@ -394,6 +394,7 @@
      - ปรับ `LoginForm.tsx`: ตัดปุ่ม `staff_user` และ `client_user` ออกจากกล่องพับ Demo คงไว้เฉพาะบัญชี `admin_user`
      - ปรับ `App.tsx`: เปลี่ยนค่าเริ่มต้นของ State `username` จาก `staff_user` เป็น `admin_user`
      - ทดสอบการคอมไพล์ผ่าน 100%
+  6. ปรับปรุงหน้า Login คืนความคลีน 100%: นำแถบกล่องพับบัญชีทดสอบ (Developer Demo Drawer) ออกจากหน้าจอทั้งหมดตามคำขอ เพื่อให้เป็นหน้าล็อกอิน Enterprise VPN จริง 100%
 - **ไฟล์ที่สร้าง/แก้ไข**:
   - `Rain/portal/src/i18n/translations.ts`
   - `Rain/portal/src/components/LoginForm.tsx`
