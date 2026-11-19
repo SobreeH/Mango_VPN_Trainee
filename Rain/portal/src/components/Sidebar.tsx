@@ -12,7 +12,6 @@ import {
 } from 'lucide-react';
 import { RoleName } from '@mango/shared';
 import { useI18n } from '../i18n/I18nContext';
-import { LanguageSwitcher } from './LanguageSwitcher';
 
 export type NavTab =
   | 'connect'
@@ -137,11 +136,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               ? t.dashboard.accessCorporate
               : t.dashboard.accessFull}
           </div>
-        </div>
-
-        {/* ตัวเลือกภาษา */}
-        <div className="px-2">
-          <LanguageSwitcher compact />
         </div>
 
         {/* ปุ่มออกจากระบบ */}

@@ -399,6 +399,13 @@
      - ปรับ `App.tsx`: ยกเลิกการแสดงรหัส 6 หลักบน Toast แต่พิมพ์ออกทาง `console.log` สไตล์ Terminal ของ API เซิร์ฟเวอร์ และแสดง Toast เพียงสถานะส่งรหัส
      - ปรับ `translations.ts`: ปรับข้อความนำทางให้ผู้ใช้ตรวจสอบรหัสจาก Terminal / Developer Console
      - ทดสอบการคอมไพล์ผ่าน 100%
+  8. ปรับปรุงตำแหน่งปุ่มสลับภาษา (TH / EN) ตามหลักการออกแบบ Human-Computer Interaction (HCI):
+     - ใช้หลัก Jakob's Law และ F-Pattern Scanning ที่ผู้ใช้คุ้นเคยกับการมองหาการตั้งค่าภาษาที่มุมขวาบนของหน้าจอ
+     - หน้า Login (`App.tsx`): ย้ายปุ่มภาษาจากในกล่องแบบฟอร์ม ไปตรึงไว้ที่มุมขวาบนของหน้าจอแบบ Fixed (`fixed top-4 right-4 sm:top-5 sm:right-6 z-40`)
+     - กล่องข้อความแจ้งเตือน (`Toast.tsx`): ปรับระยะตำแหน่งลงมาเป็น `top-16` เพื่อไม่ให้ป๊อปอัปแจ้งเตือนทับหรือบดบังปุ่มเปลี่ยนภาษา
+     - หน้า Dashboard และหน้าจัดการทุกหน้า (`VpnDashboard.tsx`, `App.tsx`): เพิ่มปุ่มเปลี่ยนภาษาไว้ที่ Utility Bar มุมขวาบน ควบคู่กับปุ่ม Dark Mode และปุ่มย้อนกลับอย่างสม่ำเสมอ
+     - แถบเมนูด้านซ้าย (`Sidebar.tsx`): ถอดปุ่มเปลี่ยนภาษาที่อยู่ด้านล่างสุดออก เพื่อขจัดความซ้ำซ้อนและคืนความสะอาดตาให้กับเมนูนำทาง
+     - ทดสอบการคอมไพล์ผ่าน TypeScript และ Vite Build 100%
 - **ไฟล์ที่สร้าง/แก้ไข**:
   - `Rain/portal/src/i18n/translations.ts`
   - `Rain/portal/src/components/LoginForm.tsx`
@@ -406,7 +413,6 @@
   - `Rain/portal/src/App.tsx`
   - `Rain/portal/src/components/Sidebar.tsx`
   - `Rain/portal/src/components/VpnDashboard.tsx`
+  - `Rain/portal/src/components/Toast.tsx`
   - `Rain/portal/src/components/AdminPanel.tsx`
   - `Rain/RULES_AND_WORKLOG.md`
-
-

@@ -472,12 +472,15 @@ export default function App() {
                       : t.pages.historyAdminSubtitle}
                   </p>
                 </div>
-                <button
-                  onClick={() => setActiveTab('connect')}
-                  className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
-                >
-                  {t.common.backToConnect}
-                </button>
+                <div className="flex items-center space-x-2">
+                  <LanguageSwitcher compact />
+                  <button
+                    onClick={() => setActiveTab('connect')}
+                    className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
+                  >
+                    {t.common.backToConnect}
+                  </button>
+                </div>
               </div>
 
               <AdminPanel
@@ -503,12 +506,15 @@ export default function App() {
                     {t.pages.devicesSubtitle}
                   </p>
                 </div>
-                <button
-                  onClick={() => setActiveTab('connect')}
-                  className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
-                >
-                  {t.common.backToConnect}
-                </button>
+                <div className="flex items-center space-x-2">
+                  <LanguageSwitcher compact />
+                  <button
+                    onClick={() => setActiveTab('connect')}
+                    className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
+                  >
+                    {t.common.backToConnect}
+                  </button>
+                </div>
               </div>
 
               <AdminPanel
@@ -534,12 +540,15 @@ export default function App() {
                     {t.pages.usersSubtitle}
                   </p>
                 </div>
-                <button
-                  onClick={() => setActiveTab('connect')}
-                  className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
-                >
-                  {t.common.backToConnect}
-                </button>
+                <div className="flex items-center space-x-2">
+                  <LanguageSwitcher compact />
+                  <button
+                    onClick={() => setActiveTab('connect')}
+                    className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
+                  >
+                    {t.common.backToConnect}
+                  </button>
+                </div>
               </div>
 
               <AdminPanel
@@ -565,12 +574,15 @@ export default function App() {
                     {t.pages.policiesSubtitle}
                   </p>
                 </div>
-                <button
-                  onClick={() => setActiveTab('connect')}
-                  className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
-                >
-                  {t.common.backToConnect}
-                </button>
+                <div className="flex items-center space-x-2">
+                  <LanguageSwitcher compact />
+                  <button
+                    onClick={() => setActiveTab('connect')}
+                    className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
+                  >
+                    {t.common.backToConnect}
+                  </button>
+                </div>
               </div>
 
               <AdminPanel
@@ -596,12 +608,15 @@ export default function App() {
                     {t.pages.auditLogsSubtitle}
                   </p>
                 </div>
-                <button
-                  onClick={() => setActiveTab('connect')}
-                  className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
-                >
-                  {t.common.backToConnect}
-                </button>
+                <div className="flex items-center space-x-2">
+                  <LanguageSwitcher compact />
+                  <button
+                    onClick={() => setActiveTab('connect')}
+                    className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
+                  >
+                    {t.common.backToConnect}
+                  </button>
+                </div>
               </div>
 
               <AdminPanel
@@ -631,12 +646,15 @@ export default function App() {
                       : t.pages.agentUserSubtitle}
                   </p>
                 </div>
-                <button
-                  onClick={() => setActiveTab('connect')}
-                  className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
-                >
-                  {t.common.backToConnect}
-                </button>
+                <div className="flex items-center space-x-2">
+                  <LanguageSwitcher compact />
+                  <button
+                    onClick={() => setActiveTab('connect')}
+                    className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
+                  >
+                    {t.common.backToConnect}
+                  </button>
+                </div>
               </div>
 
               <AdminPanel
@@ -668,13 +686,17 @@ export default function App() {
         />
       )}
 
-      {/* สถานะเซิร์ฟเวอร์จิ๋ว และตัวเลือกภาษา */}
-      <div className="w-full max-w-[400px] flex items-center justify-between mb-2">
+      {/* ปุ่มเปลี่ยนภาษา มุมขวาบนของหน้าจอตามหลัก HCI (Jakob's Law / F-Pattern) */}
+      <div className="fixed top-4 right-4 sm:top-5 sm:right-6 z-40">
+        <LanguageSwitcher />
+      </div>
+
+      {/* สถานะเซิร์ฟเวอร์จิ๋ว */}
+      <div className="w-full max-w-[400px] flex items-center mb-2">
         <div className="flex items-center space-x-1.5 text-[10px] text-slate-500 font-mono">
           <span className={`w-1.5 h-1.5 rounded-full ${portalOnline ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
           <span>{portalOnline ? t.common.gatewayOnline : t.common.gatewayStandby}</span>
         </div>
-        <LanguageSwitcher compact />
       </div>
 
       {/* กรอบขนาด Mobile App Card */}

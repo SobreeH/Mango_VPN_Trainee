@@ -68,7 +68,7 @@ export const Toast: React.FC<ToastProps> = ({
   return (
     <aside
       aria-label={t.common.notificationsAria}
-      className={`fixed top-5 right-5 z-50 flex items-center space-x-3 px-4 py-3 rounded-xl border ${config.border} ${config.bg} shadow-2xl ${config.shadow} backdrop-blur-md max-w-sm transition-all duration-300 animate-in fade-in slide-in-from-top-4`}
+      className={`fixed top-16 right-4 sm:right-6 z-50 flex items-center space-x-3 px-4 py-3 rounded-xl border ${config.border} ${config.bg} shadow-2xl ${config.shadow} backdrop-blur-md max-w-sm transition-all duration-300 animate-in fade-in slide-in-from-top-4`}
     >
       {/* ไอคอนตามประเภท */}
       {config.icon}

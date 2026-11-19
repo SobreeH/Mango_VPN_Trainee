@@ -11,6 +11,7 @@ import {
 import { RoleName } from '@mango/shared';
 import { useI18n } from '../i18n/I18nContext';
 import { formatMessage } from '../i18n/translations';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 // =========================================================================
 // 1. Props Interface
@@ -125,6 +126,9 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
             <Moon className="w-3.5 h-3.5" />
             <span>{t.dashboard.darkMode}</span>
           </div>
+
+          {/* ปุ่มสลับภาษา TH / EN (Top-Right Utility ตามหลัก HCI) */}
+          <LanguageSwitcher compact />
         </div>
       </div>
 
