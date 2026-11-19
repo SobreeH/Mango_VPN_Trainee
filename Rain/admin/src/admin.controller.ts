@@ -1,5 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { AdminService, CreateUserDto, CreatePolicyDto, CreateDeviceDto } from './admin.service.js';
+import { AdminService, CreateUserDto, CreatePolicyDto, CreateDeviceDto, CreateAgentVersionDto } from './admin.service.js';
 
 const adminService = new AdminService();
 
@@ -82,6 +82,61 @@ export class AdminController {
       return reply.status(500).send({
         success: false,
         error: { code: 'SERVER_ERROR', message: err.message },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  async createAgentVersion(request: FastifyRequest<{ Body: CreateAgentVersionDto }>, reply: FastifyReply) {
+    try {
+      const user = (request as any).user;
+      if (user?.role !== 'ADMIN') {
+        return reply.status(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'Admin access required' } });
+      }
+
+      const body = request.body;
+      if (!body?.versionString || !body?.downloadUrl || !body?.checksumSha256) {
+        return reply.status(400).send({
+          success: false,
+          error: { code: 'INVALID_INPUT', message: 'Missing versionString, downloadUrl, or checksumSha256' },
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      const version = await adminService.createAgentVersion(body);
+      return reply.status(201).send({
+        success: true,
+        data: version,
+        message: 'Agent version created successfully',
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      return reply.status(500).send({
+        success: false,
+        error: { code: 'SERVER_ERROR', message: err.message },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  async deleteAgentVersion(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
+    try {
+      const user = (request as any).user;
+      if (user?.role !== 'ADMIN') {
+        return reply.status(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'Admin access required' } });
+      }
+
+      const { id } = request.params;
+      await adminService.deleteAgentVersion(id);
+      return reply.status(200).send({
+        success: true,
+        message: 'Agent version deleted successfully',
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      return reply.status(err.message === 'Agent version not found' ? 404 : 500).send({
+        success: false,
+        error: { code: err.message === 'Agent version not found' ? 'NOT_FOUND' : 'SERVER_ERROR', message: err.message },
         timestamp: new Date().toISOString(),
       });
     }

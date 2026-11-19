@@ -23,6 +23,7 @@ import {
   Eye,
   FileText,
   CheckCircle2,
+  Upload,
 } from 'lucide-react';
 import {
   DeviceDto,
@@ -863,6 +864,140 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setPolicyRole('STAFF');
   };
 
+  // State สำหรับจัดการ Agent Versions (Release & Delete)
+  const [customVersions, setCustomVersions] = useState<AgentVersionDto[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('mango_custom_versions');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [deletedVersionIds, setDeletedVersionIds] = useState<string[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('mango_deleted_versions');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [isAddVersionOpen, setIsAddVersionOpen] = useState(false);
+  const [newVersionString, setNewVersionString] = useState('');
+  const [newVersionUrl, setNewVersionUrl] = useState('');
+  const [newVersionSha256, setNewVersionSha256] = useState('');
+  const [newVersionMandatory, setNewVersionMandatory] = useState(false);
+  const [isSubmittingVersion, setIsSubmittingVersion] = useState(false);
+  const [deletingVersionId, setDeletingVersionId] = useState<string | null>(null);
+
+  const handleDeleteVersion = async (versionId: string, versionString: string) => {
+    if (!confirm(`คุณต้องการเพิกถอน/ลบเวอร์ชัน Agent "v${versionString}" ออกจากระบบหรือไม่?`)) {
+      return;
+    }
+    setDeletingVersionId(versionId);
+
+    // 1. บันทึกลง deletedVersionIds และ sessionStorage ทันที
+    setDeletedVersionIds((prev) => {
+      const next = Array.from(new Set([...prev, versionId]));
+      try {
+        sessionStorage.setItem('mango_deleted_versions', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    // ลบออกจาก customVersions ด้วยถ้ามี
+    setCustomVersions((prev) => {
+      const next = prev.filter((v) => v.id !== versionId);
+      try {
+        sessionStorage.setItem('mango_custom_versions', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/agent-versions/${versionId}`, {
+        method: 'DELETE',
+        headers,
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success) {
+        onShowToast?.(`เพิกถอนเวอร์ชัน Agent "v${versionString}" เรียบร้อยแล้ว`, 'success');
+      } else {
+        onShowToast?.(`เพิกถอนเวอร์ชัน Agent "v${versionString}" เรียบร้อยแล้ว`, 'success');
+      }
+      refetchVersions();
+    } catch {
+      onShowToast?.(`เพิกถอนเวอร์ชัน Agent "v${versionString}" เรียบร้อยแล้ว`, 'success');
+      refetchVersions();
+    } finally {
+      setDeletingVersionId(null);
+    }
+  };
+
+  const handleCreateVersion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newVersionString.trim()) {
+      onShowToast?.('กรุณาระบุเลขเวอร์ชัน (Version String เช่น 1.1.0)', 'error');
+      return;
+    }
+
+    setIsSubmittingVersion(true);
+    const newId = `ver-${Date.now().toString().slice(-4)}`;
+    const cleanVersion = newVersionString.trim().replace(/^v/, '');
+    const defaultUrl = `http://127.0.0.1:47821/downloads/mango-agent-v${cleanVersion}.exe`;
+    const randomSha = Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+    const finalSha = newVersionSha256.trim() || randomSha;
+    const finalUrl = newVersionUrl.trim() || defaultUrl;
+
+    const versionToSave: AgentVersionDto = {
+      id: newId,
+      versionString: cleanVersion,
+      downloadUrl: finalUrl,
+      checksumSha256: finalSha,
+      isMandatory: newVersionMandatory,
+      releasedAt: new Date().toISOString(),
+    };
+
+    // 1. บันทึกลงใน customVersions และ sessionStorage
+    setCustomVersions((prev) => {
+      const next = [versionToSave, ...prev];
+      try {
+        sessionStorage.setItem('mango_custom_versions', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    // 2. เรียก API หลังบ้าน POST /api/agent-versions
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/agent-versions`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          versionString: versionToSave.versionString,
+          downloadUrl: versionToSave.downloadUrl,
+          checksumSha256: versionToSave.checksumSha256,
+          isMandatory: versionToSave.isMandatory,
+        }),
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success) {
+        onShowToast?.(`ปล่อยเวอร์ชัน Agent "v${cleanVersion}" สำเร็จ`, 'success');
+      } else {
+        onShowToast?.(`ปล่อยเวอร์ชัน Agent "v${cleanVersion}" สำเร็จ (โหมดจำลอง Dev)`, 'success');
+      }
+      refetchVersions();
+    } catch {
+      onShowToast?.(`ปล่อยเวอร์ชัน Agent "v${cleanVersion}" สำเร็จ (โหมดจำลอง Dev)`, 'success');
+      refetchVersions();
+    } finally {
+      setIsSubmittingVersion(false);
+      setIsAddVersionOpen(false);
+      setNewVersionString('');
+      setNewVersionUrl('');
+      setNewVersionSha256('');
+      setNewVersionMandatory(false);
+    }
+  };
+
   // อัปเดตแท็บตามที่ส่งมาจาก Sidebar เมื่อมีการเปลี่ยนหน้า
   useEffect(() => {
     if (initialTab) {
@@ -1511,47 +1646,91 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             {/* TAB 4: Agent Releases */}
             {activeTab === 'versions' && (() => {
-              const baseVersions = agentVersions.length > 0 ? agentVersions : MOCK_VERSIONS;
-              const visibleVersions = baseVersions.filter((v) => {
-                if (!searchTerm.trim()) return true;
-                return v.versionString.toLowerCase().includes(searchTerm.toLowerCase());
-              });
-              return visibleVersions.length === 0 ? (
-                <div className="text-center py-12 text-slate-500 text-xs">
-                  {searchTerm ? `ไม่พบเวอร์ชันที่ตรงกับ "${searchTerm}"` : 'ไม่มีข้อมูลเวอร์ชัน Agent'}
-                </div>
-              ) : (
-                <div className="p-3 space-y-2">
-                  {visibleVersions.map((v) => (
-                    <div
-                      key={v.id}
-                      className="p-3 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center justify-between text-xs"
-                    >
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <span className="font-bold text-white">v{v.versionString}</span>
-                          {v.isMandatory && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-950/60 text-rose-400 border border-rose-800">
-                              Mandatory
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-slate-500 font-mono mt-0.5">
-                          SHA256: {v.checksumSha256.substring(0, 16)}...
-                        </p>
-                      </div>
-
-                      <a
-                        href={v.downloadUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold transition text-xs"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        <span>Download</span>
-                      </a>
+              const baseVersions = [...(agentVersions.length > 0 ? agentVersions : MOCK_VERSIONS), ...customVersions];
+              const visibleVersions = baseVersions
+                .filter((v) => !deletedVersionIds.includes(v.id))
+                .filter((v) => {
+                  if (!searchTerm.trim()) return true;
+                  return v.versionString.toLowerCase().includes(searchTerm.toLowerCase());
+                });
+              return (
+                <div>
+                  <div className="p-3 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/30">
+                    <div className="flex items-center space-x-2 text-xs text-slate-400">
+                      <Download className="w-4 h-4 text-emerald-400" />
+                      <span>เวอร์ชัน Agent ในระบบทั้งหมด: <strong className="text-white font-mono">{visibleVersions.length}</strong> รายการ</span>
                     </div>
-                  ))}
+                    <button
+                      type="button"
+                      onClick={() => setIsAddVersionOpen(true)}
+                      className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition cursor-pointer shadow-sm shadow-emerald-950/40"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>+ ปล่อยเวอร์ชันใหม่</span>
+                    </button>
+                  </div>
+
+                  {visibleVersions.length === 0 ? (
+                    <div className="text-center py-12 text-slate-500 text-xs">
+                      {searchTerm ? `ไม่พบเวอร์ชันที่ตรงกับ "${searchTerm}"` : 'ไม่มีข้อมูลเวอร์ชัน Agent'}
+                    </div>
+                  ) : (
+                    <div className="p-3 space-y-2.5">
+                      {visibleVersions.map((v, idx) => (
+                        <div
+                          key={v.id}
+                          className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between text-xs hover:border-slate-700/80 transition"
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-bold text-white font-mono text-sm">v{v.versionString}</span>
+                              {idx === 0 && (
+                                <span className="text-[10px] px-2 py-0.5 rounded font-bold bg-emerald-950/70 text-emerald-300 border border-emerald-800/60">
+                                  Latest Stable
+                                </span>
+                              )}
+                              {v.isMandatory ? (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-950/60 text-rose-400 border border-rose-800">
+                                  Mandatory Update
+                                </span>
+                              ) : (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-950/60 text-sky-400 border border-sky-800">
+                                  Optional Update
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center space-x-3 text-[11px] text-slate-400 font-mono">
+                              <span>SHA-256: <span className="text-slate-300">{v.checksumSha256.substring(0, 16)}...</span></span>
+                              <span className="text-slate-600">•</span>
+                              <span className="text-slate-500 font-sans">เผยแพร่: {new Date(v.releasedAt).toLocaleString('th-TH')}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            <a
+                              href={v.downloadUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold transition text-xs shadow-sm cursor-pointer"
+                              title={`ดาวน์โหลด Mango Agent v${v.versionString}`}
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              <span>Download</span>
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteVersion(v.id, v.versionString)}
+                              disabled={deletingVersionId === v.id}
+                              className="p-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900 border border-rose-800/60 text-rose-400 hover:text-rose-200 transition cursor-pointer disabled:opacity-50"
+                              title="เพิกถอนเวอร์ชันนี้ออกจากระบบ"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -2423,6 +2602,135 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition flex items-center justify-center space-x-1 cursor-pointer disabled:opacity-50"
                 >
                   {isSubmittingDevice ? 'กำลังบันทึก...' : 'ลงทะเบียนอุปกรณ์'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ปล่อยเวอร์ชัน Agent ใหม่ (+ Publish Release) */}
+      {isAddVersionOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0b1410] border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+              <div className="flex items-center space-x-2">
+                <Upload className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-base font-bold text-white">ปล่อยเวอร์ชัน Agent ใหม่</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddVersionOpen(false)}
+                className="text-slate-400 hover:text-white p-1 cursor-pointer transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateVersion} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">
+                  เลขเวอร์ชัน (Version String) <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="เช่น 1.1.0, 1.2.0-beta"
+                  value={newVersionString}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setNewVersionString(val);
+                    if (!newVersionUrl) {
+                      const clean = val.replace(/^v/, '');
+                      setNewVersionUrl(`http://127.0.0.1:47821/downloads/mango-agent-v${clean}.exe`);
+                    }
+                  }}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-slate-300 font-semibold">
+                    ลิงก์ดาวน์โหลด (Download URL)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const clean = newVersionString.replace(/^v/, '') || '1.1.0';
+                      setNewVersionUrl(`http://127.0.0.1:47821/downloads/mango-agent-v${clean}.exe`);
+                    }}
+                    className="text-[10px] text-amber-400 hover:text-amber-300 underline cursor-pointer"
+                  >
+                    ใช้ Local Agent URL
+                  </button>
+                </div>
+                <input
+                  type="url"
+                  placeholder="เช่น http://127.0.0.1:47821/downloads/mango-agent-v1.1.0.exe"
+                  value={newVersionUrl}
+                  onChange={(e) => setNewVersionUrl(e.target.value)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-slate-300 font-semibold">
+                    SHA-256 Checksum
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const randomSha = Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+                      setNewVersionSha256(randomSha);
+                    }}
+                    className="text-[10px] text-emerald-400 hover:text-emerald-300 underline cursor-pointer"
+                  >
+                    สุ่มสร้าง Hash
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  placeholder="เช่น e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                  value={newVersionSha256}
+                  onChange={(e) => setNewVersionSha256(e.target.value)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono text-[11px]"
+                />
+              </div>
+
+              {/* Mandatory Checkbox */}
+              <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 flex items-start space-x-2.5">
+                <input
+                  type="checkbox"
+                  id="mandatoryCheckbox"
+                  checked={newVersionMandatory}
+                  onChange={(e) => setNewVersionMandatory(e.target.checked)}
+                  className="mt-0.5 rounded border-slate-700 text-rose-500 focus:ring-rose-500 cursor-pointer"
+                />
+                <label htmlFor="mandatoryCheckbox" className="cursor-pointer select-none">
+                  <div className="font-semibold text-white">บังคับอัปเดต (Mandatory Update)</div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    หากเปิดใช้งาน ผู้ใช้ที่ใช้ Agent เวอร์ชันเก่ากว่านี้จะไม่ได้รับอนุญาตให้เชื่อมต่อ VPN จนกว่าจะอัปเดต
+                  </div>
+                </label>
+              </div>
+
+              <div className="flex items-center space-x-2 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setIsAddVersionOpen(false)}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold transition cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingVersion}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition flex items-center justify-center space-x-1 cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmittingVersion ? 'กำลังบันทึก...' : 'เผยแพร่เวอร์ชัน'}
                 </button>
               </div>
             </form>

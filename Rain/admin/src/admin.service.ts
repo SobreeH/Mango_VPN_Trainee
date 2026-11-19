@@ -26,6 +26,13 @@ export interface CreateDeviceDto {
   macAddress?: string | null;
 }
 
+export interface CreateAgentVersionDto {
+  versionString: string;
+  downloadUrl: string;
+  checksumSha256: string;
+  isMandatory?: boolean;
+}
+
 export interface UserDto {
   id: string;
   username: string;
@@ -165,6 +172,42 @@ export class AdminService {
       isMandatory: v.isMandatory,
       releasedAt: v.releasedAt.toISOString(),
     }));
+  }
+
+  async createAgentVersion(data: CreateAgentVersionDto): Promise<AgentVersionDto> {
+    const existing = await prisma.agentVersion.findUnique({
+      where: { versionString: data.versionString },
+    });
+    if (existing) {
+      throw new Error(`Agent version ${data.versionString} already exists`);
+    }
+
+    const version = await prisma.agentVersion.create({
+      data: {
+        versionString: data.versionString,
+        downloadUrl: data.downloadUrl,
+        checksumSha256: data.checksumSha256,
+        isMandatory: data.isMandatory ?? false,
+      },
+    });
+
+    return {
+      id: version.id,
+      versionString: version.versionString,
+      downloadUrl: version.downloadUrl,
+      checksumSha256: version.checksumSha256,
+      isMandatory: version.isMandatory,
+      releasedAt: version.releasedAt.toISOString(),
+    };
+  }
+
+  async deleteAgentVersion(versionId: string): Promise<boolean> {
+    const existing = await prisma.agentVersion.findUnique({ where: { id: versionId } });
+    if (!existing) {
+      throw new Error('Agent version not found');
+    }
+    await prisma.agentVersion.delete({ where: { id: versionId } });
+    return true;
   }
 
   async createDevice(data: CreateDeviceDto): Promise<DeviceDto> {
