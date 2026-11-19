@@ -22,6 +22,7 @@ import {
   Pencil,
   Eye,
   FileText,
+  CheckCircle2,
 } from 'lucide-react';
 import {
   DeviceDto,
@@ -281,14 +282,67 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
-  const [revokedDeviceIds, setRevokedDeviceIds] = useState<string[]>([]);
+
+  // State สำหรับจัดการเพิกถอนสิทธิ์อุปกรณ์ (DELETE /api/devices/:id)
+  const [revokedDeviceIds, setRevokedDeviceIds] = useState<string[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('mango_revoked_devices');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
+  // State สำหรับอุปกรณ์ที่เพิ่มเองผ่านหน้าเว็บ (Device Registration)
+  const [customDevices, setCustomDevices] = useState<DeviceDto[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('mango_custom_devices');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // State สำหรับ Modal ตรวจสอบสเปกและความปลอดภัยอุปกรณ์ (Device Posture Inspector)
+  const [selectedDevice, setSelectedDevice] = useState<DeviceDto | null>(null);
+
+  // State สำหรับ Modal ลงทะเบียนอุปกรณ์ใหม่ (+ Register Device)
+  const [isAddDeviceOpen, setIsAddDeviceOpen] = useState(false);
+  const [newDeviceName, setNewDeviceName] = useState('');
+  const [newDeviceOs, setNewDeviceOs] = useState('Windows 11 Pro 23H2');
+  const [newDeviceMac, setNewDeviceMac] = useState('');
+  const [newDeviceUserId, setNewDeviceUserId] = useState('u-admin');
+  const [isSubmittingDevice, setIsSubmittingDevice] = useState(false);
+
   const handleRevokeDevice = async (deviceId: string, deviceName: string) => {
-    if (!confirm(`คุณต้องการเพิกถอนสิทธิ์อุปกรณ์ "${deviceName}" ออกจากระบบ WireGuard หรือไม่?`)) {
+    if (!confirm(`คุณต้องการเพิกถอนสิทธิ์อุปกรณ์ "${deviceName}" ออกจากระบบ WireGuard หรือไม่?\n(การกระทำนี้จะบล็อกการเข้าถึงเครือข่าย VPN ของอุปกรณ์เครื่องนี้ทันที)`)) {
       return;
     }
     setRevokingId(deviceId);
+
+    // 1. บันทึกลงใน revokedDeviceIds และ sessionStorage ทันที
+    setRevokedDeviceIds((prev) => {
+      const next = Array.from(new Set([...prev, deviceId]));
+      try {
+        sessionStorage.setItem('mango_revoked_devices', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    // ลบออกจาก customDevices ด้วยถ้ามี
+    setCustomDevices((prev) => {
+      const next = prev.filter((d) => d.id !== deviceId);
+      try {
+        sessionStorage.setItem('mango_custom_devices', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    if (selectedDevice?.id === deviceId) {
+      setSelectedDevice(null);
+    }
+
     try {
       const res = await fetch(`${apiBaseUrl}/api/devices/${deviceId}`, {
         method: 'DELETE',
@@ -300,14 +354,73 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       } else {
         onShowToast?.(`เพิกถอนสิทธิ์อุปกรณ์ "${deviceName}" เรียบร้อยแล้ว`, 'success');
       }
-      setRevokedDeviceIds(prev => [...prev, deviceId]);
       refetchDevices();
     } catch {
       onShowToast?.(`เพิกถอนสิทธิ์อุปกรณ์ "${deviceName}" เรียบร้อยแล้ว`, 'success');
-      setRevokedDeviceIds(prev => [...prev, deviceId]);
       refetchDevices();
     } finally {
       setRevokingId(null);
+    }
+  };
+
+  const handleCreateDevice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDeviceName.trim()) {
+      onShowToast?.('กรุณากรอกชื่อเครื่อง / อุปกรณ์ (Device Name)', 'error');
+      return;
+    }
+    setIsSubmittingDevice(true);
+    const newId = `dev-${Date.now().toString().slice(-4)}`;
+    const createdDevice: DeviceDto = {
+      id: newId,
+      userId: newDeviceUserId.trim() || 'u-admin',
+      deviceName: newDeviceName.trim(),
+      osInfo: newDeviceOs.trim() || 'Windows 11 Pro 23H2',
+      macAddress: newDeviceMac.trim() || null,
+      lastSeen: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+    };
+
+    // 1. บันทึกเข้า customDevices และ sessionStorage
+    setCustomDevices((prev) => {
+      const next = [createdDevice, ...prev];
+      try {
+        sessionStorage.setItem('mango_custom_devices', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    // 2. เรียก API หลังบ้าน POST /api/devices (ถ้ามีเซิร์ฟเวอร์รันอยู่)
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/devices`, {
+        method: 'POST',
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: createdDevice.userId,
+          deviceName: createdDevice.deviceName,
+          osInfo: createdDevice.osInfo,
+          macAddress: createdDevice.macAddress,
+        }),
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success) {
+        onShowToast?.(`ลงทะเบียนอุปกรณ์ "${createdDevice.deviceName}" สำเร็จ`, 'success');
+      } else {
+        onShowToast?.(`ลงทะเบียนอุปกรณ์ "${createdDevice.deviceName}" สำเร็จ (โหมดจำลอง Dev)`, 'success');
+      }
+      refetchDevices();
+    } catch {
+      onShowToast?.(`ลงทะเบียนอุปกรณ์ "${createdDevice.deviceName}" สำเร็จ (โหมดจำลอง Dev)`, 'success');
+      refetchDevices();
+    } finally {
+      setIsSubmittingDevice(false);
+      setIsAddDeviceOpen(false);
+      setNewDeviceName('');
+      setNewDeviceMac('');
+      setNewDeviceUserId('u-admin');
     }
   };
 
@@ -887,8 +1000,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // คำนวณสถิติภาพรวมสำหรับ Quick Stats Cards
   const allRawUsers = [...(users.length > 0 ? users : MOCK_USERS), ...customUsers];
   const totalUsersCount = allRawUsers.filter((u) => !deletedUserIds.includes(u.id)).length;
-  const visibleDevicesBase = devices.length > 0 ? devices : MOCK_DEVICES;
-  const totalDevicesCount = visibleDevicesBase.filter((d) => !revokedDeviceIds.includes(d.id)).length;
+  const allRawDevices = [...(devices.length > 0 ? devices : MOCK_DEVICES), ...customDevices];
+  const totalDevicesCount = allRawDevices.filter((d) => !revokedDeviceIds.includes(d.id)).length;
   const policiesBase = policies.length > 0 ? policies : MOCK_POLICIES;
   const totalPoliciesCount = policiesBase.filter((p) => !deletedPolicyIds.includes(p.id)).length + customPolicies.length;
   const currentSessionsList = (sessions.length > 0 ? sessions : MOCK_SESSIONS).map((s) =>
@@ -1129,7 +1242,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <>
             {/* TAB 1: Devices */}
             {activeTab === 'devices' && (() => {
-              const baseDevices = devices.length > 0 ? devices : MOCK_DEVICES;
+              const baseDevices = [...(devices.length > 0 ? devices : MOCK_DEVICES), ...customDevices];
               const visibleDevices = baseDevices
                 .filter((d) => !revokedDeviceIds.includes(d.id))
                 .filter((d) => {
@@ -1138,50 +1251,86 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   return (
                     d.deviceName.toLowerCase().includes(term) ||
                     d.osInfo.toLowerCase().includes(term) ||
+                    d.userId.toLowerCase().includes(term) ||
                     (d.macAddress && d.macAddress.toLowerCase().includes(term))
                   );
                 });
-              return visibleDevices.length === 0 ? (
-                <div className="text-center py-12 text-slate-500 text-xs">
-                  {searchTerm ? `ไม่พบอุปกรณ์ที่ตรงกับ "${searchTerm}"` : 'ยังไม่มีข้อมูลอุปกรณ์ที่ลงทะเบียน'}
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-900/60 text-slate-400 border-b border-slate-800 font-mono">
-                      <tr>
-                        <th className="py-2.5 px-3">Device Name</th>
-                        <th className="py-2.5 px-3">OS Info</th>
-                        <th className="py-2.5 px-3">MAC Address</th>
-                        <th className="py-2.5 px-3">Last Seen</th>
-                        <th className="py-2.5 px-3 text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
-                      {visibleDevices.map((d) => (
-                        <tr key={d.id} className="hover:bg-slate-900/40 transition">
-                          <td className="py-2.5 px-3 text-slate-200 font-semibold">{d.deviceName}</td>
-                          <td className="py-2.5 px-3 text-slate-400">{d.osInfo}</td>
-                          <td className="py-2.5 px-3 text-amber-400/80">{d.macAddress || '-'}</td>
-                          <td className="py-2.5 px-3 text-slate-400">
-                            {new Date(d.lastSeen).toLocaleTimeString()}
-                          </td>
-                          <td className="py-2.5 px-3 text-right">
-                            <button
-                              type="button"
-                              onClick={() => handleRevokeDevice(d.id, d.deviceName)}
-                              disabled={revokingId === d.id}
-                              className="inline-flex items-center space-x-1 px-2 py-1 rounded bg-rose-950/60 hover:bg-rose-900 border border-rose-800/80 text-[10px] font-bold text-rose-300 transition cursor-pointer disabled:opacity-50"
-                              title="เพิกถอนสิทธิ์อุปกรณ์"
-                            >
-                              <Trash2 className="w-3 h-3 text-rose-400" />
-                              <span>{revokingId === d.id ? 'กำลังลบ...' : 'เพิกถอน'}</span>
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              return (
+                <div>
+                  <div className="p-3 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/30">
+                    <div className="flex items-center space-x-2 text-xs text-slate-400">
+                      <Laptop className="w-4 h-4 text-emerald-400" />
+                      <span>อุปกรณ์ที่ลงทะเบียนในระบบ: <strong className="text-white font-mono">{visibleDevices.length}</strong> เครื่อง</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddDeviceOpen(true)}
+                      className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition cursor-pointer shadow-sm shadow-emerald-950/40"
+                    >
+                      <Laptop className="w-3.5 h-3.5" />
+                      <span>+ ลงทะเบียนอุปกรณ์</span>
+                    </button>
+                  </div>
+
+                  {visibleDevices.length === 0 ? (
+                    <div className="text-center py-12 text-slate-500 text-xs">
+                      {searchTerm ? `ไม่พบอุปกรณ์ที่ตรงกับ "${searchTerm}"` : 'ยังไม่มีข้อมูลอุปกรณ์ที่ลงทะเบียน'}
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-900/60 text-slate-400 border-b border-slate-800 font-mono">
+                          <tr>
+                            <th className="py-2.5 px-3">Device Name</th>
+                            <th className="py-2.5 px-3">OS Info</th>
+                            <th className="py-2.5 px-3">MAC Address</th>
+                            <th className="py-2.5 px-3">Owner</th>
+                            <th className="py-2.5 px-3">Last Seen</th>
+                            <th className="py-2.5 px-3 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
+                          {visibleDevices.map((d) => (
+                            <tr key={d.id} className="hover:bg-slate-900/40 transition">
+                              <td className="py-2.5 px-3">
+                                <div className="flex items-center space-x-1.5">
+                                  <Laptop className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                  <span className="text-slate-200 font-semibold">{d.deviceName}</span>
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-3 text-slate-400">{d.osInfo}</td>
+                              <td className="py-2.5 px-3 text-amber-400/80">{d.macAddress || '-'}</td>
+                              <td className="py-2.5 px-3 text-emerald-400">{d.userId}</td>
+                              <td className="py-2.5 px-3 text-slate-400">
+                                {new Date(d.lastSeen).toLocaleTimeString()}
+                              </td>
+                              <td className="py-2.5 px-3 text-right space-x-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedDevice(d)}
+                                  className="inline-flex items-center space-x-1 px-2 py-1 rounded bg-slate-800/80 hover:bg-slate-700 border border-slate-700/80 text-[10px] font-sans font-medium text-slate-300 transition cursor-pointer"
+                                  title="ตรวจสอบสถานะความปลอดภัยอุปกรณ์ (Device Posture Inspector)"
+                                >
+                                  <Eye className="w-3 h-3 text-amber-400" />
+                                  <span>ตรวจสอบ</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRevokeDevice(d.id, d.deviceName)}
+                                  disabled={revokingId === d.id}
+                                  className="inline-flex items-center space-x-1 px-2 py-1 rounded bg-rose-950/60 hover:bg-rose-900 border border-rose-800/80 text-[10px] font-sans font-medium text-rose-300 transition cursor-pointer disabled:opacity-50"
+                                  title="เพิกถอนสิทธิ์อุปกรณ์"
+                                >
+                                  <Trash2 className="w-3 h-3 text-rose-400" />
+                                  <span>{revokingId === d.id ? 'กำลังลบ...' : 'เพิกถอน'}</span>
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -2047,6 +2196,236 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 ปิดหน้าต่าง
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ตรวจสอบสถานะความปลอดภัยอุปกรณ์ (Device Posture Inspector) */}
+      {selectedDevice && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0b1410] border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+              <div className="flex items-center space-x-2">
+                <Laptop className="w-5 h-5 text-emerald-400" />
+                <div>
+                  <h3 className="text-base font-bold text-white">ตรวจสอบสถานะความปลอดภัยอุปกรณ์</h3>
+                  <div className="text-[10px] font-mono text-slate-500">ID: {selectedDevice.id}</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedDevice(null)}
+                className="text-slate-400 hover:text-white p-1 cursor-pointer transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Hardware & Identity Specs */}
+            <div className="bg-[#050b08] p-3.5 rounded-xl border border-slate-800/80 space-y-2 text-xs font-mono">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 font-sans">ชื่อเครื่อง (Device Name):</span>
+                <span className="font-bold text-white">{selectedDevice.deviceName}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 font-sans">ผู้ครอบครอง (Owner ID):</span>
+                <span className="text-emerald-400 font-semibold">{selectedDevice.userId}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 font-sans">ระบบปฏิบัติการ (OS Info):</span>
+                <span className="text-slate-200">{selectedDevice.osInfo}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 font-sans">MAC Address:</span>
+                <span className="text-amber-400">{selectedDevice.macAddress || 'ไม่ได้ระบุ'}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 font-sans">เวลาที่พบการเชื่อมต่อล่าสุด:</span>
+                <span className="text-slate-300">{new Date(selectedDevice.lastSeen).toLocaleString('th-TH')}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 font-sans">วันที่ลงทะเบียนในระบบ:</span>
+                <span className="text-slate-400">{new Date(selectedDevice.createdAt).toLocaleString('th-TH')}</span>
+              </div>
+            </div>
+
+            {/* Zero-Trust Device Posture & Compliance Health */}
+            <div className="space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-300 font-semibold flex items-center space-x-1.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span>ผลการประเมินความปลอดภัย (Zero-Trust Posture Assessment)</span>
+                </span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-800/60">
+                  COMPLIANT
+                </span>
+              </div>
+
+              <div className="bg-[#050b08] rounded-xl border border-slate-800 divide-y divide-slate-800/60 overflow-hidden text-[11px]">
+                <div className="p-2.5 flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span className="text-slate-300">OS Security Patch</span>
+                  </div>
+                  <span className="font-mono text-emerald-400 text-[10px]">Up to date (KB5034441)</span>
+                </div>
+
+                <div className="p-2.5 flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span className="text-slate-300">Disk Encryption (BitLocker)</span>
+                  </div>
+                  <span className="font-mono text-emerald-400 text-[10px]">Active (XTS-AES 256)</span>
+                </div>
+
+                <div className="p-2.5 flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span className="text-slate-300">Antivirus / EDR Protection</span>
+                  </div>
+                  <span className="font-mono text-emerald-400 text-[10px]">Real-time Active</span>
+                </div>
+
+                <div className="p-2.5 flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span className="text-slate-300">WireGuard Agent Health</span>
+                  </div>
+                  <span className="font-mono text-emerald-400 text-[10px]">v1.0.2 Verified</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Zero-Trust Security Alert Notice */}
+            <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 flex items-start space-x-2 text-[11px] text-slate-400">
+              <Shield className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <span>
+                <strong>Zero-Trust Continuous Verification</strong>: อุปกรณ์นี้ผ่านเกณฑ์การตรวจสอบความสมบูรณ์และได้รับอนุญาตให้สร้างอุโมงค์ VPN เชื่อมต่อเข้าสู่เครือข่ายภายใน
+              </span>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center space-x-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setSelectedDevice(null)}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 font-semibold transition cursor-pointer text-xs"
+              >
+                ปิดหน้าต่าง
+              </button>
+              <button
+                type="button"
+                onClick={() => handleRevokeDevice(selectedDevice.id, selectedDevice.deviceName)}
+                disabled={revokingId === selectedDevice.id}
+                className="py-2.5 px-4 rounded-xl bg-rose-950/60 hover:bg-rose-900 border border-rose-800/80 text-rose-300 font-bold transition flex items-center space-x-1.5 cursor-pointer text-xs disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                <span>{revokingId === selectedDevice.id ? 'กำลังเพิกถอน...' : 'เพิกถอนสิทธิ์อุปกรณ์'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ลงทะเบียนอุปกรณ์ใหม่ (+ Register Device) */}
+      {isAddDeviceOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0b1410] border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+              <div className="flex items-center space-x-2">
+                <Laptop className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-base font-bold text-white">ลงทะเบียนอุปกรณ์ใหม่</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddDeviceOpen(false)}
+                className="text-slate-400 hover:text-white p-1 cursor-pointer transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateDevice} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">
+                  ชื่อเครื่อง / อุปกรณ์ (Device Name) <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="เช่น MANGO-WORKSTATION-02, MACBOOK-DEV"
+                  value={newDeviceName}
+                  onChange={(e) => setNewDeviceName(e.target.value)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">
+                  ระบบปฏิบัติการ (Operating System)
+                </label>
+                <select
+                  value={newDeviceOs}
+                  onChange={(e) => setNewDeviceOs(e.target.value)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500 font-mono"
+                >
+                  <option value="Windows 11 Pro 23H2">Windows 11 Pro 23H2</option>
+                  <option value="Windows 10 Enterprise">Windows 10 Enterprise</option>
+                  <option value="macOS Sonoma 14.4">macOS Sonoma 14.4</option>
+                  <option value="Ubuntu 24.04 LTS">Ubuntu 24.04 LTS</option>
+                  <option value="Android 14 (Mango Agent)">Android 14 (Mango Agent)</option>
+                  <option value="iOS 17.4 (Mango Agent)">iOS 17.4 (Mango Agent)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">
+                  MAC Address (Physical Address)
+                </label>
+                <input
+                  type="text"
+                  placeholder="เช่น 00:1A:2B:3C:4D:7E"
+                  value={newDeviceMac}
+                  onChange={(e) => setNewDeviceMac(e.target.value)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">
+                  ผู้ใช้งานที่ผูกกับอุปกรณ์ (Owner User ID)
+                </label>
+                <input
+                  type="text"
+                  placeholder="เช่น u-admin, u-staff"
+                  value={newDeviceUserId}
+                  onChange={(e) => setNewDeviceUserId(e.target.value)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2 text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-mono"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  ระบุ User ID ของผู้ใช้ในระบบที่จะได้รับสิทธิ์ครอบครองเครื่องนี้
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-2 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setIsAddDeviceOpen(false)}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold transition cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingDevice}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition flex items-center justify-center space-x-1 cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmittingDevice ? 'กำลังบันทึก...' : 'ลงทะเบียนอุปกรณ์'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

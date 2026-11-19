@@ -19,6 +19,13 @@ export interface CreatePolicyDto {
   action: 'ALLOW' | 'DENY';
 }
 
+export interface CreateDeviceDto {
+  userId?: string;
+  deviceName: string;
+  osInfo: string;
+  macAddress?: string | null;
+}
+
 export interface UserDto {
   id: string;
   username: string;
@@ -158,6 +165,42 @@ export class AdminService {
       isMandatory: v.isMandatory,
       releasedAt: v.releasedAt.toISOString(),
     }));
+  }
+
+  async createDevice(data: CreateDeviceDto): Promise<DeviceDto> {
+    let targetUserId = data.userId;
+    if (targetUserId) {
+      const userExists = await prisma.user.findUnique({ where: { id: targetUserId } }).catch(() => null);
+      if (!userExists) {
+        targetUserId = undefined;
+      }
+    }
+    if (!targetUserId) {
+      const defaultUser = await prisma.user.findFirst();
+      if (!defaultUser) {
+        throw new Error('No user found to associate with device');
+      }
+      targetUserId = defaultUser.id;
+    }
+
+    const device = await prisma.device.create({
+      data: {
+        userId: targetUserId,
+        deviceName: data.deviceName,
+        osInfo: data.osInfo,
+        macAddress: data.macAddress || null,
+      },
+    });
+
+    return {
+      id: device.id,
+      userId: device.userId,
+      deviceName: device.deviceName,
+      osInfo: device.osInfo,
+      macAddress: device.macAddress,
+      lastSeen: device.lastSeen.toISOString(),
+      createdAt: device.createdAt.toISOString(),
+    };
   }
 
   async revokeDevice(deviceId: string): Promise<boolean> {

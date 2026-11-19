@@ -1,5 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { AdminService, CreateUserDto, CreatePolicyDto } from './admin.service.js';
+import { AdminService, CreateUserDto, CreatePolicyDto, CreateDeviceDto } from './admin.service.js';
 
 const adminService = new AdminService();
 
@@ -120,6 +120,38 @@ export class AdminController {
       return reply.status(200).send({
         success: true,
         data: policies,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      return reply.status(500).send({
+        success: false,
+        error: { code: 'SERVER_ERROR', message: err.message },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  async createDevice(request: FastifyRequest<{ Body: CreateDeviceDto }>, reply: FastifyReply) {
+    try {
+      const user = (request as any).user;
+      if (user?.role !== 'ADMIN') {
+        return reply.status(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'Admin access required' } });
+      }
+
+      const body = request.body;
+      if (!body?.deviceName || !body?.osInfo) {
+        return reply.status(400).send({
+          success: false,
+          error: { code: 'INVALID_INPUT', message: 'Missing deviceName or osInfo' },
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      const device = await adminService.createDevice(body);
+      return reply.status(201).send({
+        success: true,
+        data: device,
+        message: 'Device created successfully',
         timestamp: new Date().toISOString(),
       });
     } catch (err: any) {
