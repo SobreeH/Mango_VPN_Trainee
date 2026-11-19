@@ -180,17 +180,9 @@ export const LoginForm: React.FC<LoginFormProps> = ({
         </div>
       </form>
 
-      {/* 5. ส่วนล่างสุด: ลิงก์ดาวน์โหลด Agent และติดต่อ Admin */}
+      {/* 5. ส่วนล่างสุด: ช่วยเหลือการเข้าสู่ระบบและติดต่อ Admin */}
       <div className="text-center text-xs text-slate-400 pt-8 pb-2">
-        <span>{t.login.agentNotInstalled}</span>
-        <button
-          type="button"
-          onClick={() => alert(t.login.downloadAgentAlert)}
-          className="text-emerald-400 hover:text-emerald-300 font-medium transition cursor-pointer"
-        >
-          {t.login.downloadAgent}
-        </button>
-        <span className="text-slate-500 mx-1">·</span>
+        <span>{t.login.needHelp}</span>
         <button
           type="button"
           onClick={() => alert(t.login.contactAdminAlert)}

@@ -34,9 +34,7 @@ export interface Translations {
     hidePassword: string;
     passwordHint: string;
     submit: string;
-    agentNotInstalled: string;
-    downloadAgent: string;
-    downloadAgentAlert: string;
+    needHelp: string;
     contactAdmin: string;
     contactAdminAlert: string;
     demoAccountsTitle: string;
@@ -303,9 +301,7 @@ export const translations: Record<Language, Translations> = {
       hidePassword: 'ซ่อน',
       passwordHint: 'อย่างน้อย 8 ตัวอักษร',
       submit: 'เข้าสู่ระบบ',
-      agentNotInstalled: 'ยังไม่ได้ติดตั้ง Agent? ',
-      downloadAgent: 'ดาวน์โหลด',
-      downloadAgentAlert: 'ดาวน์โหลด Agent: กรุณารัน npm run mock:agent บนเครื่องของคุณ',
+      needHelp: 'พบปัญหาในการเข้าสู่ระบบ? ',
       contactAdmin: 'ติดต่อ Admin',
       contactAdminAlert: 'ติดต่อ Admin: admin@mangovpn.internal',
       demoAccountsTitle: 'ข้อมูลบัญชีทดสอบสำหรับนักพัฒนา (Developer Demo)',
@@ -570,9 +566,7 @@ export const translations: Record<Language, Translations> = {
       hidePassword: 'Hide',
       passwordHint: 'At least 8 characters',
       submit: 'Sign In',
-      agentNotInstalled: 'Agent not installed? ',
-      downloadAgent: 'Download',
-      downloadAgentAlert: 'Download Agent: Please run npm run mock:agent on your machine',
+      needHelp: 'Need help signing in? ',
       contactAdmin: 'Contact Admin',
       contactAdminAlert: 'Contact Admin: admin@mangovpn.internal',
       demoAccountsTitle: 'Developer Demo Accounts',
