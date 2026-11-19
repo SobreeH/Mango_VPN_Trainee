@@ -147,10 +147,11 @@ table inet mango_vpn {
 
 ## 5. ข้อตกลงการประสานงานกับ Rain (Collaboration Contract)
 
-1. **โมดูล Admin ของ Rain**:
-   - Rain พัฒนาไฟล์ใน `Rain/admin/src/admin.service.ts` และ `admin.routes.ts`
-   - โค้ด API ของคุณจะดึงผ่าน Dependency `@mango/rain-admin` มาลงทะเบียนใน `Sobree/api/src/server.ts`
-   - **จะไม่มีการเกิด Merge Conflict** เพราะ Rain ไม่จำเป็นต้องแก้ไฟล์ใน `Sobree/api` เลย
+> อ่าน [`../AGENTS.th.md`](../AGENTS.th.md) สำหรับกฎการวางขอบเขตงานของ AI การแก้ไขข้ามโฟลเดอร์ และข้อห้ามเรื่อง Mock หลอกๆ
+
+1. **โมดูล Admin ของ Rain และการทำงานข้ามโฟลเดอร์**:
+   - Rain ดูแลหลักใน `Rain/admin/` และ `Rain/portal/` โดยโค้ด API ของคุณดึงผ่าน Dependency `@mango/rain-admin` มาลงทะเบียนใน `Sobree/api/src/server.ts`
+   - AI ของทั้งสองคนสามารถแก้ไขไฟล์ข้ามระหว่าง `Sobree/`, `Rain/` และ `packages/shared/` บน Feature Branch ได้เมื่อต้องเชื่อมต่อระบบหรือแก้บั๊กให้ครบวงจร โดยต้องรัน `npm run build` ให้ผ่านทั้งโปรเจกต์เสมอ
 2. **การแก้ไขสัญญา API (Contracts)**:
    - หากต้องการเพิ่มหรือแก้ข้อมูลใน Request/Response ให้แก้ไขที่ [`packages/shared/src/contracts.ts`](file:///e:/Trainee/Mango_VPN_Trainee/packages/shared/src/contracts.ts) จากนั้นรัน `npm --workspace=@mango/shared run build` แล้วแจ้ง Rain
 3. **การปรับเปลี่ยน Agent Simulator**:

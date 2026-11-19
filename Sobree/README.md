@@ -147,10 +147,11 @@ When a peer authenticates, the daemon injects granular allow rules matching thei
 
 ## 5. Collaboration Contract with Rain
 
-1. **Rain's Admin Module**:
-   - Rain maintains `Rain/admin/src/admin.service.ts` and `admin.routes.ts`.
-   - Your API imports it via package dependency `@mango/rain-admin` in `Sobree/api/src/server.ts`.
-   - **No merge conflicts occur** because Rain never touches `Sobree/api`!
+> See [`../AGENTS.md`](../AGENTS.md) for the complete AI scoping, cross-boundary editing, and anti-mock protocol.
+
+1. **Rain's Admin Module & Cross-Boundary Work**:
+   - Rain primarily maintains `Rain/admin/` and `Rain/portal/`, and your API imports `@mango/rain-admin` in `Sobree/api/src/server.ts`.
+   - Either developer's AI may edit across `Sobree/`, `Rain/`, and `packages/shared/` on a feature branch when implementing end-to-end integration or security fixes, provided `npm run build` passes across the whole monorepo.
 2. **Contracts**:
    - If an API payload needs to change, update [`packages/shared/src/contracts.ts`](file:///e:/Trainee/Mango_VPN_Trainee/packages/shared/src/contracts.ts), run `npm --workspace=@mango/shared run build`, and notify Rain.
 3. **Mock Agent**:
