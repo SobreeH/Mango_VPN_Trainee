@@ -364,3 +364,23 @@
   - `Rain/portal/src/components/AdminPanel.tsx` *(เพิ่ม UI จัดการ Session Disconnect, Quick Stats, User Status Toggle, Delete User, Policy Edit Modal & Persistence)*
   - `Rain/RULES_AND_WORKLOG.md` *(อัปเดตบันทึกประจำวัน)*
 
+---
+
+### 📅 วันที่: 2026-11-19
+- **Branch**: `feature/rain-fullstack-integration`
+- **Commits**:
+  - `8395479` (`feat(portal): implement audit log detail inspector modal and rich metadata view`)
+- **สิ่งที่ทำ**:
+  1. [ช่วงเช้า] ตรวจสอบ Git Status และดึงโค้ดล่าสุดจากรีโมท จากนั้นแตก Branch ใหม่ `feature/rain-fullstack-integration` เพื่อเริ่มต้นงานตามแผนงานที่ได้รับอนุมัติ
+  2. [ช่วงเช้า] พัฒนาระบบตรวจสอบบันทึกความปลอดภัยเชิงลึก (Audit Log Detail Inspector) ใน `Rain/portal/src/components/AdminPanel.tsx`:
+     - เพิ่มปุ่ม "ดูข้อมูล" (ไอคอน `Eye`) ในตาราง Audit Logs และทำให้สามารถคลิกแต่ละแถวเพื่อเปิด Inspector Modal ได้
+     - ปรับแต่ง Badge แสดง Action แยกตามกลุ่มความปลอดภัย (สีเขียว: Success/Connect, สีส้ม: Update/Modify, สีแดง: Disconnect/Delete)
+     - สร้างหน้าต่าง Modal แสดงข้อมูลสรุปกิจกรรมความปลอดภัย พร้อมอ่านฟิลด์ `metadataJson` มาแจกแจงเป็นตาราง Key-Value ที่อ่านเข้าใจง่าย
+     - เพิ่มฟังก์ชันสลับมุมมอง "ดู Raw JSON" สำหรับผู้ดูแลระบบในการตรวจสอบโครงสร้างข้อมูลดิบ
+     - ปรับปรุงข้อมูลจำลอง `MOCK_LOGS` ให้มี Metadata ด้านความปลอดภัยสมจริงตามการกระทำ CRUD ทั้งหมด
+  3. ทดสอบคอมไพล์ระบบ TypeScript และ Vite (`npm --workspace=@mango/portal run build`) ผ่านฉลุย 100%
+  4. ดำเนินการ Git Commit & Push ขึ้น Branch `feature/rain-fullstack-integration` เรียบร้อย
+- **ไฟล์ที่สร้าง/แก้ไข**:
+  - `Rain/portal/src/components/AdminPanel.tsx` *(เพิ่ม Audit Log Detail Inspector Modal, Eye button, และ metadataJson viewer)*
+  - `Rain/RULES_AND_WORKLOG.md` *(อัปเดตบันทึกประจำวัน)*
+
