@@ -64,6 +64,7 @@ export interface Translations {
       policies: string;
       audit_logs: string;
       agent: string;
+      agentReleases: string;
     };
     signOut: string;
   };
@@ -82,6 +83,10 @@ export interface Translations {
     auditLogsSubtitle: string;
     agentTitle: string;
     agentSubtitle: string;
+    agentAdminTitle: string;
+    agentAdminSubtitle: string;
+    agentUserTitle: string;
+    agentUserSubtitle: string;
   };
   toasts: {
     otpSent: string;
@@ -89,6 +94,8 @@ export interface Translations {
     smsOtpReceived: string;
     invalidOtpCode: string;
     otpResentSuccess: string;
+    checksumCopied: string;
+    urlCopied: string;
     invalidCredentials: string;
     loginSuccessWelcome: string;
     loginSuccessAs: string;
@@ -182,6 +189,21 @@ export interface Translations {
       empty: string;
       mandatory: string;
       download: string;
+      registryTitle: string;
+      latestStable: string;
+      betaRelease: string;
+      mandatoryEnforced: string;
+      optionalRecommended: string;
+      copyDownloadUrl: string;
+      copyChecksum: string;
+      releaseDate: string;
+      checksumSha256: string;
+      downloadUrl: string;
+      userDownloadTitle: string;
+      userDownloadSubtitle: string;
+      downloadInstaller: string;
+      activeHostAgent: string;
+      fleetCoverage: string;
     };
     users: {
       totalCountPrefix: string;
@@ -311,6 +333,7 @@ export const translations: Record<Language, Translations> = {
         policies: 'นโยบาย',
         audit_logs: 'Audit Logs',
         agent: 'Agent',
+        agentReleases: 'คลังเวอร์ชัน Agent',
       },
       signOut: 'ออกจากระบบ',
     },
@@ -329,6 +352,10 @@ export const translations: Record<Language, Translations> = {
       auditLogsSubtitle: 'ประวัติการตรวจสอบย้อนหลังด้านความมั่นคงปลอดภัยสารสนเทศ',
       agentTitle: 'ไคลเอนต์เอเจนต์ (Agent Versions & Releases)',
       agentSubtitle: 'ดาวน์โหลดและตรวจสอบเวอร์ชันของ Mango Windows Agent',
+      agentAdminTitle: 'คลังเวอร์ชันและการจัดการรุ่น (Agent Version & Release Catalog)',
+      agentAdminSubtitle: 'ตรวจสอบเวอร์ชัน Agent ที่พร้อมใช้งาน สถานะความปลอดภัย (SHA256) และนโยบายการอัปเดตเครื่องลูกข่าย',
+      agentUserTitle: 'ดาวน์โหลด Mango Windows Agent (Client Installer)',
+      agentUserSubtitle: 'ดาวน์โหลดและติดตั้งโปรแกรมไคลเอนต์สำหรับเชื่อมต่อ WireGuard VPN บนเครื่องของคุณ',
     },
     toasts: {
       otpSent: 'ส่งรหัสยืนยัน OTP ไปที่ {phone}',
@@ -336,6 +363,8 @@ export const translations: Record<Language, Translations> = {
       smsOtpReceived: '💬 [SMS Gateway] รหัส OTP สำหรับ MANGO VPN คือ: {otp} (หมดอายุใน 5 นาที)',
       invalidOtpCode: 'รหัส OTP ไม่ถูกต้อง กรุณาตรวจสอบรหัสจาก SMS และลองใหม่อีกครั้ง',
       otpResentSuccess: 'ส่งรหัส OTP ชุดใหม่ไปยังเบอร์มือถือของคุณแล้ว',
+      checksumCopied: 'คัดลอกค่า Checksum SHA256 เรียบร้อยแล้ว',
+      urlCopied: 'คัดลอกลิงก์ดาวน์โหลดเรียบร้อยแล้ว',
       invalidCredentials: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง (ลองใช้: admin_user / MangoVPN2026!)',
       loginSuccessWelcome: 'เข้าสู่ระบบสำเร็จ ยินดีต้อนรับ {username} ({role})',
       loginSuccessAs: 'เข้าสู่ระบบสำเร็จในฐานะ {username} ({role})',
@@ -426,9 +455,24 @@ export const translations: Record<Language, Translations> = {
       },
       versions: {
         emptySearch: 'ไม่พบเวอร์ชันที่ตรงกับ "{term}"',
-        empty: 'ไม่มีข้อมูลเวอร์ชัน Agent',
+        empty: 'ไม่มีข้อมูลเวอร์ชัน Agent ในระบบ',
         mandatory: 'Mandatory',
         download: 'Download',
+        registryTitle: 'คลังเวอร์ชัน Mango Windows Agent',
+        latestStable: 'เวอร์ชันเสถียรล่าสุด (Latest Stable)',
+        betaRelease: 'เวอร์ชันทดสอบ (Pre-release / Beta)',
+        mandatoryEnforced: 'บังคับอัปเดต (Mandatory Policy)',
+        optionalRecommended: 'แนะนำให้อัปเดต (Optional)',
+        copyDownloadUrl: 'คัดลอกลิงก์ติดตั้ง',
+        copyChecksum: 'คัดลอก SHA256',
+        releaseDate: 'วันที่ปล่อยอัปเดต',
+        checksumSha256: 'SHA-256 Checksum',
+        downloadUrl: 'Download Endpoint',
+        userDownloadTitle: 'ดาวน์โหลดตัวติดตั้ง Mango VPN สำหรับ Windows',
+        userDownloadSubtitle: 'ติดตั้ง Agent เพื่อเปิดท่ออุโมงค์ WireGuard ในเครื่องของคุณ และเชื่อมต่อกับระบบ VPN อย่างปลอดภัย',
+        downloadInstaller: 'ดาวน์โหลดตัวติดตั้ง (.exe)',
+        activeHostAgent: 'Agent บนเครื่องของคุณ (Local)',
+        fleetCoverage: 'รองรับ Windows 10/11 (x64 Architecture)',
       },
       users: {
         totalCountPrefix: 'ผู้ใช้ในระบบทั้งหมด:',
@@ -556,6 +600,7 @@ export const translations: Record<Language, Translations> = {
         policies: 'Policies',
         audit_logs: 'Audit Logs',
         agent: 'Agent',
+        agentReleases: 'Agent Releases',
       },
       signOut: 'Sign Out',
     },
@@ -574,6 +619,10 @@ export const translations: Record<Language, Translations> = {
       auditLogsSubtitle: 'Information security audit trail and activity history',
       agentTitle: 'Agent Versions & Releases',
       agentSubtitle: 'Download and inspect Mango Windows Agent releases',
+      agentAdminTitle: 'Agent Version & Release Catalog',
+      agentAdminSubtitle: 'Inspect available client agent releases, verify SHA256 integrity, and review fleet update policies',
+      agentUserTitle: 'Download Mango Windows Agent (Client Installer)',
+      agentUserSubtitle: 'Download and install the official client agent to establish secure WireGuard VPN tunnels',
     },
     toasts: {
       otpSent: 'OTP verification code sent to {phone}',
@@ -581,6 +630,8 @@ export const translations: Record<Language, Translations> = {
       smsOtpReceived: '💬 [SMS Gateway] Your MANGO VPN OTP is: {otp} (expires in 5 mins)',
       invalidOtpCode: 'Invalid OTP code. Please check your SMS and try again.',
       otpResentSuccess: 'A new OTP code has been sent to your phone.',
+      checksumCopied: 'SHA-256 Checksum copied to clipboard',
+      urlCopied: 'Download URL copied to clipboard',
       invalidCredentials: 'Invalid username or password (try: admin_user / MangoVPN2026!)',
       loginSuccessWelcome: 'Signed in successfully. Welcome {username} ({role})',
       loginSuccessAs: 'Signed in as {username} ({role})',
@@ -671,9 +722,24 @@ export const translations: Record<Language, Translations> = {
       },
       versions: {
         emptySearch: 'No versions matching "{term}"',
-        empty: 'No agent versions found',
+        empty: 'No agent versions found in registry',
         mandatory: 'Mandatory',
         download: 'Download',
+        registryTitle: 'Mango Windows Agent Version Registry',
+        latestStable: 'Latest Stable Release',
+        betaRelease: 'Pre-release / Beta',
+        mandatoryEnforced: 'Mandatory Policy Enforced',
+        optionalRecommended: 'Optional Recommendation',
+        copyDownloadUrl: 'Copy Installer URL',
+        copyChecksum: 'Copy SHA256',
+        releaseDate: 'Release Date',
+        checksumSha256: 'SHA-256 Checksum',
+        downloadUrl: 'Download Endpoint',
+        userDownloadTitle: 'Download Mango VPN Agent for Windows',
+        userDownloadSubtitle: 'Install the official client to start encrypted WireGuard tunnels and securely access private network resources.',
+        downloadInstaller: 'Download Installer (.exe)',
+        activeHostAgent: 'Host Agent Status (Local)',
+        fleetCoverage: 'Compatible with Windows 10/11 (x64)',
       },
       users: {
         totalCountPrefix: 'Total users:',

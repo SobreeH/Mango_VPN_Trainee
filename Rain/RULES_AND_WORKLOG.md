@@ -381,6 +381,15 @@
      - ปรับปรุง `Sidebar.tsx` และ `VpnDashboard.tsx`: เสริมความชัดเจนของแนวคิด Zero-Trust โดยระบุป้ายสิทธิ์การเข้าถึง (Restricted Web Portal vs Corporate Subnets vs Full Access) ของ Client, Staff, และ Admin ไว้อย่างชัดเจนทั้งบนแถบข้าง แผนภาพอุโมงค์ และกล่อง Allowed Networks
   3. ตรวจสอบความถูกต้องและทดสอบคอมไพล์ผ่าน 100%:
      - `npm --workspace=@mango/portal run build` (ผ่านฉลุย ไม่มี Error)
+  4. จัดระเบียบฝั่ง Admin และปรับโฉมหน้า Agent ให้เป็น Version Registry & Release Management:
+     - รับฟังฟีดแบค: แอดมินคือผู้บริหารจัดการระบบเครือข่าย ไม่ควรมีปุ่มดาวน์โหลด Agent สีส้มเหมือน End-user แต่ต้องเป็นหน้าจอตรวจสอบเวอร์ชัน (Version Registry & Monitoring)
+     - อัปเดต `translations.ts` เพิ่มคำศัพท์สำหรับ Agent Releases, Checksum Copy, URL Copy ทั้งไทยและอังกฤษ
+     - ปรับปรุง `Sidebar.tsx`: เปลี่ยนชื่อเมนูสำหรับ Admin เป็น `คลังเวอร์ชัน Agent` พร้อมไอคอน `Package`
+     - ปรับปรุง `App.tsx`: แยกหัวข้อหน้าเพจตาม Role ระหว่าง "คลังเวอร์ชันและการจัดการรุ่น (Agent Version & Release Catalog)" ของ Admin และ "ดาวน์โหลด Mango Windows Agent" ของ User
+     - ปรับปรุง `AdminPanel.tsx`:
+       - สำหรับ Admin: แสดง Dashboard Release Registry มีการ์ดสรุปภาพรวม (Latest Stable `v1.0.0`, Beta `v1.1.0-beta`, Mandatory Policies), ตารางรายละเอียดเวอร์ชันพร้อมปุ่ม Copy SHA256 และ Copy Download URL ตัดปุ่ม Download สีส้มแบบ End-user ออก 100%
+       - สำหรับ Staff / Client: แสดงกล่องดาวน์โหลดตัวติดตั้ง Mango VPN Windows Agent อย่างสวยงามและใช้งานง่าย
+     - ทดสอบการคอมไพล์ผ่าน TypeScript และ Vite Build 100%
 - **ไฟล์ที่สร้าง/แก้ไข**:
   - `Rain/portal/src/i18n/translations.ts`
   - `Rain/portal/src/components/LoginForm.tsx`
@@ -388,6 +397,7 @@
   - `Rain/portal/src/App.tsx`
   - `Rain/portal/src/components/Sidebar.tsx`
   - `Rain/portal/src/components/VpnDashboard.tsx`
+  - `Rain/portal/src/components/AdminPanel.tsx`
   - `Rain/RULES_AND_WORKLOG.md`
 
 

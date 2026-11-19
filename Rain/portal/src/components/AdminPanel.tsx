@@ -20,6 +20,9 @@ import {
   UserCheck,
   UserX,
   Pencil,
+  Copy,
+  Check,
+  Package,
 } from 'lucide-react';
 import {
   DeviceDto,
@@ -130,10 +133,18 @@ const MOCK_LOGS: AuditLogDto[] = [
 const MOCK_VERSIONS: AgentVersionDto[] = [
   {
     id: 'ver-001',
-    versionString: '1.0.0-mock',
-    downloadUrl: 'http://127.0.0.1:47821/health',
+    versionString: '1.0.0',
+    downloadUrl: 'https://downloads.mangovpn.internal/agents/mango-vpn-agent-windows-amd64.exe',
     checksumSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
     isMandatory: true,
+    releasedAt: new Date(Date.now() - 86400000 * 7).toISOString(),
+  },
+  {
+    id: 'ver-002',
+    versionString: '1.1.0-beta',
+    downloadUrl: 'https://downloads.mangovpn.internal/agents/mango-vpn-agent-windows-amd64-v1.1.0-beta.exe',
+    checksumSha256: 'a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0',
+    isMandatory: false,
     releasedAt: new Date().toISOString(),
   },
 ];
@@ -685,6 +696,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [copiedText, setCopiedText] = useState<string | null>(null);
+
+  const handleCopyText = async (text: string, type: 'checksum' | 'url') => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedText(text);
+      if (type === 'checksum') {
+        onShowToast?.(t.toasts.checksumCopied, 'success');
+      } else {
+        onShowToast?.(t.toasts.urlCopied, 'success');
+      }
+      setTimeout(() => setCopiedText(null), 2000);
+    } catch {
+      onShowToast?.('Failed to copy', 'error');
+    }
+  };
 
   // 1. Query Devices
   const {
@@ -1249,51 +1276,253 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               );
             })()}
 
-            {/* TAB 4: Agent Releases */}
+            {/* TAB 4: Agent Releases / Version Registry */}
             {activeTab === 'versions' && (() => {
               const baseVersions = agentVersions.length > 0 ? agentVersions : MOCK_VERSIONS;
               const visibleVersions = baseVersions.filter((v) => {
                 if (!searchTerm.trim()) return true;
-                return v.versionString.toLowerCase().includes(searchTerm.toLowerCase());
+                return (
+                  v.versionString.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  v.checksumSha256.toLowerCase().includes(searchTerm.toLowerCase())
+                );
               });
-              return visibleVersions.length === 0 ? (
-                <div className="text-center py-12 text-slate-500 text-xs">
-                  {searchTerm
-                    ? formatMessage(t.admin.versions.emptySearch, { term: searchTerm })
-                    : t.admin.versions.empty}
-                </div>
-              ) : (
-                <div className="p-3 space-y-2">
-                  {visibleVersions.map((v) => (
-                    <div
-                      key={v.id}
-                      className="p-3 rounded-lg bg-slate-900/60 border border-slate-800 flex items-center justify-between text-xs"
-                    >
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <span className="font-bold text-white">v{v.versionString}</span>
-                          {v.isMandatory && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-950/60 text-rose-400 border border-rose-800">
-                              Mandatory
-                            </span>
-                          )}
+
+              if (visibleVersions.length === 0) {
+                return (
+                  <div className="text-center py-12 text-slate-500 text-xs">
+                    {searchTerm
+                      ? formatMessage(t.admin.versions.emptySearch, { term: searchTerm })
+                      : t.admin.versions.empty}
+                  </div>
+                );
+              }
+
+              // ===============================================================
+              // 1. มุมมองสำหรับ ADMIN: คลังเวอร์ชันระบบ (Agent Version Registry)
+              // ===============================================================
+              if (userRole === 'ADMIN') {
+                const latestStable = baseVersions.find((v) => !v.versionString.includes('beta')) || baseVersions[0];
+                const latestBeta = baseVersions.find((v) => v.versionString.includes('beta'));
+                const mandatoryCount = baseVersions.filter((v) => v.isMandatory).length;
+
+                return (
+                  <div className="p-4 space-y-4">
+                    {/* การ์ดสรุปภาพรวมเวอร์ชัน (Fleet Version Overview) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {/* กล่อง 1: เวอร์ชันเสถียรล่าสุด */}
+                      <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                        <div className="text-[11px] font-mono text-slate-400">
+                          {t.admin.versions.latestStable}
                         </div>
-                        <p className="text-[11px] text-slate-500 font-mono mt-0.5">
-                          SHA256: {v.checksumSha256.substring(0, 16)}...
+                        <div className="flex items-center space-x-2">
+                          <span className="text-lg font-bold font-mono text-emerald-400">
+                            v{latestStable.versionString}
+                          </span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 font-semibold">
+                            STABLE
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-500">
+                          {t.admin.versions.fleetCoverage}
                         </p>
                       </div>
 
+                      {/* กล่อง 2: เวอร์ชันทดสอบ (Beta / Pre-release) */}
+                      <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                        <div className="text-[11px] font-mono text-slate-400">
+                          {t.admin.versions.betaRelease}
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-lg font-bold font-mono text-sky-400">
+                            v{latestBeta ? latestBeta.versionString : 'None'}
+                          </span>
+                          {latestBeta && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-950/80 text-sky-400 border border-sky-800/60 font-semibold">
+                              BETA
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-slate-500">
+                          {latestBeta ? 'For internal testing' : 'All systems on stable'}
+                        </p>
+                      </div>
+
+                      {/* กล่อง 3: นโยบายบังคับอัปเดต */}
+                      <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                        <div className="text-[11px] font-mono text-slate-400">
+                          {t.admin.versions.mandatoryEnforced}
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-lg font-bold font-mono text-rose-400">
+                            {mandatoryCount}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {t.admin.stats.policiesUnit}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-500">
+                          Clients below requirement will be blocked
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* รายการคลังเวอร์ชัน (Release Registry List) */}
+                    <div className="space-y-3 pt-1">
+                      <div className="text-xs font-semibold text-slate-300 flex items-center space-x-2">
+                        <Package className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>{t.admin.versions.registryTitle}</span>
+                      </div>
+
+                      {visibleVersions.map((v) => {
+                        const isBeta = v.versionString.includes('beta');
+                        const isChecksumCopied = copiedText === v.checksumSha256;
+                        const isUrlCopied = copiedText === v.downloadUrl;
+
+                        return (
+                          <div
+                            key={v.id}
+                            className="p-4 rounded-xl bg-[#070e0a] border border-slate-800/90 shadow-md space-y-3 text-xs"
+                          >
+                            {/* แถวบน: เวอร์ชัน, Badges และวันที่ปล่อย */}
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/60 pb-2.5">
+                              <div className="flex items-center space-x-2.5">
+                                <span className="text-base font-bold font-mono text-white">
+                                  v{v.versionString}
+                                </span>
+
+                                <span
+                                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                                    isBeta
+                                      ? 'bg-sky-950/60 text-sky-400 border-sky-800/60'
+                                      : 'bg-emerald-950/60 text-emerald-400 border-emerald-800/60'
+                                  }`}
+                                >
+                                  {isBeta ? t.admin.versions.betaRelease : t.admin.versions.latestStable}
+                                </span>
+
+                                {v.isMandatory ? (
+                                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-rose-950/60 text-rose-400 border border-rose-800/60">
+                                    {t.admin.versions.mandatoryEnforced}
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-900 text-slate-400 border border-slate-800">
+                                    {t.admin.versions.optionalRecommended}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="text-[11px] text-slate-500 font-mono">
+                                {t.admin.versions.releaseDate}:{' '}
+                                <span className="text-slate-400">
+                                  {new Date(v.releasedAt).toLocaleDateString()}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* แถวล่าง 2 คอลัมน์: Checksum SHA256 & Asset Endpoint */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-0.5">
+                              {/* กล่อง SHA-256 */}
+                              <div className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/80 space-y-1">
+                                <div className="text-[10px] font-mono text-slate-500 uppercase flex items-center justify-between">
+                                  <span>{t.admin.versions.checksumSha256}</span>
+                                  <button
+                                    onClick={() => handleCopyText(v.checksumSha256, 'checksum')}
+                                    className="text-[10px] text-emerald-400 hover:text-emerald-300 font-sans flex items-center space-x-1 cursor-pointer transition"
+                                  >
+                                    {isChecksumCopied ? (
+                                      <>
+                                        <Check className="w-3 h-3 text-emerald-400" />
+                                        <span>Copied</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Copy className="w-3 h-3" />
+                                        <span>{t.admin.versions.copyChecksum}</span>
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                                <div className="font-mono text-[11px] text-slate-300 break-all select-all">
+                                  {v.checksumSha256}
+                                </div>
+                              </div>
+
+                              {/* กล่อง Download URL */}
+                              <div className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/80 space-y-1">
+                                <div className="text-[10px] font-mono text-slate-500 uppercase flex items-center justify-between">
+                                  <span>{t.admin.versions.downloadUrl}</span>
+                                  <button
+                                    onClick={() => handleCopyText(v.downloadUrl, 'url')}
+                                    className="text-[10px] text-emerald-400 hover:text-emerald-300 font-sans flex items-center space-x-1 cursor-pointer transition"
+                                  >
+                                    {isUrlCopied ? (
+                                      <>
+                                        <Check className="w-3 h-3 text-emerald-400" />
+                                        <span>Copied</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Copy className="w-3 h-3" />
+                                        <span>{t.admin.versions.copyDownloadUrl}</span>
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                                <div className="font-mono text-[11px] text-slate-300 break-all select-all">
+                                  {v.downloadUrl}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              }
+
+              // ===============================================================
+              // 2. มุมมองสำหรับ STAFF / CLIENT: หน้าดาวน์โหลดตัวติดตั้งสำหรับผู้ใช้
+              // ===============================================================
+              const primaryRelease = baseVersions[0];
+
+              return (
+                <div className="p-6 space-y-6 max-w-2xl mx-auto">
+                  <div className="bg-[#070e0a] border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4 text-center">
+                    <div className="w-12 h-12 mx-auto rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-lg shadow-emerald-950/40">
+                      <Download className="w-6 h-6" />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <h3 className="text-lg font-bold text-white tracking-wide">
+                        {t.admin.versions.userDownloadTitle}
+                      </h3>
+                      <p className="text-xs text-slate-400 leading-relaxed max-w-md mx-auto">
+                        {t.admin.versions.userDownloadSubtitle}
+                      </p>
+                    </div>
+
+                    <div className="pt-2">
                       <a
-                        href={v.downloadUrl}
+                        href={primaryRelease.downloadUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold transition text-xs"
+                        className="inline-flex items-center space-x-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm transition shadow-lg shadow-emerald-950/50 cursor-pointer"
                       >
-                        <Download className="w-3.5 h-3.5" />
-                        <span>Download</span>
+                        <Download className="w-4 h-4" />
+                        <span>
+                          {t.admin.versions.downloadInstaller} (v{primaryRelease.versionString})
+                        </span>
                       </a>
                     </div>
-                  ))}
+
+                    <div className="pt-2 text-[11px] font-mono text-slate-500 space-y-1">
+                      <div>{t.admin.versions.fleetCoverage}</div>
+                      <div>
+                        SHA256: <span className="text-slate-400">{primaryRelease.checksumSha256.substring(0, 16)}...</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               );
             })()}

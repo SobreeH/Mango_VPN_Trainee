@@ -8,6 +8,7 @@ import {
   Shield,
   User,
   AlignLeft,
+  Package,
 } from 'lucide-react';
 import { RoleName } from '@mango/shared';
 import { useI18n } from '../i18n/I18nContext';
@@ -45,7 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   let navItems: { id: NavTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [];
 
   if (user.role === 'ADMIN') {
-    // ฝั่ง ADMIN: มีครบทั้ง 7 เมนู
+    // ฝั่ง ADMIN: มีครบทั้ง 7 เมนู (Agent แสดงเป็น Package Registry)
     navItems = [
       { id: 'connect', label: t.sidebar.nav.connect, icon: ShieldCheck },
       { id: 'history', label: t.sidebar.nav.history, icon: Clock },
@@ -53,7 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       { id: 'users', label: t.sidebar.nav.users, icon: User },
       { id: 'policies', label: t.sidebar.nav.policies, icon: Shield },
       { id: 'audit_logs', label: t.sidebar.nav.audit_logs, icon: AlignLeft },
-      { id: 'agent', label: t.sidebar.nav.agent, icon: Download },
+      { id: 'agent', label: t.sidebar.nav.agentReleases, icon: Package },
     ];
   } else if (user.role === 'STAFF') {
     // ฝั่ง STAFF: 4 เมนู

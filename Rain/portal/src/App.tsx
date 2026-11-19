@@ -599,10 +599,14 @@ export default function App() {
               <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                 <div>
                   <h2 className="text-xl font-bold text-white tracking-wide">
-                    {t.pages.agentTitle}
+                    {authData.user.role === 'ADMIN'
+                      ? t.pages.agentAdminTitle
+                      : t.pages.agentUserTitle}
                   </h2>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    {t.pages.agentSubtitle}
+                    {authData.user.role === 'ADMIN'
+                      ? t.pages.agentAdminSubtitle
+                      : t.pages.agentUserSubtitle}
                   </p>
                 </div>
                 <button
