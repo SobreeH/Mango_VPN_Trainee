@@ -128,6 +128,20 @@ export interface Translations {
     roleClientLabel: string;
     roleStaffLabel: string;
     roleAdminLabel: string;
+    targetEnvironment: string;
+    selectGateway: string;
+    gatewayStatusOnline: string;
+    currentConnectedTo: string;
+    gateways: {
+      hqTitle: string;
+      hqDesc: string;
+      cloudTitle: string;
+      cloudDesc: string;
+      devTitle: string;
+      devDesc: string;
+      egressTitle: string;
+      egressDesc: string;
+    };
   };
   admin: {
     stats: {
@@ -395,6 +409,20 @@ export const translations: Record<Language, Translations> = {
       roleClientLabel: 'CLIENT · RESTRICTED',
       roleStaffLabel: 'STAFF · CORPORATE SUBNET',
       roleAdminLabel: 'ADMIN · FULL INFRASTRUCTURE',
+      targetEnvironment: 'สภาพแวดล้อมเกตเวย์เป้าหมาย (Target Gateway)',
+      selectGateway: 'เลือก Gateway สำหรับเชื่อมต่อ',
+      gatewayStatusOnline: 'พร้อมใช้งาน',
+      currentConnectedTo: 'เชื่อมต่อไปยัง:',
+      gateways: {
+        hqTitle: 'HQ Datacenter (ศูนย์ข้อมูลหลัก)',
+        hqDesc: 'เซิร์ฟเวอร์ On-Premises, Storage & LDAP (10.0.0.0/8)',
+        cloudTitle: 'Cloud Production VPC (คลาวด์)',
+        cloudDesc: 'AWS/GCP Production Clusters & DB (172.16.0.0/12)',
+        devTitle: 'DevOps & Staging Lab (ทดสอบ)',
+        devDesc: 'Kubernetes Dev, CI/CD & Sandbox (192.168.0.0/16)',
+        egressTitle: 'Global Internet Egress (ออกเน็ตปลอดภัย)',
+        egressDesc: 'เข้ารหัสทุกทราฟฟิกอินเทอร์เน็ต Full Tunnel (0.0.0.0/0)',
+      },
     },
     admin: {
       stats: {
@@ -660,6 +688,20 @@ export const translations: Record<Language, Translations> = {
       roleClientLabel: 'CLIENT · RESTRICTED',
       roleStaffLabel: 'STAFF · CORPORATE SUBNET',
       roleAdminLabel: 'ADMIN · FULL INFRASTRUCTURE',
+      targetEnvironment: 'Target Gateway Environment',
+      selectGateway: 'Select Gateway to Connect',
+      gatewayStatusOnline: 'Online',
+      currentConnectedTo: 'Connected to:',
+      gateways: {
+        hqTitle: 'HQ Datacenter (Core Servers)',
+        hqDesc: 'On-Premises Core, Storage & LDAP (10.0.0.0/8)',
+        cloudTitle: 'Cloud Production VPC (Cloud)',
+        cloudDesc: 'AWS/GCP Production Clusters & DB (172.16.0.0/12)',
+        devTitle: 'DevOps & Staging Lab (Dev/Test)',
+        devDesc: 'Kubernetes Dev, CI/CD & Sandbox (192.168.0.0/16)',
+        egressTitle: 'Global Internet Egress (Full Tunnel)',
+        egressDesc: 'Encrypt all internet traffic Full Tunnel (0.0.0.0/0)',
+      },
     },
     admin: {
       stats: {

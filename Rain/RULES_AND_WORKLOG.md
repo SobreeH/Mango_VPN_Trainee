@@ -412,7 +412,24 @@
      - ปรับข้อความส่วนท้ายของแบบฟอร์มให้สะอาดและตรงเป้าหมาย: 'พบปัญหาในการเข้าสู่ระบบ? ติดต่อ Admin' (แสดงช่องทางติดต่อแอดมินเครือข่ายเมื่อต้องการความช่วยเหลือ)
      - ใน `translations.ts`: ลบคีย์ที่ไม่จำเป็น (`agentNotInstalled`, `downloadAgent`, `downloadAgentAlert`) และเพิ่มคีย์ `needHelp` ทั้งภาษาไทยและอังกฤษ
      - ทดสอบการคอมไพล์ผ่าน TypeScript และ Vite Build 100%
+  10. พัฒนาระบบเชื่อมต่อหลายเป้าหมาย (Multi-Gateway Environment Connections) สำหรับบทบาท Admin:
+      - นำคำแนะนำด้านสถาปัตยกรรมของระบบเครือข่ายจากเพื่อน (Sobree) มาปรับใช้จริง: บทบาททั่วไป (Staff/Client) จะถูกจำกัดปลายทางตายตัวตามนโยบาย Least-Privilege แต่ Admin มีสิทธิ์ Full Infrastructure จึงควรสามารถเลือกเชื่อมต่อไปยัง Gateway หรือสภาพแวดล้อมที่ต้องการดูแลได้หลากหลาย
+      - สร้างโมเดล `types/gateway.ts` กำหนดข้อมูลเกตเวย์ 4 สภาพแวดล้อมหลัก:
+        1. HQ Datacenter (10.0.0.0/8) -> vpn-hq.mangovpn.internal:51820
+        2. Cloud Production VPC (172.16.0.0/12) -> vpn-cloud.mangovpn.internal:51820
+        3. DevOps & Staging Lab (192.168.0.0/16) -> vpn-dev.mangovpn.internal:51820
+        4. Global Internet Egress (0.0.0.0/0) -> vpn.mangovpn.internal:51820
+      - อัปเดต `translations.ts` รองรับคำแปลชื่อและคำอธิบายเกตเวย์ทั้งภาษาไทยและอังกฤษ
+      - ปรับปรุง `VpnDashboard.tsx`:
+        - สำหรับ Admin: แสดงแผงการ์ดเลือก Gateway 4 สภาพแวดล้อม (Target Gateway Environment Selector)
+        - ปรับแผนภาพ Secure Tunnel Card ให้เปลี่ยนไอคอน ชื่อปลายทาง และ Subnet ตาม Gateway ที่เลือกแบบไดนามิก
+        - อัปเดต Endpoint และ VPN IP ตาม Gateway ที่เชื่อมต่อ
+        - เพิ่มแผงแสดงรายการ Internal Services ที่ Admin สามารถเข้าถึงได้ในแต่ละ Gateway
+        - สำหรับ Staff และ Client: คงโครงสร้างหน้าจอจำกัดสิทธิ์ Least-Privilege ตามเดิม ไม่แสดงแผงเลือก Gateway ของ Admin
+      - ทดสอบการคอมไพล์ผ่าน TypeScript และ Vite Build 100%
 - **ไฟล์ที่สร้าง/แก้ไข**:
+  - `Rain/portal/src/types/gateway.ts`
+
 
   - `Rain/portal/src/i18n/translations.ts`
   - `Rain/portal/src/components/LoginForm.tsx`

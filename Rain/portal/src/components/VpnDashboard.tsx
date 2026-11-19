@@ -7,11 +7,16 @@ import {
   Check,
   RefreshCw,
   Moon,
+  Cloud,
+  FlaskConical,
+  Globe,
+  Layers,
 } from 'lucide-react';
 import { RoleName } from '@mango/shared';
 import { useI18n } from '../i18n/I18nContext';
 import { formatMessage } from '../i18n/translations';
 import { LanguageSwitcher } from './LanguageSwitcher';
+import { ADMIN_GATEWAYS, GatewayTarget } from '../types/gateway';
 
 // =========================================================================
 // 1. Props Interface
@@ -53,6 +58,25 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
 
   // สลับไอคอนติ๊กถูกเมื่อกดคัดลอก IP
   const [copiedIp, setCopiedIp] = useState(false);
+
+  // สภาพแวดล้อมเกตเวย์เป้าหมายสำหรับ Admin (ค่าเริ่มต้น: Global Internet Egress)
+  const [selectedGatewayId, setSelectedGatewayId] = useState<string>('gw-egress');
+  const selectedGateway: GatewayTarget =
+    ADMIN_GATEWAYS.find((g) => g.id === selectedGatewayId) || ADMIN_GATEWAYS[3];
+
+  const renderGatewayIcon = (icon: 'building' | 'cloud' | 'flask' | 'globe', className: string) => {
+    switch (icon) {
+      case 'cloud':
+        return <Cloud className={className} />;
+      case 'flask':
+        return <FlaskConical className={className} />;
+      case 'globe':
+        return <Globe className={className} />;
+      case 'building':
+      default:
+        return <Building2 className={className} />;
+    }
+  };
 
   // ตัวนับเวลาการเชื่อมต่อ (Connected Duration Timer: HH:MM:SS)
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -154,10 +178,82 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
         </span>
       </div>
 
+      {/* 2.1 แผงเลือกสภาพแวดล้อมเกตเวย์ (Multi-Gateway Environment Selector สำหรับ ADMIN) */}
+      {user.role === 'ADMIN' && (
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between">
+            <div className="text-[11px] font-mono tracking-wider text-emerald-400 font-semibold uppercase flex items-center space-x-1.5">
+              <Layers className="w-3.5 h-3.5" />
+              <span>{t.dashboard.targetEnvironment}</span>
+            </div>
+            <span className="text-[10px] text-slate-500 font-mono">
+              {isConnected
+                ? `${t.dashboard.currentConnectedTo} ${t.dashboard.gateways[selectedGateway.nameKey]}`
+                : t.dashboard.selectGateway}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+            {ADMIN_GATEWAYS.map((gw) => {
+              const isSelected = selectedGatewayId === gw.id;
+              return (
+                <button
+                  key={gw.id}
+                  type="button"
+                  onClick={() => !loading && setSelectedGatewayId(gw.id)}
+                  disabled={loading}
+                  className={`text-left p-3 rounded-xl border transition-all cursor-pointer relative overflow-hidden ${
+                    isSelected
+                      ? 'bg-emerald-950/40 border-emerald-500 shadow-md shadow-emerald-950/40 ring-1 ring-emerald-500/50'
+                      : 'bg-[#080d0a] border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/40 text-slate-400'
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-200">
+                      {renderGatewayIcon(gw.icon, `w-4 h-4 ${isSelected ? 'text-emerald-400' : 'text-slate-400'}`)}
+                    </div>
+                    <span
+                      className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${
+                        isSelected
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-semibold'
+                          : 'bg-slate-900 text-slate-500 border-slate-800'
+                      }`}
+                    >
+                      {gw.subnet}
+                    </span>
+                  </div>
+
+                  <div className="mt-2">
+                    <div className={`text-xs font-semibold ${isSelected ? 'text-white' : 'text-slate-300'}`}>
+                      {t.dashboard.gateways[gw.nameKey]}
+                    </div>
+                    <p className="text-[10px] text-slate-500 line-clamp-2 mt-0.5 leading-snug">
+                      {t.dashboard.gateways[gw.descKey]}
+                    </p>
+                  </div>
+
+                  {isSelected && (
+                    <div className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* 3. การ์ดแผนภาพอุโมงค์ VPN (Secure Tunnel Diagram Card) */}
       <div className="bg-[#0b100d] border border-slate-800/90 rounded-2xl p-6 shadow-xl space-y-6">
-        <div className="text-[10px] font-mono tracking-widest text-emerald-400 font-semibold uppercase">
-          SECURE TUNNEL · ENCRYPTED
+        <div className="flex items-center justify-between">
+          <div className="text-[10px] font-mono tracking-widest text-emerald-400 font-semibold uppercase">
+            SECURE TUNNEL · ENCRYPTED
+          </div>
+          {user.role === 'ADMIN' && (
+            <div className="text-[10px] font-mono text-emerald-400 flex items-center space-x-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>{t.dashboard.gateways[selectedGateway.nameKey]}</span>
+            </div>
+          )}
         </div>
 
         {/* แผนภาพเชื่อมต่อระหว่างเครื่องและเน็ตเวิร์ก */}
@@ -190,18 +286,31 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
             </div>
           </div>
 
-          {/* ฝั่งขวา: Private Network ตามสิทธิ์ของ Role */}
-          <div className="flex flex-col items-center space-y-2 z-10">
+          {/* ฝั่งขวา: Private Network หรือ Gateway ที่เลือก */}
+          <div className="flex flex-col items-center space-y-2 z-10 max-w-[170px] text-center">
             <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-200">
-              <Building2 className="w-6 h-6" />
+              {user.role === 'ADMIN' ? (
+                renderGatewayIcon(selectedGateway.icon, `w-6 h-6 ${isConnected ? 'text-emerald-400' : 'text-slate-300'}`)
+              ) : (
+                <Building2 className="w-6 h-6" />
+              )}
             </div>
-            <span className="text-xs text-slate-400 font-medium text-center">
-              {user.role === 'CLIENT'
-                ? 'Web Portal (10.13.13.100)'
-                : user.role === 'STAFF'
-                ? 'Office Subnets (10.0.0.0/8)'
-                : t.dashboard.privateNetwork}
-            </span>
+            <div className="space-y-0.5">
+              <div className="text-xs text-slate-300 font-medium leading-tight">
+                {user.role === 'CLIENT'
+                  ? 'Web Portal'
+                  : user.role === 'STAFF'
+                  ? 'Office Subnets'
+                  : t.dashboard.gateways[selectedGateway.nameKey]}
+              </div>
+              <div className="text-[10px] font-mono text-emerald-400/80">
+                {user.role === 'CLIENT'
+                  ? '10.13.13.100'
+                  : user.role === 'STAFF'
+                  ? '10.0.0.0/8'
+                  : selectedGateway.subnet}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -228,7 +337,9 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
 
           <div className="text-xs text-slate-400 font-mono">
             WireGuard · endpoint{' '}
-            <span className="text-slate-300">vpn.mangovpn.internal:51820</span>
+            <span className="text-slate-300 font-semibold">
+              {user.role === 'ADMIN' ? selectedGateway.endpoint : 'vpn.mangovpn.internal:51820'}
+            </span>
           </div>
         </div>
       </div>
@@ -240,7 +351,13 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
           <div className="text-[11px] text-slate-400 font-medium">VPN IP</div>
           <div className="flex items-center justify-between">
             <span className="font-mono text-sm md:text-base font-bold text-white">
-              {assignedIp ? `${assignedIp}/32` : isConnected ? '10.13.13.45/32' : t.dashboard.notAssigned}
+              {assignedIp
+                ? `${assignedIp}/32`
+                : isConnected
+                ? user.role === 'ADMIN'
+                  ? selectedGateway.defaultIp
+                  : '10.13.13.45/32'
+                : t.dashboard.notAssigned}
             </span>
             {(assignedIp || isConnected) && (
               <button
@@ -318,7 +435,7 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
           </div>
         </div>
 
-        {/* คอลัมน์ขวา: เครือข่ายที่เข้าถึงได้ & Public Key */}
+        {/* คอลัมน์ขวา: เครือข่ายที่เข้าถึงได้, บริการภายใน & Public Key */}
         <div className="bg-[#080d0a] border border-slate-800/80 rounded-xl p-4 space-y-4 text-xs">
           <div>
             <div className="text-emerald-400 font-semibold text-xs mb-1.5 flex items-center justify-between">
@@ -328,17 +445,39 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
                   ? t.dashboard.accessRestricted
                   : user.role === 'STAFF'
                   ? t.dashboard.accessCorporate
-                  : t.dashboard.accessFull}
+                  : `${t.dashboard.accessFull} · ${t.dashboard.gateways[selectedGateway.nameKey]}`}
               </span>
             </div>
-            <div className="font-mono text-slate-300 text-xs tracking-wide bg-slate-950/60 p-2 rounded-lg border border-slate-800/80">
+            <div className="font-mono text-slate-300 text-xs tracking-wide bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80">
               {user.role === 'CLIENT'
                 ? '10.13.13.100/32 : 80, 443'
                 : user.role === 'STAFF'
                 ? '10.0.0.0/8, 172.16.0.0/12'
-                : t.dashboard.allNetworks}
+                : `${selectedGateway.subnet} (${t.dashboard.gateways[selectedGateway.nameKey]})`}
             </div>
           </div>
+
+          {/* รายการบริการภายใน (Internal Services) สำหรับ Admin */}
+          {user.role === 'ADMIN' && (
+            <div className="pt-2 border-t border-slate-800/60 space-y-1.5">
+              <div className="text-[10px] font-mono tracking-wider text-slate-400 uppercase font-semibold">
+                INTERNAL SERVICES ({selectedGateway.internalServices.length})
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                {selectedGateway.internalServices.map((srv, idx) => (
+                  <div
+                    key={idx}
+                    className="p-1.5 rounded bg-slate-900/60 border border-slate-800/60 text-[10px] flex items-center justify-between"
+                  >
+                    <span className="text-slate-300 font-medium truncate">{srv.name}</span>
+                    <span className="text-emerald-400 font-mono text-[9px] shrink-0 ml-1">
+                      :{srv.port}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="pt-2 border-t border-slate-800/60">
             <div className="text-[10px] font-mono tracking-wider text-emerald-400 uppercase font-semibold mb-1">
