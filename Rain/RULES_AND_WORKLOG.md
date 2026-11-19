@@ -390,6 +390,10 @@
        - สำหรับ Admin: แสดง Dashboard Release Registry มีการ์ดสรุปภาพรวม (Latest Stable `v1.0.0`, Beta `v1.1.0-beta`, Mandatory Policies), ตารางรายละเอียดเวอร์ชันพร้อมปุ่ม Copy SHA256 และ Copy Download URL ตัดปุ่ม Download สีส้มแบบ End-user ออก 100%
        - สำหรับ Staff / Client: แสดงกล่องดาวน์โหลดตัวติดตั้ง Mango VPN Windows Agent อย่างสวยงามและใช้งานง่าย
      - ทดสอบการคอมไพล์ผ่าน TypeScript และ Vite Build 100%
+  5. ปรับปรุงหน้า Login นำบัญชีทดสอบ Staff และ Client ออกตามสถาปัตยกรรมแยกลิงก์ของทีม:
+     - ปรับ `LoginForm.tsx`: ตัดปุ่ม `staff_user` และ `client_user` ออกจากกล่องพับ Demo คงไว้เฉพาะบัญชี `admin_user`
+     - ปรับ `App.tsx`: เปลี่ยนค่าเริ่มต้นของ State `username` จาก `staff_user` เป็น `admin_user`
+     - ทดสอบการคอมไพล์ผ่าน 100%
 - **ไฟล์ที่สร้าง/แก้ไข**:
   - `Rain/portal/src/i18n/translations.ts`
   - `Rain/portal/src/components/LoginForm.tsx`

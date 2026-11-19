@@ -4,7 +4,6 @@ import {
   RefreshCw,
   AlertCircle,
   Crown,
-  UserCheck,
   ChevronDown,
 } from 'lucide-react';
 import { createLoginSchema } from '../schemas/auth.schema';
@@ -217,44 +216,18 @@ export const LoginForm: React.FC<LoginFormProps> = ({
             <span>⚡ {t.login.demoAccountsTitle}</span>
             <ChevronDown className="w-3.5 h-3.5 transition-transform duration-200 group-open:rotate-180 text-slate-500" />
           </summary>
-          <div className="pt-2.5 grid grid-cols-3 gap-1.5">
+          <div className="pt-2">
             <button
               type="button"
               onClick={() => handleSelectDemo('admin_user')}
-              className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 border transition cursor-pointer ${
+              className={`w-full py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center space-x-2 border transition cursor-pointer ${
                 username === 'admin_user'
                   ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm'
                   : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-200'
               }`}
             >
-              <Crown className="w-3 h-3 text-amber-400" />
-              <span>Admin</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleSelectDemo('staff_user')}
-              className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 border transition cursor-pointer ${
-                username === 'staff_user'
-                  ? 'bg-sky-500/20 text-sky-300 border-sky-500/50 shadow-sm'
-                  : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-200'
-              }`}
-            >
-              <Shield className="w-3 h-3 text-sky-400" />
-              <span>Staff</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleSelectDemo('client_user')}
-              className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 border transition cursor-pointer ${
-                username === 'client_user'
-                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-sm'
-                  : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-200'
-              }`}
-            >
-              <UserCheck className="w-3 h-3 text-emerald-400" />
-              <span>Client</span>
+              <Crown className="w-3.5 h-3.5 text-amber-400" />
+              <span>👑 Admin (admin_user · MangoVPN2026!)</span>
             </button>
           </div>
         </details>

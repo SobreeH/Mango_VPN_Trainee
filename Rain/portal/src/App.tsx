@@ -34,7 +34,7 @@ export default function App() {
   // =========================================================================
   // 1. สถานะการล็อกอินและตัวตน (Authentication State)
   // =========================================================================
-  const [username, setUsername] = useState('staff_user');
+  const [username, setUsername] = useState('admin_user');
   const [password, setPassword] = useState('MangoVPN2026!');
   const [mfaChallenge, setMfaChallenge] = useState<LoginResponse | null>(null);
   const [otpCode, setOtpCode] = useState('');
