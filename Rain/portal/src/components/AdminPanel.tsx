@@ -1397,14 +1397,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <Laptop className="w-4 h-4 text-emerald-400" />
                       <span>อุปกรณ์ที่ลงทะเบียนในระบบ: <strong className="text-white font-mono">{visibleDevices.length}</strong> เครื่อง</span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setIsAddDeviceOpen(true)}
-                      className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition cursor-pointer shadow-sm shadow-emerald-950/40"
-                    >
-                      <Laptop className="w-3.5 h-3.5" />
-                      <span>+ ลงทะเบียนอุปกรณ์</span>
-                    </button>
+                    {userRole === 'ADMIN' && (
+                      <button
+                        type="button"
+                        onClick={() => setIsAddDeviceOpen(true)}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition cursor-pointer shadow-sm shadow-emerald-950/40"
+                      >
+                        <Laptop className="w-3.5 h-3.5" />
+                        <span>+ ลงทะเบียนอุปกรณ์</span>
+                      </button>
+                    )}
                   </div>
 
                   {visibleDevices.length === 0 ? (
@@ -1449,16 +1451,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                   <Eye className="w-3 h-3 text-amber-400" />
                                   <span>ตรวจสอบ</span>
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRevokeDevice(d.id, d.deviceName)}
-                                  disabled={revokingId === d.id}
-                                  className="inline-flex items-center space-x-1 px-2 py-1 rounded bg-rose-950/60 hover:bg-rose-900 border border-rose-800/80 text-[10px] font-sans font-medium text-rose-300 transition cursor-pointer disabled:opacity-50"
-                                  title="เพิกถอนสิทธิ์อุปกรณ์"
-                                >
-                                  <Trash2 className="w-3 h-3 text-rose-400" />
-                                  <span>{revokingId === d.id ? 'กำลังลบ...' : 'เพิกถอน'}</span>
-                                </button>
+                                {userRole === 'ADMIN' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRevokeDevice(d.id, d.deviceName)}
+                                    disabled={revokingId === d.id}
+                                    className="inline-flex items-center space-x-1 px-2 py-1 rounded bg-rose-950/60 hover:bg-rose-900 border border-rose-800/80 text-[10px] font-sans font-medium text-rose-300 transition cursor-pointer disabled:opacity-50"
+                                    title="เพิกถอนสิทธิ์อุปกรณ์"
+                                  >
+                                    <Trash2 className="w-3 h-3 text-rose-400" />
+                                    <span>{revokingId === d.id ? 'กำลังลบ...' : 'เพิกถอน'}</span>
+                                  </button>
+                                )}
                               </td>
                             </tr>
                           ))}
@@ -1543,15 +1547,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           </td>
                           <td className="py-2.5 px-3 text-right">
                             {!s.disconnectedAt ? (
-                              <button
-                                onClick={() => handleDisconnectSession(s.id, s.clientPublicIp)}
-                                disabled={disconnectingSessionId === s.id}
-                                className="inline-flex items-center space-x-1 px-2 py-1 rounded text-[10px] font-sans font-medium text-rose-400 bg-rose-950/40 border border-rose-800/50 hover:bg-rose-900/60 hover:border-rose-600 transition cursor-pointer disabled:opacity-50"
-                                title="สั่งตัดการเชื่อมต่อเซสชันนี้ทันที"
-                              >
-                                <PowerOff className="w-3 h-3" />
-                                <span>{disconnectingSessionId === s.id ? 'กำลังตัด...' : 'ตัดการเชื่อมต่อ'}</span>
-                              </button>
+                              userRole === 'ADMIN' ? (
+                                <button
+                                  onClick={() => handleDisconnectSession(s.id, s.clientPublicIp)}
+                                  disabled={disconnectingSessionId === s.id}
+                                  className="inline-flex items-center space-x-1 px-2 py-1 rounded text-[10px] font-sans font-medium text-rose-400 bg-rose-950/40 border border-rose-800/50 hover:bg-rose-900/60 hover:border-rose-600 transition cursor-pointer disabled:opacity-50"
+                                  title="สั่งตัดการเชื่อมต่อเซสชันนี้ทันที"
+                                >
+                                  <PowerOff className="w-3 h-3" />
+                                  <span>{disconnectingSessionId === s.id ? 'กำลังตัด...' : 'ตัดการเชื่อมต่อ'}</span>
+                                </button>
+                              ) : (
+                                <span className="text-emerald-400/80 font-sans text-[10px]">Connected</span>
+                              )
                             ) : (
                               <span className="text-slate-600 font-sans text-[10px]">-</span>
                             )}
@@ -1660,14 +1668,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <Download className="w-4 h-4 text-emerald-400" />
                       <span>เวอร์ชัน Agent ในระบบทั้งหมด: <strong className="text-white font-mono">{visibleVersions.length}</strong> รายการ</span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setIsAddVersionOpen(true)}
-                      className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition cursor-pointer shadow-sm shadow-emerald-950/40"
-                    >
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>+ ปล่อยเวอร์ชันใหม่</span>
-                    </button>
+                    {userRole === 'ADMIN' && (
+                      <button
+                        type="button"
+                        onClick={() => setIsAddVersionOpen(true)}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition cursor-pointer shadow-sm shadow-emerald-950/40"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>+ ปล่อยเวอร์ชันใหม่</span>
+                      </button>
+                    )}
                   </div>
 
                   {visibleVersions.length === 0 ? (
@@ -1717,15 +1727,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               <Download className="w-3.5 h-3.5" />
                               <span>Download</span>
                             </a>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteVersion(v.id, v.versionString)}
-                              disabled={deletingVersionId === v.id}
-                              className="p-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900 border border-rose-800/60 text-rose-400 hover:text-rose-200 transition cursor-pointer disabled:opacity-50"
-                              title="เพิกถอนเวอร์ชันนี้ออกจากระบบ"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {userRole === 'ADMIN' && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteVersion(v.id, v.versionString)}
+                                disabled={deletingVersionId === v.id}
+                                className="p-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900 border border-rose-800/60 text-rose-400 hover:text-rose-200 transition cursor-pointer disabled:opacity-50"
+                                title="เพิกถอนเวอร์ชันนี้ออกจากระบบ"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -2493,15 +2505,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               >
                 ปิดหน้าต่าง
               </button>
-              <button
-                type="button"
-                onClick={() => handleRevokeDevice(selectedDevice.id, selectedDevice.deviceName)}
-                disabled={revokingId === selectedDevice.id}
-                className="py-2.5 px-4 rounded-xl bg-rose-950/60 hover:bg-rose-900 border border-rose-800/80 text-rose-300 font-bold transition flex items-center space-x-1.5 cursor-pointer text-xs disabled:opacity-50"
-              >
-                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-                <span>{revokingId === selectedDevice.id ? 'กำลังเพิกถอน...' : 'เพิกถอนสิทธิ์อุปกรณ์'}</span>
-              </button>
+              {userRole === 'ADMIN' && (
+                <button
+                  type="button"
+                  onClick={() => handleRevokeDevice(selectedDevice.id, selectedDevice.deviceName)}
+                  disabled={revokingId === selectedDevice.id}
+                  className="py-2.5 px-4 rounded-xl bg-rose-950/60 hover:bg-rose-900 border border-rose-800/80 text-rose-300 font-bold transition flex items-center space-x-1.5 cursor-pointer text-xs disabled:opacity-50"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                  <span>{revokingId === selectedDevice.id ? 'กำลังเพิกถอน...' : 'เพิกถอนสิทธิ์อุปกรณ์'}</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
