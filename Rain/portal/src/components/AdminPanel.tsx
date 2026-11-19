@@ -20,6 +20,8 @@ import {
   UserCheck,
   UserX,
   Pencil,
+  Eye,
+  FileText,
 } from 'lucide-react';
 import {
   DeviceDto,
@@ -107,21 +109,88 @@ const MOCK_SESSIONS: VpnSessionDto[] = [
 const MOCK_LOGS: AuditLogDto[] = [
   {
     id: 'log-001',
-    action: 'VPN_TUNNEL_CONNECTED',
+    userId: 'u-admin',
+    action: 'VPN_SESSION_DISCONNECTED',
     ipAddress: '127.0.0.1',
-    createdAt: new Date().toISOString(),
+    metadataJson: {
+      sessionId: 'ses-001',
+      clientIp: '203.144.144.1',
+      durationSeconds: 1800,
+      trafficRx: '15 MB',
+      trafficTx: '8 MB',
+      reason: 'Admin Remote Kick',
+      enforcedBy: 'Zero-Trust Policy Controller',
+    },
+    createdAt: new Date(Date.now() - 30000).toISOString(),
   },
   {
     id: 'log-002',
-    action: 'AUTH_OTP_VERIFIED',
+    userId: 'u-admin',
+    action: 'USER_STATUS_UPDATED',
     ipAddress: '127.0.0.1',
-    createdAt: new Date(Date.now() - 60000).toISOString(),
+    metadataJson: {
+      targetUserId: 'u-staff',
+      targetUsername: 'staff_user',
+      previousStatus: true,
+      newStatus: false,
+      statusLabel: 'SUSPENDED',
+      note: 'Account temporarily suspended for credential audit',
+    },
+    createdAt: new Date(Date.now() - 180000).toISOString(),
   },
   {
     id: 'log-003',
+    userId: 'u-admin',
+    action: 'POLICY_UPDATED',
+    ipAddress: '127.0.0.1',
+    metadataJson: {
+      policyId: 'pol-002',
+      role: 'STAFF',
+      destinationCidr: '10.0.0.0/8',
+      protocol: 'ALL',
+      portRange: 'ANY',
+      action: 'ALLOW',
+    },
+    createdAt: new Date(Date.now() - 600000).toISOString(),
+  },
+  {
+    id: 'log-004',
+    userId: 'u-admin',
+    action: 'VPN_TUNNEL_CONNECTED',
+    ipAddress: '203.144.144.1',
+    metadataJson: {
+      peerId: 'peer-admin-01',
+      assignedIp: '10.13.13.2/32',
+      wireguardEndpoint: '203.144.144.1:51820',
+      cipher: 'Curve25519-ChaCha20Poly1305',
+    },
+    createdAt: new Date(Date.now() - 1800000).toISOString(),
+  },
+  {
+    id: 'log-005',
+    userId: 'u-admin',
+    action: 'AUTH_OTP_VERIFIED',
+    ipAddress: '127.0.0.1',
+    metadataJson: {
+      authMethod: 'SMS_OTP',
+      phoneNumber: '+1555****567',
+      challengeId: 'mfa-ch-091',
+      status: 'VERIFIED',
+    },
+    createdAt: new Date(Date.now() - 1860000).toISOString(),
+  },
+  {
+    id: 'log-006',
+    userId: 'u-admin',
     action: 'AUTH_LOGIN_SUCCESS',
     ipAddress: '127.0.0.1',
-    createdAt: new Date(Date.now() - 120000).toISOString(),
+    metadataJson: {
+      username: 'admin_user',
+      role: 'ADMIN',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      authTier: 'Multi-Factor Enforced',
+    },
+    createdAt: new Date(Date.now() - 1920000).toISOString(),
   },
 ];
 
@@ -272,6 +341,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   });
   const [togglingUserId, setTogglingUserId] = useState<string | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+
+  // State สำหรับหน้าต่าง Audit Log Detail Inspector (Drawer / Modal)
+  const [selectedLog, setSelectedLog] = useState<AuditLogDto | null>(null);
+  const [showRawJson, setShowRawJson] = useState(false);
 
   const handleToggleUserStatus = async (userId: string, currentStatus: boolean, username: string) => {
     const newStatus = !currentStatus;
@@ -1229,19 +1302,58 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <tr>
                         <th className="py-2.5 px-3">Action</th>
                         <th className="py-2.5 px-3">IP Address</th>
-                        <th className="py-2.5 px-3 text-right">Timestamp</th>
+                        <th className="py-2.5 px-3">Timestamp</th>
+                        <th className="py-2.5 px-3 text-right">รายละเอียด</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
-                      {visibleLogs.map((l) => (
-                        <tr key={l.id} className="hover:bg-slate-900/40 transition">
-                          <td className="py-2.5 px-3 text-amber-400">{l.action}</td>
-                          <td className="py-2.5 px-3 text-slate-400">{l.ipAddress}</td>
-                          <td className="py-2.5 px-3 text-slate-500 text-right">
-                            {new Date(l.createdAt).toLocaleTimeString()}
-                          </td>
-                        </tr>
-                      ))}
+                      {visibleLogs.map((l) => {
+                        const isSuccess = l.action.includes('CONNECTED') || l.action.includes('SUCCESS') || l.action.includes('VERIFIED');
+                        const isWarning = l.action.includes('UPDATED');
+
+                        return (
+                          <tr
+                            key={l.id}
+                            onClick={() => {
+                              setSelectedLog(l);
+                              setShowRawJson(false);
+                            }}
+                            className="hover:bg-slate-900/60 transition cursor-pointer group"
+                          >
+                            <td className="py-2.5 px-3">
+                              <span
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold border inline-block ${
+                                  isSuccess
+                                    ? 'bg-emerald-950/70 text-emerald-300 border-emerald-800/60'
+                                    : isWarning
+                                    ? 'bg-amber-950/70 text-amber-300 border-amber-800/60'
+                                    : 'bg-rose-950/70 text-rose-300 border-rose-800/60'
+                                }`}
+                              >
+                                {l.action}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-300 font-mono">{l.ipAddress}</td>
+                            <td className="py-2.5 px-3 text-slate-400 font-mono">
+                              {new Date(l.createdAt).toLocaleTimeString()}
+                            </td>
+                            <td className="py-2.5 px-3 text-right">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedLog(l);
+                                  setShowRawJson(false);
+                                }}
+                                className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-800/80 group-hover:bg-slate-700 text-slate-300 group-hover:text-white border border-slate-700/60 transition text-[11px] cursor-pointer"
+                              >
+                                <Eye className="w-3 h-3 text-amber-400" />
+                                <span>ดูข้อมูล</span>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -1826,6 +1938,115 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* MODAL: ตรวจสอบบันทึกความปลอดภัย (Audit Log Detail Inspector) */}
+      {selectedLog && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0b1410] border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+              <div className="flex items-center space-x-2">
+                <Shield className="w-5 h-5 text-emerald-400" />
+                <div>
+                  <h3 className="text-base font-bold text-white">ตรวจสอบบันทึกความปลอดภัย</h3>
+                  <div className="text-[10px] font-mono text-slate-500">ID: {selectedLog.id}</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedLog(null)}
+                className="text-slate-400 hover:text-white p-1 cursor-pointer transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Quick Summary Card */}
+            <div className="bg-[#050b08] p-3.5 rounded-xl border border-slate-800/80 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 font-medium">กิจกรรม (Action):</span>
+                <span className="px-2 py-0.5 rounded font-mono font-bold text-xs bg-slate-900 border border-slate-700 text-white">
+                  {selectedLog.action}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 font-medium">IP ต้นทาง (Client IP):</span>
+                <span className="font-mono text-slate-200">{selectedLog.ipAddress}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 font-medium">เวลาที่บันทึก (Timestamp):</span>
+                <span className="font-mono text-slate-300">
+                  {new Date(selectedLog.createdAt).toLocaleString('th-TH')}
+                </span>
+              </div>
+              {selectedLog.userId && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-medium">ผู้ดำเนินการ (User ID):</span>
+                  <span className="font-mono text-emerald-400">{selectedLog.userId}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Metadata Section */}
+            <div className="space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-300 font-semibold flex items-center space-x-1.5">
+                  <FileText className="w-3.5 h-3.5 text-amber-400" />
+                  <span>ข้อมูลจำเพาะด้านความปลอดภัย (Security Metadata)</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowRawJson(!showRawJson)}
+                  className="text-[11px] font-mono text-amber-400 hover:text-amber-300 cursor-pointer underline"
+                >
+                  {showRawJson ? 'ดูแบบตารางย่อ' : 'ดู Raw JSON'}
+                </button>
+              </div>
+
+              {selectedLog.metadataJson && Object.keys(selectedLog.metadataJson).length > 0 ? (
+                showRawJson ? (
+                  <pre className="bg-[#050b08] p-3 rounded-xl border border-slate-800 font-mono text-[11px] text-emerald-400 overflow-x-auto max-h-48">
+                    {JSON.stringify(selectedLog.metadataJson, null, 2)}
+                  </pre>
+                ) : (
+                  <div className="bg-[#050b08] rounded-xl border border-slate-800 divide-y divide-slate-800/60 overflow-hidden font-mono text-[11px]">
+                    {Object.entries(selectedLog.metadataJson).map(([key, value]) => (
+                      <div key={key} className="p-2.5 flex items-center justify-between">
+                        <span className="text-slate-400">{key}:</span>
+                        <span className="font-semibold text-white">
+                          {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )
+              ) : (
+                <div className="p-4 rounded-xl bg-[#050b08] border border-slate-800 text-center text-slate-500 text-xs">
+                  ไม่มีข้อมูล metadataJson แนบมากับบันทึกนี้
+                </div>
+              )}
+            </div>
+
+            {/* Zero-Trust Security Alert Notice */}
+            <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 flex items-start space-x-2 text-[11px] text-slate-400">
+              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <span>
+                <strong>Zero-Trust Immutable Audit</strong>: บันทึกความปลอดภัยนี้ถูกจัดเก็บแบบอ่านได้อย่างเดียว (Read-Only) และไม่สามารถแก้ไขหรือลบได้ตามมาตรฐานความมั่นคงปลอดภัย
+              </span>
+            </div>
+
+            {/* Close Button */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setSelectedLog(null)}
+                className="w-full py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 font-semibold transition cursor-pointer text-xs"
+              >
+                ปิดหน้าต่าง
+              </button>
+            </div>
           </div>
         </div>
       )}
