@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, RefreshCw, AlertCircle } from 'lucide-react';
-import { otpSchema } from '../schemas/auth.schema';
+import { createOtpSchema } from '../schemas/auth.schema';
+import { useI18n } from '../i18n/I18nContext';
 
 // =========================================================================
 // 1. Props Interface
@@ -25,6 +26,7 @@ export const OtpModal: React.FC<OtpModalProps> = ({
   onVerify,
   onBack,
 }) => {
+  const { t } = useI18n();
   const [error, setError] = useState<string | null>(null);
 
   // ตัวนับเวลาถอยหลัง (นับถอยหลังเริ่มต้นที่ 4 นาที 32 วินาที = 272 วินาที ตามภาพเป๊ะๆ)
@@ -107,9 +109,9 @@ export const OtpModal: React.FC<OtpModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const validationResult = otpSchema.safeParse({ otpCode });
+    const validationResult = createOtpSchema(t.validation).safeParse({ otpCode });
     if (!validationResult.success) {
-      setError(validationResult.error.issues[0]?.message || 'กรุณากรอกรหัส OTP ให้ครบ 6 หลัก');
+      setError(validationResult.error.issues[0]?.message || t.otp.incompleteError);
       return;
     }
 
@@ -126,12 +128,12 @@ export const OtpModal: React.FC<OtpModalProps> = ({
             type="button"
             onClick={onBack}
             className="p-1 text-slate-300 hover:text-white transition cursor-pointer"
-            title="ย้อนกลับ"
+            title={t.otp.backTitle}
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
           <span className="text-xs text-slate-400 font-medium">
-            ขั้นตอนที่ 2 จาก 3
+            {t.otp.step}
           </span>
         </div>
 
@@ -145,10 +147,10 @@ export const OtpModal: React.FC<OtpModalProps> = ({
         {/* 3. หัวข้อและเบอร์โทรศัพท์ */}
         <div className="space-y-1.5 pt-1">
           <h1 className="text-2xl font-bold text-white tracking-tight">
-            ยืนยันตัวตน
+            {t.otp.title}
           </h1>
           <p className="text-xs text-slate-400">
-            ส่งรหัส 6 หลักไปที่{' '}
+            {t.otp.sentTo}{' '}
             <span className="font-mono text-slate-300 font-medium">
               {maskedPhoneNumber || '•••-•••-4821'}
             </span>
@@ -195,11 +197,11 @@ export const OtpModal: React.FC<OtpModalProps> = ({
           {/* 5. ตัวนับเวลารหัสหมดอายุ + ปุ่มลัดเติม 123456 */}
           <div className="flex items-center justify-between text-xs text-slate-400 mt-3 pt-1">
             <div>
-              รหัสหมดอายุใน{' '}
+              {t.otp.expiresInPrefix}{' '}
               <span className="text-white font-mono font-semibold">
                 {formatTime(timerSeconds)}
               </span>{' '}
-              นาที
+              {t.otp.expiresInSuffix}
             </div>
 
             <button
@@ -230,7 +232,7 @@ export const OtpModal: React.FC<OtpModalProps> = ({
             {loading ? (
               <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
             ) : (
-              <span>ยืนยัน</span>
+              <span>{t.otp.submit}</span>
             )}
           </button>
         </div>
@@ -243,7 +245,7 @@ export const OtpModal: React.FC<OtpModalProps> = ({
           onClick={onBack}
           className="text-xs font-medium text-emerald-400 hover:text-emerald-300 transition cursor-pointer"
         >
-          รหัสหมดอายุ? เข้าสู่ระบบใหม่
+          {t.otp.expiredBack}
         </button>
       </div>
     </div>

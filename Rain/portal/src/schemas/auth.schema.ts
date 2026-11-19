@@ -1,21 +1,26 @@
 import { z } from 'zod';
+import { Translations, translations } from '../i18n/translations';
 
 // =========================================================================
 // 1. แม่พิมพ์สำหรับตรวจสอบฟอร์ม Login (Username & Password)
 // =========================================================================
-export const loginSchema = z.object({
-  username: z
-    .string()
-    .trim()
-    .min(1, 'กรุณากรอก Username')
-    .max(50, 'Username ต้องไม่เกิน 50 ตัวอักษร')
-    .regex(/^[a-zA-Z0-9_.-]+$/, 'Username ต้องประกอบด้วยตัวอักษร, ตัวเลข, _ หรือ - เท่านั้น'),
+export function createLoginSchema(messages: Translations['validation']) {
+  return z.object({
+    username: z
+      .string()
+      .trim()
+      .min(1, messages.usernameRequired)
+      .max(50, messages.usernameMax)
+      .regex(/^[a-zA-Z0-9_.-]+$/, messages.usernameRegex),
 
-  password: z
-    .string()
-    .min(1, 'กรุณากรอกรหัสผ่าน')
-    .min(6, 'รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร'),
-});
+    password: z
+      .string()
+      .min(1, messages.passwordRequired)
+      .min(6, messages.passwordMin),
+  });
+}
+
+export const loginSchema = createLoginSchema(translations.th.validation);
 
 // ดึง Type ออกมาจากแม่พิมพ์โดยอัตโนมัติ (ไม่ต้องเขียน interface ซ้ำ!)
 export type LoginFormData = z.infer<typeof loginSchema>;
@@ -23,11 +28,15 @@ export type LoginFormData = z.infer<typeof loginSchema>;
 // =========================================================================
 // 2. แม่พิมพ์สำหรับตรวจสอบรหัส 2FA OTP (6 ตัวเลข)
 // =========================================================================
-export const otpSchema = z.object({
-  otpCode: z
-    .string()
-    .length(6, 'รหัส OTP ต้องมีความยาว 6 หลักพอดี')
-    .regex(/^\d{6}$/, 'รหัส OTP ต้องเป็นตัวเลขเท่านั้น'),
-});
+export function createOtpSchema(messages: Translations['validation']) {
+  return z.object({
+    otpCode: z
+      .string()
+      .length(6, messages.otpLength)
+      .regex(/^\d{6}$/, messages.otpDigits),
+  });
+}
+
+export const otpSchema = createOtpSchema(translations.th.validation);
 
 export type OtpFormData = z.infer<typeof otpSchema>;

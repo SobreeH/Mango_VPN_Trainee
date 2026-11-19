@@ -14,6 +14,9 @@ import { OtpModal } from './components/OtpModal';
 import { VpnDashboard } from './components/VpnDashboard';
 import { AdminPanel } from './components/AdminPanel';
 import { Toast, ToastType } from './components/Toast';
+import { LanguageSwitcher } from './components/LanguageSwitcher';
+import { useI18n } from './i18n/I18nContext';
+import { formatMessage } from './i18n/translations';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 const AGENT_BASE_URL = 'http://127.0.0.1:47821';
@@ -26,6 +29,8 @@ const DEMO_ACCOUNTS: Record<string, { role: RoleName; phone: string }> = {
 };
 
 export default function App() {
+  const { t } = useI18n();
+
   // =========================================================================
   // 1. สถานะการล็อกอินและตัวตน (Authentication State)
   // =========================================================================
@@ -149,7 +154,7 @@ export default function App() {
       const json = await res.json();
       if (res.ok && json.success) {
         setMfaChallenge(json.data);
-        showToast(`ส่งรหัสยืนยัน OTP ไปที่ ${json.data.maskedPhoneNumber}`, 'info');
+        showToast(formatMessage(t.toasts.otpSent, { phone: json.data.maskedPhoneNumber }), 'info');
         return;
       }
       throw new Error(json.error?.message || 'Invalid credentials');
@@ -165,9 +170,9 @@ export default function App() {
           expiresInSeconds: 300,
           message: 'Dev Mock Mode',
         });
-        showToast('โหมดจำลอง (Dev Mode): ใช้ OTP เลข 123456 ได้เลยครับ', 'info');
+        showToast(t.toasts.devMockOtp, 'info');
       } else {
-        showToast('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง (ลองใช้: admin_user / MangoVPN2026!)', 'error');
+        showToast(t.toasts.invalidCredentials, 'error');
       }
     } finally {
       setLoading(false);
@@ -198,7 +203,13 @@ export default function App() {
           },
         });
         setMfaChallenge(null);
-        showToast(`เข้าสู่ระบบสำเร็จ ยินดีต้อนรับ ${cleanUsername} (${demoAccount.role})`, 'success');
+        showToast(
+          formatMessage(t.toasts.loginSuccessWelcome, {
+            username: cleanUsername,
+            role: demoAccount.role,
+          }),
+          'success',
+        );
         return;
       }
 
@@ -219,9 +230,15 @@ export default function App() {
 
       setAuthData(json.data);
       setMfaChallenge(null);
-      showToast(`เข้าสู่ระบบสำเร็จในฐานะ ${json.data.user.username} (${json.data.user.role})`, 'success');
+      showToast(
+        formatMessage(t.toasts.loginSuccessAs, {
+          username: json.data.user.username,
+          role: json.data.user.role,
+        }),
+        'success',
+      );
     } catch (err: any) {
-      showToast(err.message || 'การยืนยันรหัส OTP ล้มเหลว', 'error');
+      showToast(err.message || t.toasts.otpFailed, 'error');
     } finally {
       setLoading(false);
     }
@@ -231,7 +248,7 @@ export default function App() {
   const handleConnectVpn = async () => {
     if (!authData) return;
     if (!agentInstalled) {
-      showToast('ไม่พบเซอร์วิส Agent บนเครื่อง 127.0.0.1:47821 (กรุณารัน: npm run mock:agent)', 'error');
+      showToast(t.toasts.agentNotFound, 'error');
       return;
     }
 
@@ -257,10 +274,10 @@ export default function App() {
       if (json.assignedIp) {
         setAssignedIp(json.assignedIp);
       }
-      showToast('เชื่อมต่อ WireGuard Tunnel เรียบร้อยแล้ว!', 'success');
+      showToast(t.toasts.vpnConnected, 'success');
     } catch (err: any) {
       setConnectionState('disconnected');
-      showToast(err.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ VPN', 'error');
+      showToast(err.message || t.toasts.vpnConnectError, 'error');
     } finally {
       setLoading(false);
     }
@@ -273,9 +290,9 @@ export default function App() {
       await fetch(`${AGENT_BASE_URL}/disconnect`, { method: 'POST' });
       setConnectionState('disconnected');
       setAssignedIp(null);
-      showToast('ตัดการเชื่อมต่อ WireGuard VPN เรียบร้อยแล้ว', 'info');
+      showToast(t.toasts.vpnDisconnected, 'info');
     } catch {
-      showToast('ไม่สามารถตัดการเชื่อมต่อได้อย่างสมบูรณ์', 'error');
+      showToast(t.toasts.vpnDisconnectError, 'error');
     } finally {
       setLoading(false);
     }
@@ -290,7 +307,7 @@ export default function App() {
     setMfaChallenge(null);
     setOtpCode('');
     setActiveTab('connect');
-    showToast('ออกจากระบบเรียบร้อยแล้ว', 'info');
+    showToast(t.toasts.signedOut, 'info');
   };
 
   // =========================================================================
@@ -342,20 +359,20 @@ export default function App() {
                 <div>
                   <h2 className="text-xl font-bold text-white tracking-wide">
                     {authData.user.role === 'CLIENT'
-                      ? 'ประวัติการเชื่อมต่อ VPN (VPN Sessions)'
-                      : 'ประวัติการใช้งานระบบ (Sessions & Audit Logs)'}
+                      ? t.pages.historyClientTitle
+                      : t.pages.historyAdminTitle}
                   </h2>
                   <p className="text-xs text-slate-400 mt-0.5">
                     {authData.user.role === 'CLIENT'
-                      ? 'ตรวจสอบประวัติวันเวลาและปริมาณการเชื่อมต่อ WireGuard ของคุณ'
-                      : 'ตรวจสอบประวัติการเชื่อมต่อ VPN และบันทึกกิจกรรมความปลอดภัย'}
+                      ? t.pages.historyClientSubtitle
+                      : t.pages.historyAdminSubtitle}
                   </p>
                 </div>
                 <button
                   onClick={() => setActiveTab('connect')}
                   className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
                 >
-                  ← กลับหน้าเชื่อมต่อ VPN
+                  {t.common.backToConnect}
                 </button>
               </div>
 
@@ -376,17 +393,17 @@ export default function App() {
               <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                 <div>
                   <h2 className="text-xl font-bold text-white tracking-wide">
-                    อุปกรณ์ที่ลงทะเบียน (Registered Devices)
+                    {t.pages.devicesTitle}
                   </h2>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    รายชื่อเครื่องคอมพิวเตอร์และอุปกรณ์ที่ได้รับอนุญาตในระบบ
+                    {t.pages.devicesSubtitle}
                   </p>
                 </div>
                 <button
                   onClick={() => setActiveTab('connect')}
                   className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
                 >
-                  ← กลับหน้าเชื่อมต่อ VPN
+                  {t.common.backToConnect}
                 </button>
               </div>
 
@@ -407,17 +424,17 @@ export default function App() {
               <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                 <div>
                   <h2 className="text-xl font-bold text-white tracking-wide">
-                    รายชื่อผู้ใช้ในระบบ (User Management)
+                    {t.pages.usersTitle}
                   </h2>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    บริหารจัดการบัญชีผู้ใช้ บทบาท และการยืนยันตัวตน 2FA
+                    {t.pages.usersSubtitle}
                   </p>
                 </div>
                 <button
                   onClick={() => setActiveTab('connect')}
                   className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
                 >
-                  ← กลับหน้าเชื่อมต่อ VPN
+                  {t.common.backToConnect}
                 </button>
               </div>
 
@@ -438,17 +455,17 @@ export default function App() {
               <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                 <div>
                   <h2 className="text-xl font-bold text-white tracking-wide">
-                    นโยบายความปลอดภัยเครือข่าย (Zero-Trust Access Policies)
+                    {t.pages.policiesTitle}
                   </h2>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    กำหนดขอบเขตและกฎระเบียบการเข้าถึง Subnet สำหรับแต่ละบทบาท (Least-Privilege)
+                    {t.pages.policiesSubtitle}
                   </p>
                 </div>
                 <button
                   onClick={() => setActiveTab('connect')}
                   className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
                 >
-                  ← กลับหน้าเชื่อมต่อ VPN
+                  {t.common.backToConnect}
                 </button>
               </div>
 
@@ -469,17 +486,17 @@ export default function App() {
               <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                 <div>
                   <h2 className="text-xl font-bold text-white tracking-wide">
-                    บันทึกกิจกรรมความปลอดภัย (Audit Logs)
+                    {t.pages.auditLogsTitle}
                   </h2>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    ประวัติการตรวจสอบย้อนหลังด้านความมั่นคงปลอดภัยสารสนเทศ
+                    {t.pages.auditLogsSubtitle}
                   </p>
                 </div>
                 <button
                   onClick={() => setActiveTab('connect')}
                   className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
                 >
-                  ← กลับหน้าเชื่อมต่อ VPN
+                  {t.common.backToConnect}
                 </button>
               </div>
 
@@ -500,17 +517,17 @@ export default function App() {
               <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                 <div>
                   <h2 className="text-xl font-bold text-white tracking-wide">
-                    ไคลเอนต์เอเจนต์ (Agent Versions & Releases)
+                    {t.pages.agentTitle}
                   </h2>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    ดาวน์โหลดและตรวจสอบเวอร์ชันของ Mango Windows Agent
+                    {t.pages.agentSubtitle}
                   </p>
                 </div>
                 <button
                   onClick={() => setActiveTab('connect')}
                   className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition cursor-pointer"
                 >
-                  ← กลับหน้าเชื่อมต่อ VPN
+                  {t.common.backToConnect}
                 </button>
               </div>
 
@@ -543,10 +560,13 @@ export default function App() {
         />
       )}
 
-      {/* สถานะเซิร์ฟเวอร์จิ๋ว */}
-      <div className="flex items-center space-x-1.5 text-[10px] text-slate-500 mb-2 font-mono">
-        <span className={`w-1.5 h-1.5 rounded-full ${portalOnline ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
-        <span>{portalOnline ? 'Gateway API Online' : 'Gateway Standby (Dev Mock)'}</span>
+      {/* สถานะเซิร์ฟเวอร์จิ๋ว และตัวเลือกภาษา */}
+      <div className="w-full max-w-[400px] flex items-center justify-between mb-2">
+        <div className="flex items-center space-x-1.5 text-[10px] text-slate-500 font-mono">
+          <span className={`w-1.5 h-1.5 rounded-full ${portalOnline ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
+          <span>{portalOnline ? t.common.gatewayOnline : t.common.gatewayStandby}</span>
+        </div>
+        <LanguageSwitcher compact />
       </div>
 
       {/* กรอบขนาด Mobile App Card */}

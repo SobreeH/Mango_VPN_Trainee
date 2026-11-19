@@ -9,6 +9,8 @@ import {
   Moon,
 } from 'lucide-react';
 import { RoleName } from '@mango/shared';
+import { useI18n } from '../i18n/I18nContext';
+import { formatMessage } from '../i18n/translations';
 
 // =========================================================================
 // 1. Props Interface
@@ -46,6 +48,8 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
   onDisconnect,
   onNotify,
 }) => {
+  const { t } = useI18n();
+
   // สลับไอคอนติ๊กถูกเมื่อกดคัดลอก IP
   const [copiedIp, setCopiedIp] = useState(false);
 
@@ -82,10 +86,10 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
     try {
       await navigator.clipboard.writeText(assignedIp);
       setCopiedIp(true);
-      onNotify?.(`คัดลอก VPN IP (${assignedIp}) เรียบร้อยแล้ว`, 'success');
+      onNotify?.(formatMessage(t.toasts.ipCopied, { ip: assignedIp }), 'success');
       setTimeout(() => setCopiedIp(false), 2000);
     } catch {
-      onNotify?.('ไม่สามารถคัดลอก IP ได้', 'error');
+      onNotify?.(t.toasts.ipCopyError, 'error');
     }
   };
 
@@ -113,13 +117,13 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
                 isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
               }`}
             />
-            <span>{isConnected ? 'เชื่อมต่อแล้ว' : 'ยังไม่เชื่อมต่อ'}</span>
+            <span>{isConnected ? t.dashboard.connected : t.dashboard.disconnected}</span>
           </div>
 
           {/* ป้ายโหมดมืด */}
           <div className="px-3 py-1 rounded-full text-xs text-slate-400 bg-slate-900/80 border border-slate-800 flex items-center space-x-1.5">
             <Moon className="w-3.5 h-3.5" />
-            <span>โหมดมืด</span>
+            <span>{t.dashboard.darkMode}</span>
           </div>
         </div>
       </div>
@@ -127,7 +131,7 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
       {/* 2. ข้อความต้อนรับผู้ใช้ */}
       <div>
         <h1 className="text-2xl font-bold text-white tracking-tight">
-          สวัสดี, {user.username}
+          {formatMessage(t.dashboard.greeting, { username: user.username })}
         </h1>
       </div>
 
@@ -144,7 +148,7 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
             <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-200">
               <Monitor className="w-6 h-6" />
             </div>
-            <span className="text-xs text-slate-400 font-medium">เครื่องของคุณ</span>
+            <span className="text-xs text-slate-400 font-medium">{t.dashboard.yourDevice}</span>
           </div>
 
           {/* เส้นทางการเชื่อมต่อตรงกลาง พร้อมไอคอนกุญแจล็อค */}
@@ -172,7 +176,7 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
             <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-200">
               <Building2 className="w-6 h-6" />
             </div>
-            <span className="text-xs text-slate-400 font-medium">Private Network</span>
+            <span className="text-xs text-slate-400 font-medium">{t.dashboard.privateNetwork}</span>
           </div>
         </div>
 
@@ -184,7 +188,7 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
               disabled={loading}
               className="px-6 py-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700 font-medium text-xs transition cursor-pointer disabled:opacity-50"
             >
-              ตัดการเชื่อมต่อ
+              {t.dashboard.disconnect}
             </button>
           ) : (
             <button
@@ -193,7 +197,7 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
               className="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition shadow-lg shadow-emerald-500/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1.5"
             >
               {loading && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-              <span>{loading ? 'กำลังเชื่อมต่อ...' : 'เชื่อมต่อ VPN'}</span>
+              <span>{loading ? t.dashboard.connecting : t.dashboard.connectVpn}</span>
             </button>
           )}
 
@@ -211,13 +215,13 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
           <div className="text-[11px] text-slate-400 font-medium">VPN IP</div>
           <div className="flex items-center justify-between">
             <span className="font-mono text-sm md:text-base font-bold text-white">
-              {assignedIp ? `${assignedIp}/32` : isConnected ? '10.13.13.45/32' : 'Not Assigned'}
+              {assignedIp ? `${assignedIp}/32` : isConnected ? '10.13.13.45/32' : t.dashboard.notAssigned}
             </span>
             {(assignedIp || isConnected) && (
               <button
                 onClick={handleCopyIp}
                 className="p-1 text-slate-400 hover:text-emerald-400 rounded transition cursor-pointer"
-                title="คัดลอก IP"
+                title={t.dashboard.copyIpTitle}
               >
                 {copiedIp ? (
                   <Check className="w-3.5 h-3.5 text-emerald-400" />
@@ -247,7 +251,7 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
 
         {/* กล่อง 4: เวลาเชื่อมต่อ */}
         <div className="bg-[#0b100d] border border-slate-800/80 rounded-xl p-4 space-y-1">
-          <div className="text-[11px] text-slate-400 font-medium">เวลาเชื่อมต่อ</div>
+          <div className="text-[11px] text-slate-400 font-medium">{t.dashboard.duration}</div>
           <div className="font-mono text-sm md:text-base font-bold text-white">
             {isConnected ? formatDuration(elapsedSeconds) : '00:00:00'}
           </div>
@@ -293,14 +297,14 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
         <div className="bg-[#080d0a] border border-slate-800/80 rounded-xl p-4 space-y-4 text-xs">
           <div>
             <div className="text-emerald-400 font-semibold text-xs mb-1.5">
-              เครือข่ายที่เข้าถึงได้
+              {t.dashboard.allowedNetworks}
             </div>
             <div className="font-mono text-slate-300 text-xs tracking-wide">
               {user.role === 'CLIENT'
                 ? '10.13.13.100/32 : 80, 443'
                 : user.role === 'STAFF'
                 ? '10.0.0.0/8, 172.16.0.0/12'
-                : '0.0.0.0/0 (ทุกเครือข่าย)'}
+                : t.dashboard.allNetworks}
             </div>
           </div>
 

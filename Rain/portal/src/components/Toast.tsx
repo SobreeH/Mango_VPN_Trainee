@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import { useI18n } from '../i18n/I18nContext';
 
 export type ToastType = 'success' | 'error' | 'info';
 
@@ -22,6 +23,7 @@ export const Toast: React.FC<ToastProps> = ({
   durationMs = 3500,
   onClose,
 }) => {
+  const { t } = useI18n();
   // เก็บฟังก์ชัน onClose ล่าสุดไว้ใน Ref เพื่อป้องกันไม่ให้ Timer ถูก Reset ซ้ำซากเมื่อ Parent Re-render
   const onCloseRef = useRef(onClose);
   useEffect(() => {
@@ -65,7 +67,7 @@ export const Toast: React.FC<ToastProps> = ({
 
   return (
     <aside
-      aria-label="การแจ้งเตือน"
+      aria-label={t.common.notificationsAria}
       className={`fixed top-5 right-5 z-50 flex items-center space-x-3 px-4 py-3 rounded-xl border ${config.border} ${config.bg} shadow-2xl ${config.shadow} backdrop-blur-md max-w-sm transition-all duration-300 animate-in fade-in slide-in-from-top-4`}
     >
       {/* ไอคอนตามประเภท */}
@@ -80,7 +82,7 @@ export const Toast: React.FC<ToastProps> = ({
       <button
         onClick={onClose}
         className="text-slate-500 hover:text-slate-300 p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer shrink-0"
-        title="ปิดการแจ้งเตือน"
+        title={t.common.dismissNotification}
       >
         <X className="w-3.5 h-3.5" />
       </button>

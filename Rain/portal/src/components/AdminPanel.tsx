@@ -22,6 +22,8 @@ import {
   AgentVersionDto,
   VpnPolicyDto,
 } from '@mango/shared';
+import { useI18n } from '../i18n/I18nContext';
+import { formatMessage } from '../i18n/translations';
 
 export interface UserDto {
   id: string;
@@ -194,13 +196,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   userRole,
   onShowToast,
 }) => {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const [revokedDeviceIds, setRevokedDeviceIds] = useState<string[]>([]);
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
   const handleRevokeDevice = async (deviceId: string, deviceName: string) => {
-    if (!confirm(`คุณต้องการเพิกถอนสิทธิ์อุปกรณ์ "${deviceName}" ออกจากระบบ WireGuard หรือไม่?`)) {
+    if (!confirm(formatMessage(t.admin.devices.revokeConfirm, { name: deviceName }))) {
       return;
     }
     setRevokingId(deviceId);
@@ -209,16 +212,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         method: 'DELETE',
         headers,
       });
-      const json = await res.json().catch(() => null);
-      if (res.ok && json?.success) {
-        onShowToast?.(`เพิกถอนสิทธิ์อุปกรณ์ "${deviceName}" เรียบร้อยแล้ว`, 'success');
-      } else {
-        onShowToast?.(`เพิกถอนสิทธิ์อุปกรณ์ "${deviceName}" เรียบร้อยแล้ว`, 'success');
-      }
+      await res.json().catch(() => null);
+      onShowToast?.(formatMessage(t.admin.devices.revokeSuccess, { name: deviceName }), 'success');
       setRevokedDeviceIds(prev => [...prev, deviceId]);
       refetchDevices();
     } catch {
-      onShowToast?.(`เพิกถอนสิทธิ์อุปกรณ์ "${deviceName}" เรียบร้อยแล้ว`, 'success');
+      onShowToast?.(formatMessage(t.admin.devices.revokeSuccess, { name: deviceName }), 'success');
       setRevokedDeviceIds(prev => [...prev, deviceId]);
       refetchDevices();
     } finally {
@@ -237,7 +236,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUsername.trim()) {
-      alert('กรุณากรอกชื่อผู้ใช้');
+      alert(t.admin.users.usernameRequiredAlert);
       return;
     }
     setIsSubmittingUser(true);
@@ -257,7 +256,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       const json = await res.json().catch(() => null);
       if (res.ok && json?.success && json?.data) {
         setCustomUsers((prev) => [...prev, json.data]);
-        onShowToast?.(`เพิ่มผู้ใช้ "${newUsername}" สำเร็จแล้ว`, 'success');
+        onShowToast?.(formatMessage(t.admin.users.createSuccess, { username: newUsername }), 'success');
       } else {
         const mockNew: UserDto = {
           id: `u-${Date.now()}`,
@@ -268,7 +267,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           createdAt: new Date().toISOString(),
         };
         setCustomUsers((prev) => [...prev, mockNew]);
-        onShowToast?.(`เพิ่มผู้ใช้ "${newUsername}" สำเร็จแล้ว`, 'success');
+        onShowToast?.(formatMessage(t.admin.users.createSuccess, { username: newUsername }), 'success');
       }
     } catch {
       const mockNew: UserDto = {
@@ -280,7 +279,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         createdAt: new Date().toISOString(),
       };
       setCustomUsers((prev) => [...prev, mockNew]);
-      onShowToast?.(`เพิ่มผู้ใช้ "${newUsername}" สำเร็จแล้ว`, 'success');
+      onShowToast?.(formatMessage(t.admin.users.createSuccess, { username: newUsername }), 'success');
     } finally {
       setIsSubmittingUser(false);
       setIsAddUserOpen(false);
@@ -302,23 +301,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [isSubmittingPolicy, setIsSubmittingPolicy] = useState(false);
 
   const handleDeletePolicy = async (policyId: string, destinationCidr: string) => {
-    if (!window.confirm(`ต้องการลบนโยบายเครือข่ายสำหรับ "${destinationCidr}" ใช่หรือไม่?`)) {
+    if (!window.confirm(formatMessage(t.admin.policies.deleteConfirm, { cidr: destinationCidr }))) {
       return;
     }
     try {
-      const res = await fetch(`${apiBaseUrl}/api/policies/${policyId}`, {
+      await fetch(`${apiBaseUrl}/api/policies/${policyId}`, {
         method: 'DELETE',
         headers,
       });
-      if (res.ok) {
-        onShowToast?.(`ลบนโยบาย "${destinationCidr}" เรียบร้อยแล้ว`, 'success');
-      } else {
-        onShowToast?.(`ลบนโยบาย "${destinationCidr}" เรียบร้อยแล้ว`, 'success');
-      }
+      onShowToast?.(formatMessage(t.admin.policies.deleteSuccess, { cidr: destinationCidr }), 'success');
       setDeletedPolicyIds((prev) => [...prev, policyId]);
       refetchPolicies();
     } catch {
-      onShowToast?.(`ลบนโยบาย "${destinationCidr}" เรียบร้อยแล้ว`, 'success');
+      onShowToast?.(formatMessage(t.admin.policies.deleteSuccess, { cidr: destinationCidr }), 'success');
       setDeletedPolicyIds((prev) => [...prev, policyId]);
       refetchPolicies();
     }
@@ -327,7 +322,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleCreatePolicy = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!policyCidr.trim()) {
-      alert('กรุณากรอก Destination Subnet (เช่น 10.50.0.0/16)');
+      alert(t.admin.policies.cidrRequiredAlert);
       return;
     }
     setIsSubmittingPolicy(true);
@@ -348,7 +343,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       const json = await res.json().catch(() => null);
       if (res.ok && json?.success && json?.data) {
         setCustomPolicies((prev) => [...prev, json.data]);
-        onShowToast?.(`เพิ่มนโยบายสำหรับ "${policyCidr}" สำเร็จแล้ว`, 'success');
+        onShowToast?.(formatMessage(t.admin.policies.createSuccess, { cidr: policyCidr }), 'success');
       } else {
         const mockNew: VpnPolicyDto = {
           id: `pol-${Date.now()}`,
@@ -360,7 +355,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           action: policyAction,
         };
         setCustomPolicies((prev) => [...prev, mockNew]);
-        onShowToast?.(`เพิ่มนโยบายสำหรับ "${policyCidr}" สำเร็จแล้ว`, 'success');
+        onShowToast?.(formatMessage(t.admin.policies.createSuccess, { cidr: policyCidr }), 'success');
       }
     } catch {
       const mockNew: VpnPolicyDto = {
@@ -373,7 +368,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         action: policyAction,
       };
       setCustomPolicies((prev) => [...prev, mockNew]);
-      onShowToast?.(`เพิ่มนโยบายสำหรับ "${policyCidr}" สำเร็จแล้ว`, 'success');
+      onShowToast?.(formatMessage(t.admin.policies.createSuccess, { cidr: policyCidr }), 'success');
     } finally {
       setIsSubmittingPolicy(false);
       setIsAddPolicyOpen(false);
@@ -556,14 +551,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setTimeout(() => {
       setIsManualRefreshing(false);
       const tabNames: Record<AdminTab, string> = {
-        devices: 'อุปกรณ์ (Devices)',
-        sessions: 'ประวัติเชื่อมต่อ (Sessions)',
-        logs: 'บันทึกความปลอดภัย (Audit Logs)',
-        versions: 'เวอร์ชัน Agent',
-        users: 'ผู้ใช้ (Users)',
-        policies: 'นโยบาย (Policies)',
+        devices: t.admin.tabs.devices,
+        sessions: t.admin.tabs.sessions,
+        logs: t.admin.tabs.logs,
+        versions: t.admin.tabs.versions,
+        users: t.admin.tabs.users,
+        policies: t.admin.tabs.policies,
       };
-      onShowToast?.(`ซิงค์ข้อมูล ${tabNames[activeTab] || activeTab} ล่าสุดเรียบร้อยแล้ว`, 'info');
+      onShowToast?.(formatMessage(t.admin.syncSuccess, { tab: tabNames[activeTab] || activeTab }), 'info');
     }, 450);
   };
 
@@ -577,8 +572,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <Users className="w-4 h-4" />
             </div>
             <div>
-              <div className="text-[10px] uppercase font-mono text-slate-400 font-bold">ผู้ใช้ทั้งหมด</div>
-              <div className="text-base font-bold font-mono text-white">{totalUsersCount} <span className="text-[10px] text-emerald-400 font-normal">บัญชี</span></div>
+              <div className="text-[10px] uppercase font-mono text-slate-400 font-bold">{t.admin.stats.totalUsers}</div>
+              <div className="text-base font-bold font-mono text-white">{totalUsersCount} <span className="text-[10px] text-emerald-400 font-normal">{t.admin.stats.usersUnit}</span></div>
             </div>
           </div>
 
@@ -587,8 +582,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <Laptop className="w-4 h-4" />
             </div>
             <div>
-              <div className="text-[10px] uppercase font-mono text-slate-400 font-bold">อุปกรณ์ที่ลงทะเบียน</div>
-              <div className="text-base font-bold font-mono text-white">{totalDevicesCount} <span className="text-[10px] text-amber-400 font-normal">เครื่อง</span></div>
+              <div className="text-[10px] uppercase font-mono text-slate-400 font-bold">{t.admin.stats.registeredDevices}</div>
+              <div className="text-base font-bold font-mono text-white">{totalDevicesCount} <span className="text-[10px] text-amber-400 font-normal">{t.admin.stats.devicesUnit}</span></div>
             </div>
           </div>
 
@@ -597,8 +592,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <ShieldCheck className="w-4 h-4" />
             </div>
             <div>
-              <div className="text-[10px] uppercase font-mono text-slate-400 font-bold">กฎ Zero-Trust</div>
-              <div className="text-base font-bold font-mono text-white">{totalPoliciesCount} <span className="text-[10px] text-sky-400 font-normal">นโยบาย</span></div>
+              <div className="text-[10px] uppercase font-mono text-slate-400 font-bold">{t.admin.stats.zeroTrustRules}</div>
+              <div className="text-base font-bold font-mono text-white">{totalPoliciesCount} <span className="text-[10px] text-sky-400 font-normal">{t.admin.stats.policiesUnit}</span></div>
             </div>
           </div>
 
@@ -611,8 +606,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </span>
             </div>
             <div>
-              <div className="text-[10px] uppercase font-mono text-slate-400 font-bold">เซสชันออนไลน์</div>
-              <div className="text-base font-bold font-mono text-white">{activeSessionsCount} <span className="text-[10px] text-emerald-400 font-normal">Active</span></div>
+              <div className="text-[10px] uppercase font-mono text-slate-400 font-bold">{t.admin.stats.activeSessions}</div>
+              <div className="text-base font-bold font-mono text-white">{activeSessionsCount} <span className="text-[10px] text-emerald-400 font-normal">{t.admin.stats.activeUnit}</span></div>
             </div>
           </div>
         </div>
@@ -709,7 +704,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         ) : (
           <div className="text-xs text-slate-400 font-mono flex items-center space-x-1">
             <span className="text-emerald-400 font-bold">●</span>
-            <span>จัดการข้อมูลระบบ ({activeTab.toUpperCase()})</span>
+            <span>{formatMessage(t.admin.managingSystem, { tab: activeTab.toUpperCase() })}</span>
           </div>
         )}
 
@@ -721,7 +716,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="ค้นหาข้อมูล..."
+              placeholder={t.common.searchPlaceholder}
               className="w-full bg-[#050b08] border border-slate-800 rounded-lg pl-8 pr-7 py-1 text-xs text-white placeholder-slate-500 font-mono focus:border-emerald-500 focus:outline-none transition"
             />
             {searchTerm && (
@@ -729,7 +724,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 type="button"
                 onClick={() => setSearchTerm('')}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white p-0.5 cursor-pointer"
-                title="ล้างคำค้นหา"
+                title={t.common.clearSearch}
               >
                 <X className="w-3 h-3" />
               </button>
@@ -740,10 +735,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             onClick={handleRefresh}
             disabled={currentLoading || isManualRefreshing}
             className="flex items-center space-x-1 p-1.5 px-2.5 text-xs text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition cursor-pointer disabled:opacity-50 border border-slate-800/80 shrink-0"
-            title="รีเฟรชข้อมูล"
+            title={t.common.refreshTitle}
           >
             <RefreshCw className={`w-3.5 h-3.5 ${currentFetching || isManualRefreshing ? 'animate-spin text-amber-400' : ''}`} />
-            <span className="hidden sm:inline text-[11px]">รีเฟรช</span>
+            <span className="hidden sm:inline text-[11px]">{t.common.refresh}</span>
           </button>
         </div>
       </div>
@@ -753,7 +748,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         {currentLoading ? (
           <div className="flex flex-col items-center justify-center h-48 space-y-2 text-slate-500 text-xs">
             <RefreshCw className="w-5 h-5 animate-spin text-amber-400" />
-            <span>กำลังโหลดข้อมูล...</span>
+            <span>{t.common.loadingData}</span>
           </div>
         ) : (
           <>
@@ -773,18 +768,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 });
               return visibleDevices.length === 0 ? (
                 <div className="text-center py-12 text-slate-500 text-xs">
-                  {searchTerm ? `ไม่พบอุปกรณ์ที่ตรงกับ "${searchTerm}"` : 'ยังไม่มีข้อมูลอุปกรณ์ที่ลงทะเบียน'}
+                  {searchTerm
+                    ? formatMessage(t.admin.devices.emptySearch, { term: searchTerm })
+                    : t.admin.devices.empty}
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-900/60 text-slate-400 border-b border-slate-800 font-mono">
                       <tr>
-                        <th className="py-2.5 px-3">Device Name</th>
-                        <th className="py-2.5 px-3">OS Info</th>
-                        <th className="py-2.5 px-3">MAC Address</th>
-                        <th className="py-2.5 px-3">Last Seen</th>
-                        <th className="py-2.5 px-3 text-right">Action</th>
+                        <th className="py-2.5 px-3">{t.admin.devices.colName}</th>
+                        <th className="py-2.5 px-3">{t.admin.devices.colOs}</th>
+                        <th className="py-2.5 px-3">{t.admin.devices.colMac}</th>
+                        <th className="py-2.5 px-3">{t.admin.devices.colLastSeen}</th>
+                        <th className="py-2.5 px-3 text-right">{t.admin.devices.colAction}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
@@ -802,10 +799,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               onClick={() => handleRevokeDevice(d.id, d.deviceName)}
                               disabled={revokingId === d.id}
                               className="inline-flex items-center space-x-1 px-2 py-1 rounded bg-rose-950/60 hover:bg-rose-900 border border-rose-800/80 text-[10px] font-bold text-rose-300 transition cursor-pointer disabled:opacity-50"
-                              title="เพิกถอนสิทธิ์อุปกรณ์"
+                              title={t.admin.devices.revokeTitle}
                             >
                               <Trash2 className="w-3 h-3 text-rose-400" />
-                              <span>{revokingId === d.id ? 'กำลังลบ...' : 'เพิกถอน'}</span>
+                              <span>{revokingId === d.id ? t.admin.devices.revoking : t.admin.devices.revoke}</span>
                             </button>
                           </td>
                         </tr>
@@ -829,7 +826,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               });
               return visibleSessions.length === 0 ? (
                 <div className="text-center py-12 text-slate-500 text-xs">
-                  {searchTerm ? `ไม่พบเซสชันที่ตรงกับ "${searchTerm}"` : 'ยังไม่มีประวัติการเชื่อมต่อ'}
+                  {searchTerm
+                    ? formatMessage(t.admin.sessions.emptySearch, { term: searchTerm })
+                    : t.admin.sessions.empty}
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -885,7 +884,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               });
               return visibleLogs.length === 0 ? (
                 <div className="text-center py-12 text-slate-500 text-xs">
-                  {searchTerm ? `ไม่พบบันทึก Log ที่ตรงกับ "${searchTerm}"` : 'ยังไม่มีบันทึก Audit Log'}
+                  {searchTerm
+                    ? formatMessage(t.admin.logs.emptySearch, { term: searchTerm })
+                    : t.admin.logs.empty}
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -922,7 +923,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               });
               return visibleVersions.length === 0 ? (
                 <div className="text-center py-12 text-slate-500 text-xs">
-                  {searchTerm ? `ไม่พบเวอร์ชันที่ตรงกับ "${searchTerm}"` : 'ไม่มีข้อมูลเวอร์ชัน Agent'}
+                  {searchTerm
+                    ? formatMessage(t.admin.versions.emptySearch, { term: searchTerm })
+                    : t.admin.versions.empty}
                 </div>
               ) : (
                 <div className="p-3 space-y-2">
@@ -977,7 +980,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <div className="p-3 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/30">
                     <div className="flex items-center space-x-2 text-xs text-slate-400">
                       <Users className="w-4 h-4 text-emerald-400" />
-                      <span>ผู้ใช้ในระบบทั้งหมด: <strong className="text-white font-mono">{allUsers.length}</strong> บัญชี</span>
+                      <span>
+                        {t.admin.users.totalCountPrefix}{' '}
+                        <strong className="text-white font-mono">{allUsers.length}</strong>{' '}
+                        {t.admin.users.totalCountSuffix}
+                      </span>
                     </div>
                     <button
                       type="button"
@@ -985,13 +992,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition cursor-pointer shadow-sm shadow-emerald-950/40"
                     >
                       <UserPlus className="w-3.5 h-3.5" />
-                      <span>+ เพิ่มผู้ใช้ใหม่</span>
+                      <span>{t.admin.users.addButton}</span>
                     </button>
                   </div>
 
                   {allUsers.length === 0 ? (
                     <div className="text-center py-12 text-slate-500 text-xs">
-                      {searchTerm ? `ไม่พบผู้ใช้ที่ตรงกับ "${searchTerm}"` : 'ยังไม่มีข้อมูลผู้ใช้ในระบบ'}
+                      {searchTerm
+                        ? formatMessage(t.admin.users.emptySearch, { term: searchTerm })
+                        : t.admin.users.empty}
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
@@ -1061,7 +1070,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <div className="p-3 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/30">
                     <div className="flex items-center space-x-2 text-xs text-slate-400">
                       <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                      <span>กฎความปลอดภัยทั้งหมด: <strong className="text-white font-mono">{allPolicies.length}</strong> นโยบาย</span>
+                      <span>
+                        {t.admin.policies.totalCountPrefix}{' '}
+                        <strong className="text-white font-mono">{allPolicies.length}</strong>{' '}
+                        {t.admin.policies.totalCountSuffix}
+                      </span>
                     </div>
                     <button
                       type="button"
@@ -1069,25 +1082,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition cursor-pointer shadow-sm shadow-emerald-950/40"
                     >
                       <ShieldPlus className="w-3.5 h-3.5" />
-                      <span>+ เพิ่มนโยบาย</span>
+                      <span>{t.admin.policies.addButton}</span>
                     </button>
                   </div>
 
                   {allPolicies.length === 0 ? (
                     <div className="text-center py-12 text-slate-500 text-xs">
-                      {searchTerm ? `ไม่พบนโยบายที่ตรงกับ "${searchTerm}"` : 'ยังไม่มีนโยบายการเข้าถึง'}
+                      {searchTerm
+                        ? formatMessage(t.admin.policies.emptySearch, { term: searchTerm })
+                        : t.admin.policies.empty}
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-xs">
                         <thead className="bg-slate-900/60 text-slate-400 border-b border-slate-800 font-mono">
                           <tr>
-                            <th className="py-2.5 px-3">Role Target</th>
-                            <th className="py-2.5 px-3">Protocol</th>
-                            <th className="py-2.5 px-3">Destination Subnet</th>
-                            <th className="py-2.5 px-3">Port Range</th>
-                            <th className="py-2.5 px-3">Action</th>
-                            <th className="py-2.5 px-3 text-right">จัดการ</th>
+                            <th className="py-2.5 px-3">{t.admin.policies.colRoleTarget}</th>
+                            <th className="py-2.5 px-3">{t.admin.policies.colProtocol}</th>
+                            <th className="py-2.5 px-3">{t.admin.policies.colDestination}</th>
+                            <th className="py-2.5 px-3">{t.admin.policies.colPortRange}</th>
+                            <th className="py-2.5 px-3">{t.admin.policies.colAction}</th>
+                            <th className="py-2.5 px-3 text-right">{t.admin.policies.colManage}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
@@ -1124,7 +1139,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => handleDeletePolicy(p.id, p.destinationCidr)}
-                                  title="ลบนโยบายเครือข่าย"
+                                  title={t.admin.policies.deleteTitle}
                                   className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition cursor-pointer"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -1150,7 +1165,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
               <div className="flex items-center space-x-2">
                 <UserPlus className="w-5 h-5 text-emerald-400" />
-                <h3 className="text-base font-bold text-white">เพิ่มบัญชีผู้ใช้ใหม่</h3>
+                <h3 className="text-base font-bold text-white">{t.admin.addUserModal.title}</h3>
               </div>
               <button
                 type="button"
@@ -1163,11 +1178,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             <form onSubmit={handleCreateUser} className="space-y-4 text-xs">
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">ชื่อผู้ใช้ (Username)</label>
+                <label className="block text-slate-300 font-semibold mb-1">{t.admin.addUserModal.usernameLabel}</label>
                 <input
                   type="text"
                   required
-                  placeholder="เช่น somchai.k"
+                  placeholder={t.admin.addUserModal.usernamePlaceholder}
                   value={newUsername}
                   onChange={(e) => setNewUsername(e.target.value)}
                   className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-emerald-500 focus:outline-none"
@@ -1175,7 +1190,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">เบอร์โทรศัพท์ (สำหรับ 2FA OTP)</label>
+                <label className="block text-slate-300 font-semibold mb-1">{t.admin.addUserModal.phoneLabel}</label>
                 <input
                   type="text"
                   required
@@ -1187,7 +1202,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">บทบาทและสิทธิ์ (Role)</label>
+                <label className="block text-slate-300 font-semibold mb-1">{t.admin.addUserModal.roleLabel}</label>
                 <select
                   value={newRole}
                   onChange={(e) => setNewRole(e.target.value as any)}
@@ -1200,7 +1215,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
 
               <div className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80 text-[11px] text-slate-400">
-                รหัสผ่านเริ่มต้น: <span className="font-mono text-emerald-400 font-bold">MangoVPN2026!</span>
+                {t.admin.addUserModal.defaultPasswordLabel}{' '}
+                <span className="font-mono text-emerald-400 font-bold">MangoVPN2026!</span>
               </div>
 
               <div className="flex space-x-2 pt-2">
@@ -1209,14 +1225,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   onClick={() => setIsAddUserOpen(false)}
                   className="flex-1 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold transition cursor-pointer"
                 >
-                  ยกเลิก
+                  {t.common.cancel}
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingUser}
                   className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition flex items-center justify-center space-x-1 cursor-pointer"
                 >
-                  {isSubmittingUser ? 'กำลังบันทึก...' : 'บันทึกผู้ใช้'}
+                  {isSubmittingUser ? t.admin.addUserModal.saving : t.admin.addUserModal.save}
                 </button>
               </div>
             </form>
@@ -1231,7 +1247,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
               <div className="flex items-center space-x-2">
                 <ShieldPlus className="w-5 h-5 text-emerald-400" />
-                <h3 className="text-base font-bold text-white">เพิ่มกฎความปลอดภัยเครือข่าย</h3>
+                <h3 className="text-base font-bold text-white">{t.admin.addPolicyModal.title}</h3>
               </div>
               <button
                 type="button"
@@ -1244,7 +1260,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             <form onSubmit={handleCreatePolicy} className="space-y-4 text-xs">
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">บทบาทเป้าหมาย (Role Target)</label>
+                <label className="block text-slate-300 font-semibold mb-1">{t.admin.addPolicyModal.roleLabel}</label>
                 <select
                   value={policyRole}
                   onChange={(e) => setPolicyRole(e.target.value as any)}
@@ -1257,11 +1273,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">ปลายทางเครือข่าย (Destination Subnet / CIDR)</label>
+                <label className="block text-slate-300 font-semibold mb-1">{t.admin.addPolicyModal.cidrLabel}</label>
                 <input
                   type="text"
                   required
-                  placeholder="เช่น 10.50.0.0/16 หรือ 192.168.1.100/32"
+                  placeholder={t.admin.addPolicyModal.cidrPlaceholder}
                   value={policyCidr}
                   onChange={(e) => setPolicyCidr(e.target.value)}
                   className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-emerald-500 focus:outline-none"
@@ -1270,13 +1286,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">โปรโตคอล (Protocol)</label>
+                  <label className="block text-slate-300 font-semibold mb-1">{t.admin.addPolicyModal.protocolLabel}</label>
                   <select
                     value={policyProtocol}
                     onChange={(e) => setPolicyProtocol(e.target.value as any)}
                     className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-emerald-500 focus:outline-none"
                   >
-                    <option value="ALL">ALL (ทุกโปรโตคอล)</option>
+                    <option value="ALL">{t.admin.addPolicyModal.protocolAll}</option>
                     <option value="TCP">TCP</option>
                     <option value="UDP">UDP</option>
                     <option value="ICMP">ICMP (Ping)</option>
@@ -1284,11 +1300,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">พอร์ต (Port Range)</label>
+                  <label className="block text-slate-300 font-semibold mb-1">{t.admin.addPolicyModal.portLabel}</label>
                   <input
                     type="text"
                     required
-                    placeholder="ANY หรือ 80,443"
+                    placeholder={t.admin.addPolicyModal.portPlaceholder}
                     value={policyPortRange}
                     onChange={(e) => setPolicyPortRange(e.target.value)}
                     className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-emerald-500 focus:outline-none"
@@ -1297,14 +1313,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">การกระทำ (Action)</label>
+                <label className="block text-slate-300 font-semibold mb-1">{t.admin.addPolicyModal.actionLabel}</label>
                 <select
                   value={policyAction}
                   onChange={(e) => setPolicyAction(e.target.value as any)}
                   className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-emerald-500 focus:outline-none"
                 >
-                  <option value="ALLOW">ALLOW (อนุญาตการเข้าถึง)</option>
-                  <option value="DENY">DENY (ปฏิเสธ / บล็อก)</option>
+                  <option value="ALLOW">{t.admin.addPolicyModal.actionAllow}</option>
+                  <option value="DENY">{t.admin.addPolicyModal.actionDeny}</option>
                 </select>
               </div>
 
@@ -1314,14 +1330,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   onClick={() => setIsAddPolicyOpen(false)}
                   className="flex-1 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold transition cursor-pointer"
                 >
-                  ยกเลิก
+                  {t.common.cancel}
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingPolicy}
                   className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition flex items-center justify-center space-x-1 cursor-pointer"
                 >
-                  {isSubmittingPolicy ? 'กำลังบันทึก...' : 'บันทึกนโยบาย'}
+                  {isSubmittingPolicy ? t.admin.addPolicyModal.saving : t.admin.addPolicyModal.save}
                 </button>
               </div>
             </form>

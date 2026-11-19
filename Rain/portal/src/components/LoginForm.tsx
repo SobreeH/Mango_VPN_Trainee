@@ -6,7 +6,8 @@ import {
   Crown,
   UserCheck,
 } from 'lucide-react';
-import { loginSchema } from '../schemas/auth.schema';
+import { createLoginSchema } from '../schemas/auth.schema';
+import { useI18n } from '../i18n/I18nContext';
 
 // =========================================================================
 // 1. Props Interface
@@ -31,6 +32,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
   loading,
   onSubmit,
 }) => {
+  const { t } = useI18n();
   const [errors, setErrors] = useState<{ username?: string; password?: string }>({});
   const [showPassword, setShowPassword] = useState(false);
 
@@ -45,7 +47,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
     e.preventDefault();
 
     const trimmedUsername = username.trim();
-    const validationResult = loginSchema.safeParse({ username: trimmedUsername, password });
+    const validationResult = createLoginSchema(t.validation).safeParse({ username: trimmedUsername, password });
 
     if (!validationResult.success) {
       const fieldErrors: { username?: string; password?: string } = {};
@@ -84,10 +86,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({
             SECURE CHANNEL · TLS 1.3
           </div>
           <h1 className="text-2xl font-bold text-white tracking-tight">
-            เข้าสู่ระบบ VPN
+            {t.login.title}
           </h1>
           <p className="text-xs text-slate-400">
-            ขั้นตอนที่ 1 จาก 3 · กรอกข้อมูลเพื่อเข้าใช้งาน
+            {t.login.stepSubtitle}
           </p>
 
           {/* แถบความคืบหน้า 3 ท่อน (Step Indicator) */}
@@ -147,7 +149,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
           {/* ช่องที่ 1: ชื่อผู้ใช้ */}
           <div>
             <label className="block text-xs font-medium text-slate-200 mb-1.5">
-              ชื่อผู้ใช้
+              {t.login.usernameLabel}
             </label>
             <input
               type="text"
@@ -156,7 +158,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
                 setUsername(e.target.value);
                 if (errors.username) setErrors((prev) => ({ ...prev, username: undefined }));
               }}
-              placeholder="เช่น somchai.k"
+              placeholder={t.login.usernamePlaceholder}
               className={`w-full px-3.5 py-3 bg-[#070e0a] border rounded-xl text-sm text-white placeholder-slate-600 focus:outline-none transition ${
                 errors.username
                   ? 'border-rose-500 focus:border-rose-500'
@@ -174,7 +176,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
           {/* ช่องที่ 2: รหัสผ่าน */}
           <div>
             <label className="block text-xs font-medium text-slate-200 mb-1.5">
-              รหัสผ่าน
+              {t.login.passwordLabel}
             </label>
             <div className="relative">
               <input
@@ -197,7 +199,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3.5 top-3.5 text-xs font-medium text-emerald-400 hover:text-emerald-300 transition cursor-pointer select-none"
               >
-                {showPassword ? 'ซ่อน' : 'แสดง'}
+                {showPassword ? t.login.hidePassword : t.login.showPassword}
               </button>
             </div>
 
@@ -209,7 +211,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
                   <span>{errors.password}</span>
                 </p>
               ) : (
-                <span className="text-[11px] text-slate-400">อย่างน้อย 8 ตัวอักษร</span>
+                <span className="text-[11px] text-slate-400">{t.login.passwordHint}</span>
               )}
             </div>
           </div>
@@ -225,7 +227,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
             {loading ? (
               <RefreshCw className="w-4 h-4 animate-spin" />
             ) : (
-              <span>เข้าสู่ระบบ</span>
+              <span>{t.login.submit}</span>
             )}
           </button>
         </div>
@@ -233,21 +235,21 @@ export const LoginForm: React.FC<LoginFormProps> = ({
 
       {/* 6. ส่วนล่างสุด: ลิงก์ดาวน์โหลด Agent และติดต่อ Admin */}
       <div className="text-center text-xs text-slate-400 pt-8 pb-2">
-        <span>ยังไม่ได้ติดตั้ง Agent? </span>
+        <span>{t.login.agentNotInstalled}</span>
         <button
           type="button"
-          onClick={() => alert('ดาวน์โหลด Agent: กรุณารัน npm run mock:agent บนเครื่องของคุณ')}
+          onClick={() => alert(t.login.downloadAgentAlert)}
           className="text-emerald-400 hover:text-emerald-300 font-medium transition cursor-pointer"
         >
-          ดาวน์โหลด
+          {t.login.downloadAgent}
         </button>
         <span className="text-slate-500 mx-1">·</span>
         <button
           type="button"
-          onClick={() => alert('ติดต่อ Admin: admin@mangovpn.internal')}
+          onClick={() => alert(t.login.contactAdminAlert)}
           className="text-emerald-400 hover:text-emerald-300 font-medium transition cursor-pointer"
         >
-          ติดต่อ Admin
+          {t.login.contactAdmin}
         </button>
       </div>
     </div>
