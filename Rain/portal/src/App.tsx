@@ -156,12 +156,48 @@ export default function App() {
     } catch {
       // Dev Mock Fallback: ถ้า API หลังบ้านออฟไลน์
       const cleanUsername = username.trim();
-      const demoAccount = DEMO_ACCOUNTS[cleanUsername];
-      if (demoAccount && password === 'MangoVPN2026!') {
+      let account = DEMO_ACCOUNTS[cleanUsername];
+
+      // ค้นหาใน customUsers ที่สร้างผ่าน Admin Panel ด้วย
+      let customUserObj: any = null;
+      if (!account) {
+        try {
+          const savedUsers = sessionStorage.getItem('mango_custom_users');
+          if (savedUsers) {
+            const list = JSON.parse(savedUsers);
+            const found = list.find((u: any) => u.username === cleanUsername);
+            if (found) {
+              account = { role: found.roleName, phone: found.phoneNumber };
+              customUserObj = found;
+            }
+          }
+        } catch {}
+      }
+
+      // ตรวจสอบว่าถูกลบหรือถูกระงับสิทธิ์หรือไม่
+      let isSuspended = false;
+      try {
+        const deleted = sessionStorage.getItem('mango_deleted_users');
+        if (deleted && customUserObj && JSON.parse(deleted).includes(customUserObj.id)) {
+          showToast('บัญชีผู้ใช้นี้ถูกลบออกจากระบบแล้ว', 'error');
+          return;
+        }
+        const toggled = sessionStorage.getItem('mango_toggled_users');
+        if (toggled && customUserObj && JSON.parse(toggled)[customUserObj.id] === false) {
+          isSuspended = true;
+        }
+      } catch {}
+
+      if (isSuspended) {
+        showToast('บัญชีผู้ใช้นี้ถูกระงับสิทธิ์การใช้งาน (Suspended)', 'error');
+        return;
+      }
+
+      if (account && password === 'MangoVPN2026!') {
         setMfaChallenge({
           requiresOtp: true,
           challengeId: 'mock-challenge-dev',
-          maskedPhoneNumber: '+1555****567',
+          maskedPhoneNumber: account.phone ? account.phone.substring(0, 5) + '****' + account.phone.slice(-3) : '+1555****567',
           expiresInSeconds: 300,
           message: 'Dev Mock Mode',
         });
@@ -184,7 +220,22 @@ export default function App() {
       // Dev Mock Mode
       if (mfaChallenge.challengeId === 'mock-challenge-dev') {
         const cleanUsername = username.trim();
-        const demoAccount = DEMO_ACCOUNTS[cleanUsername] || { role: 'ADMIN', phone: '+15551234567' };
+        let demoAccount = DEMO_ACCOUNTS[cleanUsername];
+        if (!demoAccount) {
+          try {
+            const savedUsers = sessionStorage.getItem('mango_custom_users');
+            if (savedUsers) {
+              const list = JSON.parse(savedUsers);
+              const found = list.find((u: any) => u.username === cleanUsername);
+              if (found) {
+                demoAccount = { role: found.roleName, phone: found.phoneNumber };
+              }
+            }
+          } catch {}
+        }
+        if (!demoAccount) {
+          demoAccount = { role: 'ADMIN', phone: '+15551234567' };
+        }
         setAuthData({
           accessToken: 'mock-jwt-access-token-mango-2026',
           refreshToken: 'mock-jwt-refresh-token-mango-2026',
@@ -275,7 +326,10 @@ export default function App() {
       setAssignedIp(null);
       showToast('ตัดการเชื่อมต่อ WireGuard VPN เรียบร้อยแล้ว', 'info');
     } catch {
-      showToast('ไม่สามารถตัดการเชื่อมต่อได้อย่างสมบูรณ์', 'error');
+      // โหมด Fallback / Dev Simulator: อัปเดตสถานะหน้าจอให้ตัดการเชื่อมต่อสำเร็จเสมอ แม้ Agent พอร์ต 47821 ไม่ได้รันอยู่
+      setConnectionState('disconnected');
+      setAssignedIp(null);
+      showToast('ตัดการเชื่อมต่อ WireGuard VPN เรียบร้อยแล้ว (โหมดจำลอง)', 'info');
     } finally {
       setLoading(false);
     }

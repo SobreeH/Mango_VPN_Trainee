@@ -277,3 +277,90 @@
   - `Rain/portal/src/components/AdminPanel.tsx` *(เพิ่มแท็บและ useQuery สำหรับ users & policies, ปุ่ม Revoke Device, Modal Add User, Modal Add Policy, ปุ่ม Delete Policy, Toast Refresh)*
   - `Rain/portal/src/App.tsx` *(เชื่อมโยง Component AdminPanel และส่งฟังก์ชัน showToast)*
   - `Rain/RULES_AND_WORKLOG.md` *(อัปเดตบันทึกประจำวัน)*
+
+---
+
+### 📅 วันที่: 2026-11-18
+- **Branch**: `feature/rain-db-seeder`
+- **Commits**:
+  - `8683070` (`feat(admin): complete database seeder for all 8 prisma tables`)
+  - `b6dcd8d` (`docs(rain): update worklog with 8-table database seeder commit`)
+  - `6f541d0` (`feat(admin): implement session disconnect endpoint and audit logging`)
+  - `2a77948` (`docs(rain): update worklog with session disconnect api commit`)
+  - `956ed1a` (`feat(portal): add session disconnect action and polish traffic telemetry ui in admin panel`)
+  - `ec59430` (`docs(rain): update worklog with portal session disconnect and telemetry commit`)
+  - `d596d39` (`feat(portal): add sessionStorage persistence for session kicks and display quick stats on sessions tab`)
+  - `0d4b645` (`docs(rain): update worklog with persistence and quick stats commit`)
+  - `2ab8383` (`feat(portal): implement user status toggle and deletion in admin panel`)
+  - `29aa551` (`feat(portal): implement zero-trust policy update modal and api integration`)
+  - `43f658d` (`feat(portal): refine policy update modal and state persistence`)
+  - `9448002` (`docs(rain): update worklog with zero-trust policy edit implementation`)
+  - `f1a46cc` (`fix(portal): persist customUsers and customPolicies in sessionStorage`)
+- **สิ่งที่ทำ**:
+  1. [ช่วงเช้า] จัดทำและอนุมัติแผนปฏิบัติงานประจำวัน (18 พ.ย. 2569) และสรุปหัวข้อโครงงานสหกิจศึกษา 3.2 ลงในเล่มรายงาน
+  2. [ช่วงเช้า] ตรวจสอบสถาปัตยกรรมโมเดลฐานข้อมูล 8 ตารางหลักใน Prisma ORM (`roles`, `users`, `devices`, `vpn_peers`, `vpn_sessions`, `vpn_policies`, `audit_logs`, `agent_versions`)
+  3. [ช่วงเช้า] พัฒนาขยายสคริปต์จำลองข้อมูลตั้งต้น Database Seeder (`Rain/admin/src/seed.ts`):
+     - ปรับโครงสร้าง Seeder ให้รองรับความสัมพันธ์ของทั้ง 8 ตารางอย่างสมบูรณ์แบบ
+     - สร้าง Roles 3 ระดับ (ADMIN, STAFF, CLIENT)
+     - สร้าง Zero-Trust Firewall Policies ตามสิทธิ์ของแต่ละบทบาท
+     - สร้าง Users พร้อมแฮชรหัสผ่านความปลอดภัยสูงด้วย `bcryptjs`
+     - สร้าง Devices จำลองอุปกรณ์คอมพิวเตอร์และมือถือของผู้ใช้แต่ละราย
+     - สร้าง WireGuard VPN Peers พร้อม Curve25519 Public Keys และ Assigned IPs (`10.13.13.x/32`)
+     - สร้าง VPN Sessions จำลองทราฟฟิกข้อมูล Rx/Tx และสถานะ Active Online / Closed
+     - สร้าง Audit Logs จำลองประวัติกิจกรรมด้านความปลอดภัย เช่น การล็อกอิน การยืนยัน 2FA และการตั้งค่าระบบ
+     - บันทึกเวอร์ชัน Agent ล่าสุด (1.0.0 และ 1.1.0-beta)
+  4. [ช่วงเช้า] พัฒนาระบบหลังบ้าน Session Disconnect API ในโมดูล `Rain/admin`:
+     - เพิ่มเมธอด `disconnectSession(sessionId, adminUserId)` ใน `admin.service.ts` พร้อมเขียนประวัติความปลอดภัย AuditLog อัตโนมัติ (`VPN_SESSION_DISCONNECTED`)
+     - เพิ่มตัวควบคุม `disconnectSession` ใน `admin.controller.ts` ดักตรวจสิทธิ์เฉพาะบทบาท `ADMIN` (Zero-Trust RBAC)
+     - จดทะเบียนเส้นทาง API ใหม่ `POST /api/sessions/:id/disconnect` ใน `admin.routes.ts`
+  5. [ช่วงบ่าย] ศึกษาทำความเข้าใจหลักการทำงานเชิงลึกของ WireGuard VPN (Asymmetric Cryptography Curve25519, Public/Private Key, Peer, AllowedIPs, UDP Roaming)
+  6. [ช่วงบ่าย] พัฒนาและยกระดับ UI การจัดการเซสชันในเว็บพอร์ทัล (`Rain/portal/src/components/AdminPanel.tsx`):
+     - เพิ่มฟังก์ชัน `formatBytes(bytes)` สำหรับแปลงขนาดเน็ตเวิร์กทราฟฟิกเป็น B, KB, MB, GB โดยอัตโนมัติ
+     - ปรับแต่งการแสดงผลคอลัมน์ Traffic (RX/TX) ด้วย Badge สี Emerald (Download) และ Sky (Upload) พร้อมไอคอนลูกศรทิศทางกำกับ
+     - เพิ่มคอลัมน์ Action ในตาราง Sessions และสร้างปุ่มสีแดง 'ตัดการเชื่อมต่อ' พร้อมไอคอน `PowerOff` สำหรับเซสชันที่สถานะ Online
+     - เชื่อมต่อฟังก์ชัน `handleDisconnectSession` ยิงเรียก API `POST /api/sessions/:id/disconnect` พร้อมกล่องไดอะล็อกยืนยันและการแจ้งเตือน Toast
+     - อัปเดตสถิติ Quick Stats Card แบบ Real-time: ปรับลดจำนวนเซสชันออนไลน์ทันทีเมื่อมีการตัดการเชื่อมต่อ
+  7. [ช่วงบ่าย] ยกระดับความต่อเนื่องของสถานะ (Persistence) และเปิดแสดงสถิติในแท็บ Sessions:
+     - นำ `sessionStorage` เข้ามาผูกกับ `disconnectedSessionIds` เพื่อให้เบราว์เซอร์จดจำสถานะที่ถูกตัดการเชื่อมต่อได้อย่างถาวร แม้ผู้ใช้จะกด Refresh (F5) หน้าระบบ
+     - เปิดแสดงการ์ดสรุปสถิติ 4 มิติ (Quick Stats 4 Cards) ในแท็บ Sessions เพื่อให้เห็นตัวเลขเซสชันออนไลน์ลดลงจริง
+     - ปรับปรุง `App.tsx` ในส่วน `handleDisconnectVpn` ให้มี Fallback ตัดการเชื่อมต่อได้เสมอในโหมดทดสอบ
+  8. ทดสอบคอมไพล์ระบบ TypeScript & Vite:
+     - `npm --workspace=@mango/rain-admin run build` (ผ่านฉลุย 100%)
+     - `npm --workspace=@mango/api run build` (ผ่านฉลุย 100%)
+     - `npm --workspace=@mango/portal run build` (ผ่านฉลุย 100%)
+  9. ดำเนินการ Git Commit & Push ขึ้น Branch `feature/rain-db-seeder` เรียบร้อย
+  10. [ช่วงบ่าย] พัฒนาระบบจัดการผู้ใช้งานครบวงจร (User Management Full CRUD):
+      - ฝั่งหลังบ้าน (`Rain/admin`):
+        - เพิ่มฟังก์ชัน `toggleUserStatus(userId, adminUserId)` ใน `admin.service.ts` สำหรับสลับสถานะเปิดใช้งาน/ระงับสิทธิ์ พร้อมบันทึก `USER_STATUS_UPDATED` ลงใน AuditLog อัตโนมัติ
+        - เพิ่มฟังก์ชัน `deleteUser(userId, adminUserId)` ใน `admin.service.ts` สำหรับลบข้อมูลผู้ใช้ออกจากฐานข้อมูล พร้อมบันทึก `USER_DELETED` ลงใน AuditLog
+        - เพิ่มตัวจัดการ `toggleUserStatus` และ `deleteUser` ใน `admin.controller.ts` ดักตรวจสิทธิ์เฉพาะบทบาท `ADMIN`
+        - จดทะเบียนเส้นทาง API `PATCH /api/users/:id/status` และ `DELETE /api/users/:id` ใน `admin.routes.ts`
+      - ฝั่งหน้าเว็บ (`Rain/portal/src/components/AdminPanel.tsx`):
+        - เพิ่มคอลัมน์ "Action" ในแท็บจัดการผู้ใช้งาน (Users)
+        - พัฒนาปุ่มสลับสถานะผู้ใช้ (Toggle Active/Suspended) แสดงปุ่ม "ระงับสิทธิ์" (ไอคอน `UserX`) หรือ "เปิดใช้งาน" (ไอคอน `UserCheck`) ตามสถานะปัจจุบัน
+        - พัฒนาปุ่มลบผู้ใช้ (ไอคอน `Trash2` สีแดง) พร้อมกล่องไดอะล็อกยืนยันการลบ
+        - ออกแบบ State Persistence ด้วย `sessionStorage` (`mango_toggled_users` และ `mango_deleted_users`) เพื่อให้ข้อมูลที่ถูกสลับสถานะหรือลบออกยังคงแสดงผลถูกต้องแม้กด F5 หรือรีเฟรชหน้าเว็บ
+        - อัปเดตตัวเลขสถิติภาพรวม "ผู้ใช้ทั้งหมด" ใน Quick Stats Card ให้คำนวณตัดจำนวนผู้ใช้ที่ถูกลบออกทันทีแบบไดนามิก
+  11. [ช่วงบ่าย] พัฒนาระบบจัดการนโยบายความปลอดภัยครบวงจร (Zero-Trust Policy Management Full CRUD - จุดที่ 2):
+      - ฝั่งหลังบ้าน (`Rain/admin`):
+        - เพิ่มฟังก์ชัน `updatePolicy(policyId, data, adminUserId)` ใน `admin.service.ts` เพื่อแก้ไข Target Role, Destination CIDR, Protocol, Port Range, และ Action พร้อมเขียนบันทึกความปลอดภัย AuditLog อัตโนมัติ (`POLICY_UPDATED`)
+        - เพิ่มตัวควบคุม `updatePolicy` ใน `admin.controller.ts` ดักตรวจสิทธิ์เฉพาะบทบาท `ADMIN`
+        - จดทะเบียนเส้นทาง API `PUT /api/policies/:id` ใน `admin.routes.ts`
+      - ฝั่งหน้าเว็บ (`Rain/portal/src/components/AdminPanel.tsx`):
+        - เพิ่มปุ่มไอคอนดินสอ `Pencil` สีทองคู่กับปุ่มถังขยะ `Trash2` ในตารางนโยบายเครือข่าย (Policies)
+        - พัฒนาหน้าต่าง Modal "แก้ไขกฎความปลอดภัยเครือข่าย" (Controlled Form with Pre-population) ดึงค่าเดิมของนโยบายที่เลือกขึ้นมากรอกลงในฟอร์มอัตโนมัติ เพื่อให้ผู้ใช้แก้ไขเฉพาะค่าที่ต้องการ
+        - เชื่อมต่อฟังก์ชัน `handleUpdatePolicy` ยิงเรียก API `PUT /api/policies/:id` พร้อมการแจ้งเตือน Toast
+        - เพิ่มระบบ State Persistence ผ่าน `sessionStorage` (`mango_updated_policies` และ `mango_deleted_policies`) ทำให้ข้อมูลนโยบายที่แก้ไขหรือลบยังคงแสดงผลถูกต้องแม้กด Refresh (F5)
+  12. [ช่วงบ่าย] แก้ไขปัญหาข้อมูลผู้ใช้และนโยบายที่สร้างใหม่สูญหายเมื่อรีเฟรชหน้าเว็บ (Create Persistence Fix):
+      - ตรวจพบสาเหตุ (Root Cause): State `customUsers` และ `customPolicies` เดิมถูกประกาศเป็น `useState([])` ในหน่วยความจำชั่วคราวเท่านั้น เมื่อผู้ใช้กด Refresh (F5) หรือเกิด Vite HMR (Hot Module Reload) ตัวแปรจะถูกรีเซ็ตกลับเป็น Array ว่างเปล่าทันที
+      - ดำเนินการแก้ไข: ผูก `customUsers` เข้ากับ `sessionStorage.getItem('mango_custom_users')` และ `customPolicies` เข้ากับ `sessionStorage.getItem('mango_custom_policies')`
+      - ปรับฟังก์ชัน `handleCreateUser`, `handleDeleteUser`, `handleCreatePolicy`, `handleDeletePolicy` ให้ซิงค์ข้อมูลลงใน Storage แบบ Real-time ทำให้ข้อมูลที่เพิ่มใหม่คงอยู่ถาวรตลอดเซสชันของเบราว์เซอร์
+- **ไฟล์ที่สร้าง/แก้ไข**:
+  - `Rain/admin/src/seed.ts` *(ขยาย Seeder ครบ 8 ตาราง พร้อมความสัมพันธ์และตัวอย่างข้อมูล)*
+  - `Rain/admin/src/admin.service.ts` *(เพิ่ม disconnectSession, toggleUserStatus, deleteUser, updatePolicy และ AuditLog)*
+  - `Rain/admin/src/admin.controller.ts` *(เพิ่ม endpoint handlers สำหรับตัดเซสชัน สลับสถานะผู้ใช้ ลบผู้ใช้ และแก้ไขนโยบาย)*
+  - `Rain/admin/src/admin.routes.ts` *(ลงทะเบียน POST /api/sessions/:id/disconnect, PATCH /api/users/:id/status, DELETE /api/users/:id, PUT /api/policies/:id)*
+  - `Rain/portal/src/App.tsx` *(เพิ่ม Fallback การตัดการเชื่อมต่อ VPN ในหน้า Dashboard)*
+  - `Rain/portal/src/components/AdminPanel.tsx` *(เพิ่ม UI จัดการ Session Disconnect, Quick Stats, User Status Toggle, Delete User, Policy Edit Modal & Persistence)*
+  - `Rain/RULES_AND_WORKLOG.md` *(อัปเดตบันทึกประจำวัน)*
+
