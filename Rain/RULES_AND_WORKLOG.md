@@ -371,6 +371,7 @@
 - **Commits**:
   - `8395479` (`feat(portal): implement audit log detail inspector modal and rich metadata view`)
   - `a59c364` (`feat(devices): implement device posture inspector modal and registration with session persistence`)
+  - `c6079bb` (`feat(versions): implement agent releases manager with publishing modal and session persistence`)
 - **สิ่งที่ทำ**:
   1. [ช่วงเช้า] ตรวจสอบ Git Status และดึงโค้ดล่าสุดจากรีโมท จากนั้นแตก Branch ใหม่ `feature/rain-fullstack-integration` เพื่อเริ่มต้นงานตามแผนงานที่ได้รับอนุมัติ
   2. [ช่วงเช้า] พัฒนาระบบตรวจสอบบันทึกความปลอดภัยเชิงลึก (Audit Log Detail Inspector) ใน `Rain/portal/src/components/AdminPanel.tsx`:
@@ -390,12 +391,22 @@
        - ออกแบบระบบ State Persistence ผ่าน `sessionStorage` (`mango_revoked_devices` และ `mango_custom_devices`) เพื่อให้การลงทะเบียนอุปกรณ์และการเพิกถอนสิทธิ์คงอยู่ถาวรแม้ผู้ใช้กด Refresh (F5) หรือเกิด Vite HMR
        - ปรับปรุงตารางใน Tab 1 (Devices): เพิ่มแถบเครื่องมือด้านบนพร้อมปุ่ม `+ ลงทะเบียนอุปกรณ์`, คอลัมน์แสดง Owner ID, ปุ่มตรวจสอบสถานะ (ไอคอน `Eye`), และปุ่มเพิกถอนสิทธิ์ (ไอคอน `Trash2`)
        - อัปเดตการคำนวณ Quick Stats Card รวมอุปกรณ์ที่เพิ่มใหม่และหักลบอุปกรณ์ที่ถูกเพิกถอนออกทันทีแบบ Real-time
-  4. ทดสอบคอมไพล์ระบบ TypeScript และ Vite ทั้ง `@mango/portal` และ `@mango/rain-admin` ผ่านฉลุย 100%
-  5. ดำเนินการ Git Commit & Push ขึ้น Branch `feature/rain-fullstack-integration` เรียบร้อย
+  4. [ช่วงเช้า] พัฒนาระบบจัดการและเผยแพร่เวอร์ชันไคลเอนต์ (Agent Releases Manager) ครบวงจร Full-Stack:
+     - **ฝั่งหลังบ้าน (`Rain/admin`)**:
+       - เพิ่มฟังก์ชัน `createAgentVersion(data)` และ `deleteAgentVersion(id)` ใน `admin.service.ts` สำหรับบันทึกและลบประวัติการปล่อย Agent ผ่าน Prisma ORM
+       - เพิ่มตัวจัดการ `createAgentVersion` และ `deleteAgentVersion` ใน `admin.controller.ts` ดักตรวจสิทธิ์เฉพาะบทบาท `ADMIN`
+       - จดทะเบียนเส้นทาง API `POST /api/agent-versions` และ `DELETE /api/agent-versions/:id` ใน `admin.routes.ts`
+     - **ฝั่งหน้าเว็บ (`Rain/portal/src/components/AdminPanel.tsx`)**:
+       - พัฒนาหน้าต่าง Modal **ปล่อยเวอร์ชัน Agent ใหม่ (`+ ปล่อยเวอร์ชันใหม่`)**: มีฟอร์มระบุ Version String, URL ดาวน์โหลด (พร้อมปุ่ม Auto-fill Local Agent URL), ช่อง SHA-256 Checksum (พร้อมปุ่มสุ่ม Hash อัตโนมัติ), และตัวเลือกเปิด/ปิด "บังคับอัปเดต (Mandatory Update)"
+       - ยกระดับ UI ในแท็บ Releases: เพิ่มแถบ Header สรุปจำนวนเวอร์ชันทั้งหมด, แสดง Badge สถานะ "Latest Stable" สำหรับเวอร์ชันล่าสุด, แยก Badge "Mandatory Update" (สีแดง) หรือ "Optional Update" (สีฟ้า)
+       - เพิ่มปุ่มลบ/เพิกถอนเวอร์ชันเก่าหรือเวอร์ชันที่มีช่องโหว่ความปลอดภัย (`Trash2`)
+       - ออกแบบ State Persistence ด้วย `sessionStorage` (`mango_custom_versions` และ `mango_deleted_versions`) ป้องกันข้อมูลสูญหายเมื่อรีเฟรชหน้าเว็บ
+  5. ทดสอบคอมไพล์ระบบ TypeScript และ Vite ทั้ง `@mango/portal` และ `@mango/rain-admin` ผ่านฉลุย 100%
+  6. ดำเนินการ Git Commit & Push ขึ้น Branch `feature/rain-fullstack-integration` เรียบร้อย
 - **ไฟล์ที่สร้าง/แก้ไข**:
-  - `Rain/admin/src/admin.service.ts` *(เพิ่ม CreateDeviceDto และ ฟังก์ชัน createDevice)*
-  - `Rain/admin/src/admin.controller.ts` *(เพิ่ม createDevice endpoint handler)*
-  - `Rain/admin/src/admin.routes.ts` *(จดทะเบียน POST /api/devices)*
-  - `Rain/portal/src/components/AdminPanel.tsx` *(เพิ่ม Device Posture Inspector, Register Device Modal, Table Toolbar, และ Session Persistence)*
+  - `Rain/admin/src/admin.service.ts` *(เพิ่ม CreateDeviceDto, CreateAgentVersionDto, createDevice, createAgentVersion, deleteAgentVersion)*
+  - `Rain/admin/src/admin.controller.ts` *(เพิ่ม createDevice, createAgentVersion, deleteAgentVersion endpoint handlers)*
+  - `Rain/admin/src/admin.routes.ts` *(จดทะเบียน POST /api/devices, POST /api/agent-versions, DELETE /api/agent-versions/:id)*
+  - `Rain/portal/src/components/AdminPanel.tsx` *(เพิ่ม Agent Releases Manager, Modal ปล่อยเวอร์ชันใหม่, Posture Inspector, Table Toolbar, และ Session Persistence)*
   - `Rain/RULES_AND_WORKLOG.md` *(อัปเดตบันทึกประจำวัน)*
 
