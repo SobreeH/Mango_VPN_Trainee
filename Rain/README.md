@@ -15,7 +15,7 @@ You own **100% of the user experience and administrative CRUD interfaces**:
 3. **Mock Agent Testing**: Using `scripts/mock-agent.js` so you never have to compile Go code or run kernel WireGuard to develop frontend features.
 
 > [!NOTE]
-> **No Git Conflicts**: All your code lives inside `Rain/`. You never need to edit files in `Sobree/`. When you update your admin routes or seed scripts, Sobree's API automatically picks them up via workspace imports!
+> **Cross-Boundary Collaboration (`AGENTS.md`)**: `Rain/` is your primary workspace, and Sobree's API automatically mounts your admin routes via workspace imports. When a feature or fix requires end-to-end integration across `packages/shared/` or `Sobree/`, your AI is permitted to edit across folders on a feature branch—follow [`../AGENTS.md`](../AGENTS.md).
 
 ---
 
