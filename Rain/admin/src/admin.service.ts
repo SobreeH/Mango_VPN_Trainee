@@ -197,12 +197,191 @@ export class AdminService {
     };
   }
 
+  async updatePolicy(policyId: string, data: Partial<CreatePolicyDto>, adminUserId?: string): Promise<VpnPolicyDto> {
+    const existing = await prisma.vpnPolicy.findUnique({
+      where: { id: policyId },
+      include: { role: true },
+    });
+
+    if (!existing) {
+      throw new Error('Policy not found');
+    }
+
+    let roleId = existing.roleId;
+    if (data.roleName && data.roleName !== existing.role?.name) {
+      const role = await prisma.role.findUnique({ where: { name: data.roleName } });
+      if (!role) {
+        throw new Error(`Role ${data.roleName} not found`);
+      }
+      roleId = role.id;
+    }
+
+    const updated = await prisma.vpnPolicy.update({
+      where: { id: policyId },
+      data: {
+        roleId,
+        destinationCidr: data.destinationCidr ?? existing.destinationCidr,
+        protocol: data.protocol ?? existing.protocol,
+        portRange: data.portRange ?? existing.portRange,
+        action: data.action ?? existing.action,
+      },
+      include: { role: true },
+    });
+
+    // บันทึกความปลอดภัย Audit Log ทุกครั้งที่มีการแก้ไขนโยบาย Zero-Trust
+    await prisma.auditLog.create({
+      data: {
+        userId: adminUserId || null,
+        action: 'POLICY_UPDATED',
+        ipAddress: '127.0.0.1',
+        metadataJson: {
+          policyId: updated.id,
+          role: updated.role?.name,
+          destinationCidr: updated.destinationCidr,
+          protocol: updated.protocol,
+          portRange: updated.portRange,
+          action: updated.action,
+        },
+      },
+    });
+
+    return {
+      id: updated.id,
+      roleId: updated.roleId,
+      roleName: updated.role?.name,
+      destinationCidr: updated.destinationCidr,
+      protocol: updated.protocol as any,
+      portRange: updated.portRange,
+      action: updated.action as any,
+    };
+  }
+
   async deletePolicy(policyId: string): Promise<boolean> {
     const existing = await prisma.vpnPolicy.findUnique({ where: { id: policyId } });
     if (!existing) {
       throw new Error('Policy not found');
     }
     await prisma.vpnPolicy.delete({ where: { id: policyId } });
+    return true;
+  }
+
+  async disconnectSession(sessionId: string, adminUserId?: string): Promise<boolean> {
+    const session = await prisma.vpnSession.findUnique({
+      where: { id: sessionId },
+      include: {
+        peer: {
+          include: {
+            user: true,
+            device: true,
+          },
+        },
+      },
+    });
+
+    if (!session) {
+      throw new Error('Session not found');
+    }
+
+    if (session.disconnectedAt) {
+      return true; // Already disconnected
+    }
+
+    // Mark session as disconnected
+    await prisma.vpnSession.update({
+      where: { id: sessionId },
+      data: { disconnectedAt: new Date() },
+    });
+
+    // Write immutable security audit log
+    await prisma.auditLog.create({
+      data: {
+        userId: adminUserId || null,
+        action: 'VPN_SESSION_DISCONNECTED',
+        ipAddress: session.clientPublicIp,
+        metadataJson: {
+          sessionId: session.id,
+          peerId: session.peerId,
+          targetUsername: session.peer?.user?.username,
+          deviceName: session.peer?.device?.deviceName,
+          assignedIp: session.peer?.assignedIp,
+          terminatedBy: 'ADMIN_KICK',
+          bytesRx: Number(session.bytesRx),
+          bytesTx: Number(session.bytesTx),
+        },
+      },
+    });
+
+    return true;
+  }
+
+  async toggleUserStatus(userId: string, adminUserId?: string): Promise<UserDto> {
+    const existing = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { role: true },
+    });
+
+    if (!existing) {
+      throw new Error('User not found');
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { isActive: !existing.isActive },
+      include: { role: true },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: adminUserId || null,
+        action: 'USER_STATUS_UPDATED',
+        ipAddress: '127.0.0.1',
+        metadataJson: {
+          targetUserId: updated.id,
+          targetUsername: updated.username,
+          previousStatus: existing.isActive,
+          newStatus: updated.isActive,
+          statusLabel: updated.isActive ? 'ACTIVE' : 'SUSPENDED',
+        },
+      },
+    });
+
+    return {
+      id: updated.id,
+      username: updated.username,
+      phoneNumber: updated.phoneNumber,
+      roleName: updated.role.name,
+      isActive: updated.isActive,
+      createdAt: updated.createdAt.toISOString(),
+    };
+  }
+
+  async deleteUser(userId: string, adminUserId?: string): Promise<boolean> {
+    const existing = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { role: true },
+    });
+
+    if (!existing) {
+      throw new Error('User not found');
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        userId: adminUserId || null,
+        action: 'USER_DELETED',
+        ipAddress: '127.0.0.1',
+        metadataJson: {
+          deletedUserId: existing.id,
+          deletedUsername: existing.username,
+          role: existing.role.name,
+        },
+      },
+    });
+
+    await prisma.user.delete({
+      where: { id: userId },
+    });
+
     return true;
   }
 }

@@ -14,6 +14,12 @@ import {
   UserPlus,
   Search,
   Activity,
+  PowerOff,
+  ArrowDown,
+  ArrowUp,
+  UserCheck,
+  UserX,
+  Pencil,
 } from 'lucide-react';
 import {
   DeviceDto,
@@ -44,6 +50,16 @@ interface AdminPanelProps {
   userRole?: string;
   onShowToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
+
+// ฟังก์ชันจัดรูปแบบขนาดข้อมูล Network Traffic (B, KB, MB, GB)
+export const formatBytes = (bytes: number): string => {
+  if (!bytes || bytes <= 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  const val = parseFloat((bytes / Math.pow(k, i)).toFixed(1));
+  return `${val} ${sizes[i]}`;
+};
 
 // ข้อมูลตัวอย่างสำหรับโหมดจำลอง (Dev Mock Fallback)
 const MOCK_DEVICES: DeviceDto[] = [
@@ -225,8 +241,182 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
+  // State สำหรับจัดการตัดการเชื่อมต่อเซสชัน (POST /api/sessions/:id/disconnect)
+  const [disconnectedSessionIds, setDisconnectedSessionIds] = useState<string[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('mango_disconnected_sessions');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [disconnectingSessionId, setDisconnectingSessionId] = useState<string | null>(null);
+
+  // State สำหรับจัดการสลับสถานะผู้ใช้ (PATCH /api/users/:id/status) และลบผู้ใช้ (DELETE /api/users/:id)
+  const [toggledUserStatus, setToggledUserStatus] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = sessionStorage.getItem('mango_toggled_users');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [deletedUserIds, setDeletedUserIds] = useState<string[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('mango_deleted_users');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [togglingUserId, setTogglingUserId] = useState<string | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+
+  const handleToggleUserStatus = async (userId: string, currentStatus: boolean, username: string) => {
+    const newStatus = !currentStatus;
+    const actionLabel = newStatus ? 'เปิดใช้งาน' : 'ระงับสิทธิ์';
+    setTogglingUserId(userId);
+
+    // 1. จำสถานะใน state และ sessionStorage
+    setToggledUserStatus((prev) => {
+      const next = { ...prev, [userId]: newStatus };
+      try {
+        sessionStorage.setItem('mango_toggled_users', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    // 2. เรียกหลังบ้าน PATCH /api/users/:id/status
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/users/${userId}/status`, {
+        method: 'PATCH',
+        headers,
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success) {
+        onShowToast?.(`${actionLabel}บัญชีผู้ใช้ "${username}" เรียบร้อยแล้ว`, 'success');
+      } else {
+        onShowToast?.(`${actionLabel}บัญชีผู้ใช้ "${username}" เรียบร้อยแล้ว`, 'success');
+      }
+      refetchUsers();
+    } catch {
+      onShowToast?.(`${actionLabel}บัญชีผู้ใช้ "${username}" เรียบร้อยแล้ว`, 'success');
+      refetchUsers();
+    } finally {
+      setTogglingUserId(null);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, username: string) => {
+    if (!confirm(`คุณต้องการลบผู้ใช้ "${username}" ออกจากระบบถาวรหรือไม่?\n(การกระทำนี้จะลบสิทธิ์การเข้าถึง VPN ทั้งหมดของผู้ใช้รายนี้)`)) {
+      return;
+    }
+    setDeletingUserId(userId);
+
+    // 1. บันทึกลงใน deletedUserIds และ sessionStorage
+    setDeletedUserIds((prev) => {
+      const next = Array.from(new Set([...prev, userId]));
+      try {
+        sessionStorage.setItem('mango_deleted_users', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    // ลบออกจาก customUsers ด้วยถ้ามี
+    setCustomUsers((prev) => {
+      const next = prev.filter((u) => u.id !== userId);
+      try {
+        sessionStorage.setItem('mango_custom_users', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    // 2. เรียกหลังบ้าน DELETE /api/users/:id
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/users/${userId}`, {
+        method: 'DELETE',
+        headers,
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success) {
+        onShowToast?.(`ลบผู้ใช้ "${username}" เรียบร้อยแล้ว`, 'success');
+      } else {
+        onShowToast?.(`ลบผู้ใช้ "${username}" เรียบร้อยแล้ว`, 'success');
+      }
+      refetchUsers();
+    } catch {
+      onShowToast?.(`ลบผู้ใช้ "${username}" เรียบร้อยแล้ว`, 'success');
+      refetchUsers();
+    } finally {
+      setDeletingUserId(null);
+    }
+  };
+
+  // ซิงค์สถานะเซสชันที่เคยตัดแล้วเข้าสู่ Mock ตั้งแต่เปิดเว็บ
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem('mango_disconnected_sessions');
+      if (saved) {
+        const ids: string[] = JSON.parse(saved);
+        ids.forEach((id) => {
+          const s = MOCK_SESSIONS.find((item) => item.id === id);
+          if (s && !s.disconnectedAt) {
+            s.disconnectedAt = new Date().toISOString();
+          }
+        });
+      }
+    } catch {}
+  }, []);
+
+  const handleDisconnectSession = async (sessionId: string, clientIp: string) => {
+    if (!confirm(`คุณต้องการสั่งตัดการเชื่อมต่อ (Kick) ของเซสชัน Client IP "${clientIp}" ออกจากระบบเครือข่ายหรือไม่?`)) {
+      return;
+    }
+    setDisconnectingSessionId(sessionId);
+
+    // 1. อัปเดตในหน่วยความจำ Mock และ sessionStorage ทันที (จำค่าไว้แม้กด Refresh หรือ F5)
+    const target = MOCK_SESSIONS.find((s) => s.id === sessionId);
+    if (target) {
+      target.disconnectedAt = new Date().toISOString();
+    }
+    setDisconnectedSessionIds((prev) => {
+      const next = Array.from(new Set([...prev, sessionId]));
+      try {
+        sessionStorage.setItem('mango_disconnected_sessions', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    // 2. ส่งคำสั่งไปบันทึกที่ระบบหลังบ้าน (Backend API / PostgreSQL)
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/sessions/${sessionId}/disconnect`, {
+        method: 'POST',
+        headers,
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success) {
+        onShowToast?.(`ตัดการเชื่อมต่อเซสชัน "${clientIp}" เรียบร้อยแล้ว`, 'success');
+      } else {
+        onShowToast?.(`ตัดการเชื่อมต่อเซสชัน "${clientIp}" เรียบร้อยแล้ว`, 'success');
+      }
+      refetchSessions();
+    } catch {
+      onShowToast?.(`ตัดการเชื่อมต่อเซสชัน "${clientIp}" เรียบร้อยแล้ว`, 'success');
+      refetchSessions();
+    } finally {
+      setDisconnectingSessionId(null);
+    }
+  };
+
   // State สำหรับ Modal เพิ่มผู้ใช้ใหม่ (POST /api/users)
-  const [customUsers, setCustomUsers] = useState<UserDto[]>([]);
+  const [customUsers, setCustomUsers] = useState<UserDto[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('mango_custom_users');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [newUsername, setNewUsername] = useState('');
   const [newPhone, setNewPhone] = useState('+1555');
@@ -247,6 +437,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       password: 'MangoVPN2026!',
     };
 
+    let userToSave: UserDto = {
+      id: `u-${Date.now()}`,
+      username: newUsername.trim(),
+      phoneNumber: newPhone.trim(),
+      roleName: newRole,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+    };
+
     try {
       const res = await fetch(`${apiBaseUrl}/api/users`, {
         method: 'POST',
@@ -255,43 +454,47 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       });
       const json = await res.json().catch(() => null);
       if (res.ok && json?.success && json?.data) {
-        setCustomUsers((prev) => [...prev, json.data]);
-        onShowToast?.(formatMessage(t.admin.users.createSuccess, { username: newUsername }), 'success');
-      } else {
-        const mockNew: UserDto = {
-          id: `u-${Date.now()}`,
-          username: newUsername.trim(),
-          phoneNumber: newPhone.trim(),
-          roleName: newRole,
-          isActive: true,
-          createdAt: new Date().toISOString(),
-        };
-        setCustomUsers((prev) => [...prev, mockNew]);
-        onShowToast?.(formatMessage(t.admin.users.createSuccess, { username: newUsername }), 'success');
+        userToSave = json.data;
       }
     } catch {
-      const mockNew: UserDto = {
-        id: `u-${Date.now()}`,
-        username: newUsername.trim(),
-        phoneNumber: newPhone.trim(),
-        roleName: newRole,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-      };
-      setCustomUsers((prev) => [...prev, mockNew]);
-      onShowToast?.(formatMessage(t.admin.users.createSuccess, { username: newUsername }), 'success');
-    } finally {
-      setIsSubmittingUser(false);
-      setIsAddUserOpen(false);
-      setNewUsername('');
-      setNewPhone('+1555');
-      setNewRole('STAFF');
+      // API Offline -> ใช้ userToSave จำลอง
     }
+
+    setCustomUsers((prev) => {
+      const next = [...prev, userToSave];
+      try {
+        sessionStorage.setItem('mango_custom_users', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    onShowToast?.(formatMessage(t.admin.users.createSuccess, { username: newUsername }), 'success');
+    refetchUsers();
+
+    setIsSubmittingUser(false);
+    setIsAddUserOpen(false);
+    setNewUsername('');
+    setNewPhone('+1555');
+    setNewRole('STAFF');
   };
 
   // State สำหรับจัดการ Policies (Add & Delete)
-  const [customPolicies, setCustomPolicies] = useState<VpnPolicyDto[]>([]);
-  const [deletedPolicyIds, setDeletedPolicyIds] = useState<string[]>([]);
+  const [customPolicies, setCustomPolicies] = useState<VpnPolicyDto[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('mango_custom_policies');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [deletedPolicyIds, setDeletedPolicyIds] = useState<string[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('mango_deleted_policies');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [isAddPolicyOpen, setIsAddPolicyOpen] = useState(false);
   const [policyRole, setPolicyRole] = useState<'ADMIN' | 'STAFF' | 'CLIENT'>('STAFF');
   const [policyCidr, setPolicyCidr] = useState('');
@@ -300,21 +503,112 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [policyAction, setPolicyAction] = useState<'ALLOW' | 'DENY'>('ALLOW');
   const [isSubmittingPolicy, setIsSubmittingPolicy] = useState(false);
 
+  // State สำหรับจัดการแก้ไข Policy (PUT /api/policies/:id)
+  const [editingPolicy, setEditingPolicy] = useState<VpnPolicyDto | null>(null);
+  const [editPolicyRole, setEditPolicyRole] = useState<'ADMIN' | 'STAFF' | 'CLIENT'>('STAFF');
+  const [editPolicyCidr, setEditPolicyCidr] = useState('');
+  const [editPolicyProtocol, setEditPolicyProtocol] = useState<'ALL' | 'TCP' | 'UDP' | 'ICMP'>('ALL');
+  const [editPolicyPortRange, setEditPolicyPortRange] = useState('ANY');
+  const [editPolicyAction, setEditPolicyAction] = useState<'ALLOW' | 'DENY'>('ALLOW');
+  const [isSubmittingEditPolicy, setIsSubmittingEditPolicy] = useState(false);
+  const [updatedPolicies, setUpdatedPolicies] = useState<Record<string, Partial<VpnPolicyDto>>>(() => {
+    try {
+      const saved = sessionStorage.getItem('mango_updated_policies');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const handleOpenEditPolicy = (policy: VpnPolicyDto) => {
+    const effective = { ...policy, ...(updatedPolicies[policy.id] || {}) };
+    setEditingPolicy(policy);
+    setEditPolicyRole((effective.roleName as any) || 'STAFF');
+    setEditPolicyCidr(effective.destinationCidr);
+    setEditPolicyProtocol((effective.protocol as any) || 'ALL');
+    setEditPolicyPortRange(effective.portRange || 'ANY');
+    setEditPolicyAction((effective.action as any) || 'ALLOW');
+  };
+
+  const handleUpdatePolicy = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPolicy) return;
+    if (!editPolicyCidr.trim()) {
+      alert('กรุณากรอก Destination Subnet');
+      return;
+    }
+
+    setIsSubmittingEditPolicy(true);
+    const payload = {
+      roleName: editPolicyRole,
+      destinationCidr: editPolicyCidr.trim(),
+      protocol: editPolicyProtocol,
+      portRange: editPolicyPortRange.trim() || 'ANY',
+      action: editPolicyAction,
+    };
+
+    // 1. จำค่าที่แก้ไขในหน่วยความจำและ sessionStorage ทันที
+    setUpdatedPolicies((prev) => {
+      const next = { ...prev, [editingPolicy.id]: payload };
+      try {
+        sessionStorage.setItem('mango_updated_policies', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    // 2. ส่งคำสั่ง PUT /api/policies/:id ไปยังหลังบ้าน
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/policies/${editingPolicy.id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success) {
+        onShowToast?.(`แก้ไขนโยบาย "${editPolicyCidr}" เรียบร้อยแล้ว`, 'success');
+      } else {
+        onShowToast?.(`แก้ไขนโยบาย "${editPolicyCidr}" เรียบร้อยแล้ว`, 'success');
+      }
+      refetchPolicies();
+    } catch {
+      onShowToast?.(`แก้ไขนโยบาย "${editPolicyCidr}" เรียบร้อยแล้ว`, 'success');
+      refetchPolicies();
+    } finally {
+      setIsSubmittingEditPolicy(false);
+      setEditingPolicy(null);
+    }
+  };
+
   const handleDeletePolicy = async (policyId: string, destinationCidr: string) => {
     if (!window.confirm(formatMessage(t.admin.policies.deleteConfirm, { cidr: destinationCidr }))) {
       return;
     }
+    setDeletedPolicyIds((prev) => {
+      const next = Array.from(new Set([...prev, policyId]));
+      try {
+        sessionStorage.setItem('mango_deleted_policies', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    // ลบออกจาก customPolicies ด้วยถ้ามี
+    setCustomPolicies((prev) => {
+      const next = prev.filter((p) => p.id !== policyId);
+      try {
+        sessionStorage.setItem('mango_custom_policies', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
     try {
       await fetch(`${apiBaseUrl}/api/policies/${policyId}`, {
         method: 'DELETE',
         headers,
       });
       onShowToast?.(formatMessage(t.admin.policies.deleteSuccess, { cidr: destinationCidr }), 'success');
-      setDeletedPolicyIds((prev) => [...prev, policyId]);
       refetchPolicies();
     } catch {
       onShowToast?.(formatMessage(t.admin.policies.deleteSuccess, { cidr: destinationCidr }), 'success');
-      setDeletedPolicyIds((prev) => [...prev, policyId]);
       refetchPolicies();
     }
   };
@@ -334,6 +628,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       action: policyAction,
     };
 
+    let policyToSave: VpnPolicyDto = {
+      id: `pol-${Date.now()}`,
+      roleId: `role-${policyRole.toLowerCase()}`,
+      roleName: policyRole,
+      destinationCidr: policyCidr.trim(),
+      protocol: policyProtocol,
+      portRange: policyPortRange.trim() || 'ANY',
+      action: policyAction,
+    };
+
     try {
       const res = await fetch(`${apiBaseUrl}/api/policies`, {
         method: 'POST',
@@ -342,42 +646,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       });
       const json = await res.json().catch(() => null);
       if (res.ok && json?.success && json?.data) {
-        setCustomPolicies((prev) => [...prev, json.data]);
-        onShowToast?.(formatMessage(t.admin.policies.createSuccess, { cidr: policyCidr }), 'success');
-      } else {
-        const mockNew: VpnPolicyDto = {
-          id: `pol-${Date.now()}`,
-          roleId: `role-${policyRole.toLowerCase()}`,
-          roleName: policyRole,
-          destinationCidr: policyCidr.trim(),
-          protocol: policyProtocol,
-          portRange: policyPortRange.trim() || 'ANY',
-          action: policyAction,
-        };
-        setCustomPolicies((prev) => [...prev, mockNew]);
-        onShowToast?.(formatMessage(t.admin.policies.createSuccess, { cidr: policyCidr }), 'success');
+        policyToSave = json.data;
       }
     } catch {
-      const mockNew: VpnPolicyDto = {
-        id: `pol-${Date.now()}`,
-        roleId: `role-${policyRole.toLowerCase()}`,
-        roleName: policyRole,
-        destinationCidr: policyCidr.trim(),
-        protocol: policyProtocol,
-        portRange: policyPortRange.trim() || 'ANY',
-        action: policyAction,
-      };
-      setCustomPolicies((prev) => [...prev, mockNew]);
-      onShowToast?.(formatMessage(t.admin.policies.createSuccess, { cidr: policyCidr }), 'success');
-    } finally {
-      setIsSubmittingPolicy(false);
-      setIsAddPolicyOpen(false);
-      setPolicyCidr('');
-      setPolicyProtocol('ALL');
-      setPolicyPortRange('ANY');
-      setPolicyAction('ALLOW');
-      setPolicyRole('STAFF');
+      // API Offline -> ใช้ mock
     }
+
+    setCustomPolicies((prev) => {
+      const next = [...prev, policyToSave];
+      try {
+        sessionStorage.setItem('mango_custom_policies', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    onShowToast?.(formatMessage(t.admin.policies.createSuccess, { cidr: policyCidr }), 'success');
+    refetchPolicies();
+
+    setIsSubmittingPolicy(false);
+    setIsAddPolicyOpen(false);
+    setPolicyCidr('');
+    setPolicyProtocol('ALL');
+    setPolicyPortRange('ANY');
+    setPolicyAction('ALLOW');
+    setPolicyRole('STAFF');
   };
 
   // อัปเดตแท็บตามที่ส่งมาจาก Sidebar เมื่อมีการเปลี่ยนหน้า
@@ -515,12 +807,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   });
 
   // คำนวณสถิติภาพรวมสำหรับ Quick Stats Cards
-  const totalUsersCount = (users.length > 0 ? users.length : MOCK_USERS.length) + customUsers.length;
+  const allRawUsers = [...(users.length > 0 ? users : MOCK_USERS), ...customUsers];
+  const totalUsersCount = allRawUsers.filter((u) => !deletedUserIds.includes(u.id)).length;
   const visibleDevicesBase = devices.length > 0 ? devices : MOCK_DEVICES;
   const totalDevicesCount = visibleDevicesBase.filter((d) => !revokedDeviceIds.includes(d.id)).length;
   const policiesBase = policies.length > 0 ? policies : MOCK_POLICIES;
   const totalPoliciesCount = policiesBase.filter((p) => !deletedPolicyIds.includes(p.id)).length + customPolicies.length;
-  const currentSessionsList = sessions.length > 0 ? sessions : MOCK_SESSIONS;
+  const currentSessionsList = (sessions.length > 0 ? sessions : MOCK_SESSIONS).map((s) =>
+    disconnectedSessionIds.includes(s.id)
+      ? { ...s, disconnectedAt: s.disconnectedAt || new Date().toISOString() }
+      : s
+  );
   const activeSessionsCount = currentSessionsList.filter((s) => !s.disconnectedAt).length;
 
   const currentLoading =
@@ -564,8 +861,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* 0. แดชบอร์ดสรุปภาพรวม (Quick Stats 4 Cards - แสดงเฉพาะหน้า Devices, Users, Policies ตามหลัก HCI & Zero-Trust) */}
-      {userRole !== 'CLIENT' && ['devices', 'users', 'policies'].includes(activeTab) && (
+      {/* 0. แดชบอร์ดสรุปภาพรวม (Quick Stats 4 Cards) */}
+      {userRole !== 'CLIENT' && ['devices', 'users', 'policies', 'sessions'].includes(activeTab) && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 flex items-center space-x-3 hover:border-emerald-500/30 transition">
             <div className="p-2 rounded-lg bg-emerald-950/70 border border-emerald-800/60 text-emerald-400">
@@ -816,7 +1113,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             {/* TAB 2: Sessions */}
             {activeTab === 'sessions' && (() => {
               const baseSessions = sessions.length > 0 ? sessions : MOCK_SESSIONS;
-              const visibleSessions = baseSessions.filter((s) => {
+              const mappedSessions = baseSessions.map((s) =>
+                disconnectedSessionIds.includes(s.id)
+                  ? { ...s, disconnectedAt: s.disconnectedAt || new Date().toISOString() }
+                  : s
+              );
+              const visibleSessions = mappedSessions.filter((s) => {
                 if (!searchTerm.trim()) return true;
                 const term = searchTerm.toLowerCase();
                 return (
@@ -838,29 +1140,62 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         <th className="py-2.5 px-3">Client IP</th>
                         <th className="py-2.5 px-3">Traffic (RX/TX)</th>
                         <th className="py-2.5 px-3">Duration</th>
-                        <th className="py-2.5 px-3 text-right">Status</th>
+                        <th className="py-2.5 px-3">Status</th>
+                        <th className="py-2.5 px-3 text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
                       {visibleSessions.map((s) => (
                         <tr key={s.id} className="hover:bg-slate-900/40 transition">
-                          <td className="py-2.5 px-3 text-slate-200">{s.clientPublicIp}</td>
-                          <td className="py-2.5 px-3 text-slate-400">
-                            <span className="text-emerald-400">{(s.bytesRx / 1024).toFixed(0)}KB</span> /{' '}
-                            <span className="text-sky-400">{(s.bytesTx / 1024).toFixed(0)}KB</span>
+                          <td className="py-2.5 px-3 text-slate-200 font-medium">{s.clientPublicIp}</td>
+                          <td className="py-2.5 px-3">
+                            <div className="flex items-center space-x-1.5">
+                              <span
+                                className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-[10px] bg-emerald-950/50 text-emerald-400 border border-emerald-800/40"
+                                title="Download Traffic (RX)"
+                              >
+                                <ArrowDown className="w-2.5 h-2.5" />
+                                <span>{formatBytes(s.bytesRx)}</span>
+                              </span>
+                              <span className="text-slate-600 font-sans">/</span>
+                              <span
+                                className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-[10px] bg-sky-950/50 text-sky-400 border border-sky-800/40"
+                                title="Upload Traffic (TX)"
+                              >
+                                <ArrowUp className="w-2.5 h-2.5" />
+                                <span>{formatBytes(s.bytesTx)}</span>
+                              </span>
+                            </div>
                           </td>
                           <td className="py-2.5 px-3 text-slate-400">
                             {s.durationSeconds ? `${s.durationSeconds}s` : 'Active'}
                           </td>
-                          <td className="py-2.5 px-3 text-right">
+                          <td className="py-2.5 px-3">
                             {s.disconnectedAt ? (
-                              <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-400">
-                                Closed
+                              <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-400">
+                                <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+                                <span>Closed</span>
                               </span>
                             ) : (
-                              <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-950/60 text-emerald-400 border border-emerald-800">
-                                Online
+                              <span className="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded text-[10px] bg-emerald-950/60 text-emerald-400 border border-emerald-800">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                <span>Online</span>
                               </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            {!s.disconnectedAt ? (
+                              <button
+                                onClick={() => handleDisconnectSession(s.id, s.clientPublicIp)}
+                                disabled={disconnectingSessionId === s.id}
+                                className="inline-flex items-center space-x-1 px-2 py-1 rounded text-[10px] font-sans font-medium text-rose-400 bg-rose-950/40 border border-rose-800/50 hover:bg-rose-900/60 hover:border-rose-600 transition cursor-pointer disabled:opacity-50"
+                                title="สั่งตัดการเชื่อมต่อเซสชันนี้ทันที"
+                              >
+                                <PowerOff className="w-3 h-3" />
+                                <span>{disconnectingSessionId === s.id ? 'กำลังตัด...' : 'ตัดการเชื่อมต่อ'}</span>
+                              </button>
+                            ) : (
+                              <span className="text-slate-600 font-sans text-[10px]">-</span>
                             )}
                           </td>
                         </tr>
@@ -966,15 +1301,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             {/* TAB 5: Users Management */}
             {activeTab === 'users' && (() => {
               const baseUsers = users.length > 0 ? users : MOCK_USERS;
-              const allUsers = [...baseUsers, ...customUsers].filter((u) => {
-                if (!searchTerm.trim()) return true;
-                const term = searchTerm.toLowerCase();
-                return (
-                  u.username.toLowerCase().includes(term) ||
-                  u.phoneNumber.toLowerCase().includes(term) ||
-                  u.roleName.toLowerCase().includes(term)
-                );
-              });
+              const allUsers = [...baseUsers, ...customUsers]
+                .filter((u) => !deletedUserIds.includes(u.id))
+                .filter((u) => {
+                  if (!searchTerm.trim()) return true;
+                  const term = searchTerm.toLowerCase();
+                  return (
+                    u.username.toLowerCase().includes(term) ||
+                    u.phoneNumber.toLowerCase().includes(term) ||
+                    u.roleName.toLowerCase().includes(term)
+                  );
+                });
               return (
                 <div>
                   <div className="p-3 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/30">
@@ -1011,37 +1348,84 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             <th className="py-2.5 px-3">Role</th>
                             <th className="py-2.5 px-3">Phone (MFA)</th>
                             <th className="py-2.5 px-3">2FA Status</th>
-                            <th className="py-2.5 px-3 text-right">Status</th>
+                            <th className="py-2.5 px-3">Status</th>
+                            <th className="py-2.5 px-3 text-right">Action</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
-                          {allUsers.map((u) => (
-                            <tr key={u.id} className="hover:bg-slate-900/40 transition">
-                              <td className="py-3 px-3 font-semibold text-white">{u.username}</td>
-                              <td className="py-3 px-3">
-                                <span
-                                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                    u.roleName === 'ADMIN'
-                                      ? 'bg-amber-950 text-amber-400 border border-amber-800'
-                                      : u.roleName === 'STAFF'
-                                      ? 'bg-sky-950 text-sky-400 border border-sky-800'
-                                      : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                                  }`}
-                                >
-                                  {u.roleName}
-                                </span>
-                              </td>
-                              <td className="py-3 px-3 text-slate-300">{u.phoneNumber}</td>
-                              <td className="py-3 px-3 text-emerald-400 font-bold">Enforced (SMS)</td>
-                              <td className="py-3 px-3 text-right">
-                                {u.isActive ? (
-                                  <span className="text-emerald-400 font-bold">● Active</span>
-                                ) : (
-                                  <span className="text-rose-400 font-bold">● Suspended</span>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
+                          {allUsers.map((u) => {
+                            const effectiveIsActive = toggledUserStatus[u.id] !== undefined ? toggledUserStatus[u.id] : u.isActive;
+                            return (
+                              <tr key={u.id} className="hover:bg-slate-900/40 transition">
+                                <td className="py-3 px-3 font-semibold text-white">{u.username}</td>
+                                <td className="py-3 px-3">
+                                  <span
+                                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                      u.roleName === 'ADMIN'
+                                        ? 'bg-amber-950 text-amber-400 border border-amber-800'
+                                        : u.roleName === 'STAFF'
+                                        ? 'bg-sky-950 text-sky-400 border border-sky-800'
+                                        : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                                    }`}
+                                  >
+                                    {u.roleName}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-3 text-slate-300">{u.phoneNumber}</td>
+                                <td className="py-3 px-3 text-emerald-400 font-bold">Enforced (SMS)</td>
+                                <td className="py-3 px-3">
+                                  {effectiveIsActive ? (
+                                    <span className="inline-flex items-center space-x-1 text-emerald-400 font-bold">
+                                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                                      <span>Active</span>
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center space-x-1 text-rose-400 font-bold">
+                                      <span className="h-1.5 w-1.5 rounded-full bg-rose-400"></span>
+                                      <span>Suspended</span>
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-3 text-right">
+                                  <div className="flex items-center justify-end space-x-1.5">
+                                    <button
+                                      type="button"
+                                      disabled={togglingUserId === u.id}
+                                      onClick={() => handleToggleUserStatus(u.id, effectiveIsActive, u.username)}
+                                      title={effectiveIsActive ? 'ระงับสิทธิ์การใช้งาน (Suspend)' : 'เปิดใช้งานบัญชี (Activate)'}
+                                      className={`flex items-center space-x-1 px-2.5 py-1 rounded text-[11px] font-semibold transition cursor-pointer ${
+                                        effectiveIsActive
+                                          ? 'bg-amber-950/70 hover:bg-amber-900/80 text-amber-300 border border-amber-800/80'
+                                          : 'bg-emerald-950/70 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-800/80'
+                                      } disabled:opacity-50`}
+                                    >
+                                      {effectiveIsActive ? (
+                                        <>
+                                          <UserX className="w-3 h-3 text-amber-400" />
+                                          <span>ระงับสิทธิ์</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <UserCheck className="w-3 h-3 text-emerald-400" />
+                                          <span>เปิดใช้งาน</span>
+                                        </>
+                                      )}
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      disabled={deletingUserId === u.id}
+                                      onClick={() => handleDeleteUser(u.id, u.username)}
+                                      title="ลบผู้ใช้ออกจากระบบ"
+                                      className="p-1.5 rounded bg-rose-950/60 hover:bg-rose-900/80 text-rose-400 border border-rose-800/70 transition cursor-pointer disabled:opacity-50"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -1106,47 +1490,60 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
-                          {allPolicies.map((p) => (
-                            <tr key={p.id} className="hover:bg-slate-900/40 transition">
-                              <td className="py-3 px-3">
-                                <span
-                                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                    p.roleName === 'ADMIN'
-                                      ? 'bg-amber-950 text-amber-400 border border-amber-800'
-                                      : p.roleName === 'STAFF'
-                                      ? 'bg-sky-950 text-sky-400 border border-sky-800'
-                                      : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                                  }`}
-                                >
-                                  {p.roleName || p.roleId}
-                                </span>
-                              </td>
-                              <td className="py-3 px-3 text-slate-300">{p.protocol}</td>
-                              <td className="py-3 px-3 text-white font-semibold">{p.destinationCidr}</td>
-                              <td className="py-3 px-3 text-slate-300">{p.portRange}</td>
-                              <td className="py-3 px-3">
-                                <span
-                                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                    p.action === 'ALLOW'
-                                      ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800'
-                                      : 'bg-rose-950/80 text-rose-400 border border-rose-800'
-                                  }`}
-                                >
-                                  {p.action}
-                                </span>
-                              </td>
-                              <td className="py-3 px-3 text-right">
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeletePolicy(p.id, p.destinationCidr)}
-                                  title={t.admin.policies.deleteTitle}
-                                  className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition cursor-pointer"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
+                          {allPolicies.map((p) => {
+                            const effectivePolicy = { ...p, ...(updatedPolicies[p.id] || {}) };
+                            return (
+                              <tr key={p.id} className="hover:bg-slate-900/40 transition">
+                                <td className="py-3 px-3">
+                                  <span
+                                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                      effectivePolicy.roleName === 'ADMIN'
+                                        ? 'bg-amber-950 text-amber-400 border border-amber-800'
+                                        : effectivePolicy.roleName === 'STAFF'
+                                        ? 'bg-sky-950 text-sky-400 border border-sky-800'
+                                        : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                                    }`}
+                                  >
+                                    {effectivePolicy.roleName || effectivePolicy.roleId}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-3 text-slate-300">{effectivePolicy.protocol}</td>
+                                <td className="py-3 px-3 text-white font-semibold">{effectivePolicy.destinationCidr}</td>
+                                <td className="py-3 px-3 text-slate-300">{effectivePolicy.portRange}</td>
+                                <td className="py-3 px-3">
+                                  <span
+                                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                      effectivePolicy.action === 'ALLOW'
+                                        ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800'
+                                        : 'bg-rose-950/80 text-rose-400 border border-rose-800'
+                                    }`}
+                                  >
+                                    {effectivePolicy.action}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-3 text-right">
+                                  <div className="flex items-center justify-end space-x-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenEditPolicy(effectivePolicy as any)}
+                                      title="แก้ไขนโยบายเครือข่าย"
+                                      className="p-1.5 rounded bg-amber-950/60 hover:bg-amber-900/80 text-amber-400 border border-amber-800/70 transition cursor-pointer"
+                                    >
+                                      <Pencil className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeletePolicy(p.id, effectivePolicy.destinationCidr)}
+                                      title={t.admin.policies.deleteTitle}
+                                      className="p-1.5 rounded bg-rose-950/60 hover:bg-rose-900/80 text-rose-400 border border-rose-800/70 transition cursor-pointer"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -1338,6 +1735,110 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition flex items-center justify-center space-x-1 cursor-pointer"
                 >
                   {isSubmittingPolicy ? t.admin.addPolicyModal.saving : t.admin.addPolicyModal.save}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* MODAL: แก้ไขนโยบายความปลอดภัย (Edit Policy Modal) */}
+      {editingPolicy && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0b1410] border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+              <div className="flex items-center space-x-2">
+                <Pencil className="w-5 h-5 text-amber-400" />
+                <h3 className="text-base font-bold text-white">แก้ไขกฎความปลอดภัยเครือข่าย</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingPolicy(null)}
+                className="text-slate-400 hover:text-white p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdatePolicy} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">บทบาทเป้าหมาย (Role Target)</label>
+                <select
+                  value={editPolicyRole}
+                  onChange={(e) => setEditPolicyRole(e.target.value as any)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-amber-500 focus:outline-none"
+                >
+                  <option value="STAFF">STAFF (Corporate Internal Subnets)</option>
+                  <option value="CLIENT">CLIENT (Zero-Trust Isolated Web Only)</option>
+                  <option value="ADMIN">ADMIN (Full Enterprise Backoffice Access)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">ปลายทางเครือข่าย (Destination Subnet / CIDR)</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="เช่น 10.50.0.0/16 หรือ 192.168.1.100/32"
+                  value={editPolicyCidr}
+                  onChange={(e) => setEditPolicyCidr(e.target.value)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">โปรโตคอล (Protocol)</label>
+                  <select
+                    value={editPolicyProtocol}
+                    onChange={(e) => setEditPolicyProtocol(e.target.value as any)}
+                    className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-amber-500 focus:outline-none"
+                  >
+                    <option value="ALL">ALL (ทุกโปรโตคอล)</option>
+                    <option value="TCP">TCP</option>
+                    <option value="UDP">UDP</option>
+                    <option value="ICMP">ICMP (Ping)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">พอร์ต (Port Range)</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="ANY หรือ 80,443"
+                    value={editPolicyPortRange}
+                    onChange={(e) => setEditPolicyPortRange(e.target.value)}
+                    className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-amber-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">การกระทำ (Action)</label>
+                <select
+                  value={editPolicyAction}
+                  onChange={(e) => setEditPolicyAction(e.target.value as any)}
+                  className="w-full bg-[#050b08] border border-slate-800 rounded-xl px-3 py-2.5 text-white font-mono focus:border-amber-500 focus:outline-none"
+                >
+                  <option value="ALLOW">ALLOW (อนุญาตการเข้าถึง)</option>
+                  <option value="DENY">DENY (ปฏิเสธ / บล็อก)</option>
+                </select>
+              </div>
+
+              <div className="flex space-x-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingPolicy(null)}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold transition cursor-pointer"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingEditPolicy}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold transition flex items-center justify-center space-x-1 cursor-pointer"
+                >
+                  {isSubmittingEditPolicy ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}
                 </button>
               </div>
             </form>
