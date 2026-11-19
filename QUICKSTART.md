@@ -4,6 +4,9 @@
 
 This guide details all **software tools, programs, runtimes, and dependencies** required to develop, run, and test MANGO VPN, along with step-by-step instructions on **how to check if your machine is ready**.
 
+> [!IMPORTANT]
+> **Using an AI Assistant?** Instruct your AI to read [`AGENTS.md`](AGENTS.md) ([ภาษาไทย](AGENTS.th.md)) before starting any task. It defines project scope, cross-boundary collaboration rules (`Rain/`, `Sobree/`, `packages/shared/`), and strict anti-mock guardrails.
+
 ---
 
 ## 1. Tool Matrix & Role Requirements
@@ -14,7 +17,7 @@ This guide details all **software tools, programs, runtimes, and dependencies** 
 | **npm** | **Both** (Rain & Sobree) | `9.0.0` | `10.x` | Monorepo workspaces (`Rain/*`, `Sobree/*`, `packages/*`) | Bundled with Node |
 | **Git** | **Both** (Rain & Sobree) | `2.30.0` | Latest | Version control and monorepo branching | [git-scm.com](https://git-scm.com/) |
 | **Docker Desktop** | **Sobree** (Senior Dev) | `24.0.0` | Latest | PostgreSQL 16 DB container & Linux WireGuard gateway (`NET_ADMIN`) | [docker.com](https://www.docker.com/products/docker-desktop/) |
-| **Go Toolchain** | **Sobree** (Senior Dev) | `1.22.0` | `1.22+` | Windows Service agent (`apps/agent-windows`) & Linux VPN daemon (`services/vpn-daemon`) | [go.dev](https://go.dev/dl/) |
+| **Go Toolchain** | **Sobree** (Senior Dev) | `1.22.0` | `1.22+` | Windows Service agent (`Sobree/agent-windows`) & Linux VPN daemon (`Sobree/vpn-daemon`) | [go.dev](https://go.dev/dl/) |
 | **WireGuard** | **Sobree** (Senior Dev) | `0.5.3` | Latest | Client tunnel interface testing on Windows | [wireguard.com](https://www.wireguard.com/install/) |
 | **VS Code** *(Optional)* | **Both** | Latest | Latest | Code editing with syntax highlighting & auto-complete | [code.visualstudio.com](https://code.visualstudio.com/) |
 

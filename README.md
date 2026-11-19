@@ -11,19 +11,24 @@ MANGO VPN eliminates manual `.conf` file management for corporate VPN users thro
 ## 📚 Documentation Index
 
 - **English**:
-  - **[🚀 Quick Start & Environment Readiness Guide](file:///e:/Trainee/Mango_VPN_Trainee/QUICKSTART.md)**: Tool prerequisites, verification scripts, and port mapping.
-  - **[🌧️ Rain's Development Guide](file:///e:/Trainee/Mango_VPN_Trainee/Rain/README.md)**: Web Portal UI & Admin CRUD development.
-  - **[⚡ Sobree's Development Guide](file:///e:/Trainee/Mango_VPN_Trainee/Sobree/README.md)**: Management API, Go Windows Service, and Linux VPN Daemon.
+  - **[🤖 AI Development & Project Scoping Guide (`AGENTS.md`)](AGENTS.md)**: **Mandatory reading for all AI coding assistants** — scope rules, cross-boundary collaboration, and anti-hallucination guardrails.
+  - **[🚀 Quick Start & Environment Readiness Guide](QUICKSTART.md)**: Tool prerequisites, verification scripts, and port mapping.
+  - **[🌧️ Rain's Development Guide](Rain/README.md)**: Web Portal UI & Admin CRUD development.
+  - **[⚡ Sobree's Development Guide](Sobree/README.md)**: Management API, Go Windows Service, and Linux VPN Daemon.
 - **ภาษาไทย**:
-  - **[🚀 คู่มือเริ่มต้นด่วน & ตรวจสอบความพร้อมของเครื่องมือ](file:///e:/Trainee/Mango_VPN_Trainee/QUICKSTART.th.md)**
-  - **[🌧️ คู่มือการพัฒนาสำหรับ Rain](file:///e:/Trainee/Mango_VPN_Trainee/Rain/README.th.md)**
-  - **[⚡ คู่มือการพัฒนาสำหรับ Sobree](file:///e:/Trainee/Mango_VPN_Trainee/Sobree/README.th.md)**
+  - **[🤖 คู่มือควบคุม AI และการกำหนดขอบเขตโปรเจกต์ (`AGENTS.th.md`)](AGENTS.th.md)**
+  - **[🚀 คู่มือเริ่มต้นด่วน & ตรวจสอบความพร้อมของเครื่องมือ](QUICKSTART.th.md)**
+  - **[🌧️ คู่มือการพัฒนาสำหรับ Rain](Rain/README.th.md)**
+  - **[⚡ คู่มือการพัฒนาสำหรับ Sobree](Sobree/README.th.md)**
 
 ---
 
 ## 1. Team Monorepo Organization: `Rain` & `Sobree`
 
-To ensure zero git conflicts and complete decoupling of responsibilities, the codebase is partitioned into two dedicated engineer directories:
+The codebase is organized by **primary ownership** into two engineer directories plus shared contracts.
+
+> [!IMPORTANT]
+> **AI-Assisted Cross-Boundary Workflow**: While `Rain/` and `Sobree/` define primary ownership, **either developer's AI assistant may edit across `Rain/`, `Sobree/`, and `packages/shared/` on a feature branch** when a task requires full-stack integration. Always follow [`AGENTS.md`](AGENTS.md) before scoping or implementing changes.
 
 ```text
 mango-vpn/

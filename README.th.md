@@ -10,15 +10,19 @@ MANGO VPN ออกแบบมาเพื่อขจัดความยุ�
 
 ## 📚 สารบัญคู่มือและเอกสาร
 
-- **[🚀 คู่มือเริ่มต้นด่วน & ตรวจสอบความพร้อมของเครื่องมือ (QUICKSTART.th.md)](file:///e:/Trainee/Mango_VPN_Trainee/QUICKSTART.th.md)**: รายการโปรแกรมที่ต้องติดตั้ง, สคริปต์ตรวจสอบอัตโนมัติ และการจัดสรรพอร์ต
-- **[🌧️ คู่มือการพัฒนาสำหรับ Rain](file:///e:/Trainee/Mango_VPN_Trainee/Rain/README.th.md)**: การพัฒนาหน้าเว็บ Portal UI และระบบ Admin CRUD
-- **[⚡ คู่มือการพัฒนาสำหรับ Sobree](file:///e:/Trainee/Mango_VPN_Trainee/Sobree/README.th.md)**: การพัฒนาระบบ Management API, Go Windows Service และ Linux VPN Daemon
+- **[🤖 คู่มือควบคุม AI และการกำหนดขอบเขตโปรเจกต์ (`AGENTS.th.md`)](AGENTS.th.md)**: **เอกสารบังคับอ่านสำหรับ AI ผู้ช่วยทุกตัว** — กฎการวางขอบเขตงาน การแก้โค้ดข้ามโฟลเดอร์ และข้อห้ามเรื่อง Mock หลอกๆ
+- **[🚀 คู่มือเริ่มต้นด่วน & ตรวจสอบความพร้อมของเครื่องมือ (QUICKSTART.th.md)](QUICKSTART.th.md)**: รายการโปรแกรมที่ต้องติดตั้ง, สคริปต์ตรวจสอบอัตโนมัติ และการจัดสรรพอร์ต
+- **[🌧️ คู่มือการพัฒนาสำหรับ Rain](Rain/README.th.md)**: การพัฒนาหน้าเว็บ Portal UI และระบบ Admin CRUD
+- **[⚡ คู่มือการพัฒนาสำหรับ Sobree](Sobree/README.th.md)**: การพัฒนาระบบ Management API, Go Windows Service และ Linux VPN Daemon
 
 ---
 
 ## 1. โครงสร้าง Monorepo: การแบ่งโฟลเดอร์ `Rain` และ `Sobree`
 
-เพื่อป้องกันปัญหา Git Merge Conflicts และแบ่งขอบเขตงานอย่างชัดเจน โค้ดทั้งหมดจึงถูกแบ่งออกเป็น 2 โฟลเดอร์หลักตามผู้รับผิดชอบ:
+โค้ดในระบบจัดแบ่งออกเป็น 2 โฟลเดอร์หลักตาม **ผู้รับผิดชอบหลัก (Primary Ownership)** พร้อมแพ็กเกจสัญญาข้อมูลกลาง
+
+> [!IMPORTANT]
+> **การทำงานร่วมกับ AI แบบข้ามโฟลเดอร์ (Cross-Boundary Workflow)**: แม้จะแบ่งโฟลเดอร์ดูแลหลักไว้ที่ `Rain/` และ `Sobree/` แต่ **AI ของทั้งสองคนได้รับอนุญาตให้แก้ไขไฟล์ข้ามโฟลเดอร์ระหว่าง `Rain/`, `Sobree/` และ `packages/shared/` บน Feature Branch ได้** เมื่อต้องเชื่อมต่อระบบแบบ End-to-End โปรดให้อ่าน [`AGENTS.th.md`](AGENTS.th.md) ก่อนเริ่มงานทุกครั้ง
 
 ```text
 mango-vpn/
