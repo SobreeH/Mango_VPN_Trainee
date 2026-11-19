@@ -204,16 +204,30 @@ export default function App() {
         const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
         setMockExpectedOtp(generatedOtp);
 
+        const maskedPhone = account.phone
+          ? account.phone.substring(0, 5) + '****' + account.phone.slice(-3)
+          : '+1555****567';
+
         setMfaChallenge({
           requiresOtp: true,
           challengeId: 'mock-challenge-dev',
-          maskedPhoneNumber: account.phone ? account.phone.substring(0, 5) + '****' + account.phone.slice(-3) : '+1555****567',
+          maskedPhoneNumber: maskedPhone,
           expiresInSeconds: 300,
           message: 'Dev Mock Mode',
         });
-        // จำลองการส่ง SMS Notification เข้ามาที่หน้าจอ
+
+        // จำลองการพิมพ์รหัส OTP ออกทาง Terminal/Console เหมือน Backend API ของ Sobree
+        console.log(`
+==================================================
+[AUTH MFA] OTP Generated for User: ${cleanUsername}
+[AUTH MFA] Challenge ID: mock-challenge-dev
+[AUTH MFA] 6-Digit OTP:  >>>>> ${generatedOtp} <<<<<
+==================================================
+        `);
+
+        // หน้าเว็บแสดงเฉพาะข้อความว่าส่ง OTP แล้ว โดยไม่เปิดเผยรหัสตัวเลขบนหน้าจอ
         showToast(
-          formatMessage(t.toasts.smsOtpReceived, { otp: generatedOtp }),
+          formatMessage(t.toasts.otpSent, { phone: maskedPhone }),
           'info',
         );
       } else {
@@ -230,10 +244,18 @@ export default function App() {
     const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
     setMockExpectedOtp(newOtp);
     setOtpCode('');
-    showToast(
-      formatMessage(t.toasts.smsOtpReceived, { otp: newOtp }),
-      'info',
-    );
+
+    // จำลองการพิมพ์รหัสชุดใหม่ลง Terminal/Console
+    console.log(`
+==================================================
+[AUTH MFA] Resent OTP for User: ${username.trim()}
+[AUTH MFA] Challenge ID: mock-challenge-dev
+[AUTH MFA] 6-Digit OTP:  >>>>> ${newOtp} <<<<<
+==================================================
+    `);
+
+    // หน้าเว็บแสดงเฉพาะข้อความว่าส่งรหัสชุดใหม่แล้ว โดยไม่เปิดเผยรหัสตัวเลขบนหน้าจอ
+    showToast(t.toasts.otpResentSuccess, 'info');
   };
 
   // ฟังก์ชันยืนยัน OTP Step 3 -> Step 4
