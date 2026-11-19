@@ -132,6 +132,7 @@ export interface Translations {
     selectGateway: string;
     gatewayStatusOnline: string;
     currentConnectedTo: string;
+    gatewaySwitched: string;
     gateways: {
       hqTitle: string;
       hqDesc: string;
@@ -413,6 +414,7 @@ export const translations: Record<Language, Translations> = {
       selectGateway: 'เลือก Gateway สำหรับเชื่อมต่อ',
       gatewayStatusOnline: 'พร้อมใช้งาน',
       currentConnectedTo: 'เชื่อมต่อไปยัง:',
+      gatewaySwitched: 'สลับไปยัง {gateway} แล้ว ระบบตัดการเชื่อมต่อเดิมเรียบร้อย กรุณากดเชื่อมต่อใหม่',
       gateways: {
         hqTitle: 'HQ Datacenter (ศูนย์ข้อมูลหลัก)',
         hqDesc: 'เซิร์ฟเวอร์ On-Premises, Storage & LDAP (10.0.0.0/8)',
@@ -692,6 +694,7 @@ export const translations: Record<Language, Translations> = {
       selectGateway: 'Select Gateway to Connect',
       gatewayStatusOnline: 'Online',
       currentConnectedTo: 'Connected to:',
+      gatewaySwitched: 'Switched to {gateway}. Prior tunnel disconnected, please click Connect.',
       gateways: {
         hqTitle: 'HQ Datacenter (Core Servers)',
         hqDesc: 'On-Premises Core, Storage & LDAP (10.0.0.0/8)',

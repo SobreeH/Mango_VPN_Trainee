@@ -64,6 +64,28 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
   const selectedGateway: GatewayTarget =
     ADMIN_GATEWAYS.find((g) => g.id === selectedGatewayId) || ADMIN_GATEWAYS[3];
 
+  // ฟังก์ชันเลือก Gateway สำหรับ Admin:
+  // หากกำลังเชื่อมต่ออยู่ ให้สั่งตัดการเชื่อมต่อเดิมออกทันที และแจ้งเตือนให้ผู้ใช้กดเชื่อมต่อใหม่
+  const handleSelectGateway = (gw: GatewayTarget) => {
+    if (loading) return;
+    if (selectedGatewayId === gw.id) return;
+
+    const isCurrentlyActive = connectionState === 'connected' || connectionState === 'connecting';
+    setSelectedGatewayId(gw.id);
+
+    if (isCurrentlyActive) {
+      onDisconnect();
+      if (onNotify) {
+        onNotify(
+          formatMessage(t.dashboard.gatewaySwitched, {
+            gateway: t.dashboard.gateways[gw.nameKey],
+          }),
+          'info'
+        );
+      }
+    }
+  };
+
   const renderGatewayIcon = (icon: 'building' | 'cloud' | 'flask' | 'globe', className: string) => {
     switch (icon) {
       case 'cloud':
@@ -200,7 +222,7 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
                 <button
                   key={gw.id}
                   type="button"
-                  onClick={() => !loading && setSelectedGatewayId(gw.id)}
+                  onClick={() => handleSelectGateway(gw)}
                   disabled={loading}
                   className={`text-left p-3 rounded-xl border transition-all cursor-pointer relative overflow-hidden ${
                     isSelected
@@ -420,7 +442,11 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
               <span className={isConnected ? 'text-emerald-400 font-bold' : 'text-slate-500'}>
                 {isConnected ? '[ OK ]' : '[ .. ]'}
               </span>
-              <span>agent /connect</span>
+              <span>
+                {user.role === 'ADMIN'
+                  ? `agent /connect · ${selectedGateway.endpoint}`
+                  : 'agent /connect'}
+              </span>
             </div>
             <div className="flex items-center space-x-2">
               <span className={isConnected ? 'text-emerald-400 font-bold' : 'text-slate-500'}>
@@ -428,7 +454,7 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
               </span>
               <span>
                 {isConnected
-                  ? `tunnel up · ${assignedIp ? `${assignedIp}/32` : '10.13.13.45/32'}`
+                  ? `tunnel up · ${user.role === 'ADMIN' ? selectedGateway.defaultIp : assignedIp ? `${assignedIp}/32` : '10.13.13.45/32'}`
                   : 'waiting for tunnel...'}
               </span>
             </div>

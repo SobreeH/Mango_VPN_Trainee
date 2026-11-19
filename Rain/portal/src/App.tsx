@@ -349,7 +349,15 @@ export default function App() {
   const handleConnectVpn = async () => {
     if (!authData) return;
     if (!agentInstalled) {
-      showToast(t.toasts.agentNotFound, 'error');
+      // โหมดทดสอบ UI (Dev Mock Simulation):
+      // จำลองสถานะ connecting -> connected เพื่อให้ทดสอบหน้าจอและการสลับ Gateway ได้อย่างราบรื่น
+      setConnectionState('connecting');
+      setLoading(true);
+      setTimeout(() => {
+        setConnectionState('connected');
+        setLoading(false);
+        showToast(t.toasts.vpnConnected, 'success');
+      }, 500);
       return;
     }
 
