@@ -5,6 +5,7 @@ import {
   AlertCircle,
   Crown,
   UserCheck,
+  ChevronDown,
 } from 'lucide-react';
 import { createLoginSchema } from '../schemas/auth.schema';
 import { useI18n } from '../i18n/I18nContext';
@@ -100,51 +101,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({
           </div>
         </div>
 
-        {/* 3. ปุ่มลัดทดสอบ Demo Accounts (1-Click Fill) */}
-        <div className="pt-1">
-          <div className="grid grid-cols-3 gap-1.5">
-            <button
-              type="button"
-              onClick={() => handleSelectDemo('admin_user')}
-              className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 border transition cursor-pointer ${
-                username === 'admin_user'
-                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm'
-                  : 'bg-slate-900/60 text-slate-400 border-slate-800 hover:text-slate-200'
-              }`}
-            >
-              <Crown className="w-3 h-3 text-amber-400" />
-              <span>Admin</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleSelectDemo('staff_user')}
-              className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 border transition cursor-pointer ${
-                username === 'staff_user'
-                  ? 'bg-sky-500/20 text-sky-300 border-sky-500/50 shadow-sm'
-                  : 'bg-slate-900/60 text-slate-400 border-slate-800 hover:text-slate-200'
-              }`}
-            >
-              <Shield className="w-3 h-3 text-sky-400" />
-              <span>Staff</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleSelectDemo('client_user')}
-              className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 border transition cursor-pointer ${
-                username === 'client_user'
-                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-sm'
-                  : 'bg-slate-900/60 text-slate-400 border-slate-800 hover:text-slate-200'
-              }`}
-            >
-              <UserCheck className="w-3 h-3 text-emerald-400" />
-              <span>Client</span>
-            </button>
-          </div>
-        </div>
-
-        {/* 4. ช่องกรอกข้อมูล (Inputs) */}
+        {/* 3. ช่องกรอกข้อมูล (Inputs) */}
         <div className="space-y-4 pt-1">
           {/* ช่องที่ 1: ชื่อผู้ใช้ */}
           <div>
@@ -233,24 +190,74 @@ export const LoginForm: React.FC<LoginFormProps> = ({
         </div>
       </form>
 
-      {/* 6. ส่วนล่างสุด: ลิงก์ดาวน์โหลด Agent และติดต่อ Admin */}
-      <div className="text-center text-xs text-slate-400 pt-8 pb-2">
-        <span>{t.login.agentNotInstalled}</span>
-        <button
-          type="button"
-          onClick={() => alert(t.login.downloadAgentAlert)}
-          className="text-emerald-400 hover:text-emerald-300 font-medium transition cursor-pointer"
-        >
-          {t.login.downloadAgent}
-        </button>
-        <span className="text-slate-500 mx-1">·</span>
-        <button
-          type="button"
-          onClick={() => alert(t.login.contactAdminAlert)}
-          className="text-emerald-400 hover:text-emerald-300 font-medium transition cursor-pointer"
-        >
-          {t.login.contactAdmin}
-        </button>
+      {/* 5. ส่วนล่างสุด: ลิงก์ดาวน์โหลด Agent และติดต่อ Admin */}
+      <div className="space-y-4 pt-6 pb-2">
+        <div className="text-center text-xs text-slate-400">
+          <span>{t.login.agentNotInstalled}</span>
+          <button
+            type="button"
+            onClick={() => alert(t.login.downloadAgentAlert)}
+            className="text-emerald-400 hover:text-emerald-300 font-medium transition cursor-pointer"
+          >
+            {t.login.downloadAgent}
+          </button>
+          <span className="text-slate-500 mx-1">·</span>
+          <button
+            type="button"
+            onClick={() => alert(t.login.contactAdminAlert)}
+            className="text-emerald-400 hover:text-emerald-300 font-medium transition cursor-pointer"
+          >
+            {t.login.contactAdmin}
+          </button>
+        </div>
+
+        {/* แถบพับเก็บได้สำหรับทดสอบ Demo Accounts โดยไม่แย่งสายตา */}
+        <details className="group border border-slate-800/80 rounded-xl bg-slate-900/40 p-2.5 text-left transition">
+          <summary className="text-[11px] font-mono text-slate-500 hover:text-slate-300 cursor-pointer flex items-center justify-between select-none">
+            <span>⚡ {t.login.demoAccountsTitle}</span>
+            <ChevronDown className="w-3.5 h-3.5 transition-transform duration-200 group-open:rotate-180 text-slate-500" />
+          </summary>
+          <div className="pt-2.5 grid grid-cols-3 gap-1.5">
+            <button
+              type="button"
+              onClick={() => handleSelectDemo('admin_user')}
+              className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 border transition cursor-pointer ${
+                username === 'admin_user'
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm'
+                  : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-200'
+              }`}
+            >
+              <Crown className="w-3 h-3 text-amber-400" />
+              <span>Admin</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSelectDemo('staff_user')}
+              className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 border transition cursor-pointer ${
+                username === 'staff_user'
+                  ? 'bg-sky-500/20 text-sky-300 border-sky-500/50 shadow-sm'
+                  : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-200'
+              }`}
+            >
+              <Shield className="w-3 h-3 text-sky-400" />
+              <span>Staff</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSelectDemo('client_user')}
+              className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 border transition cursor-pointer ${
+                username === 'client_user'
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-sm'
+                  : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-200'
+              }`}
+            >
+              <UserCheck className="w-3 h-3 text-emerald-400" />
+              <span>Client</span>
+            </button>
+          </div>
+        </details>
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, RefreshCw, AlertCircle } from 'lucide-react';
 import { createOtpSchema } from '../schemas/auth.schema';
 import { useI18n } from '../i18n/I18nContext';
+import { formatMessage } from '../i18n/translations';
 
 // =========================================================================
 // 1. Props Interface
@@ -13,6 +14,7 @@ interface OtpModalProps {
   loading: boolean;
   onVerify: (e: React.FormEvent) => void;
   onBack: () => void;
+  onResendOtp?: () => void;
 }
 
 // =========================================================================
@@ -25,23 +27,45 @@ export const OtpModal: React.FC<OtpModalProps> = ({
   loading,
   onVerify,
   onBack,
+  onResendOtp,
 }) => {
   const { t } = useI18n();
   const [error, setError] = useState<string | null>(null);
 
-  // ตัวนับเวลาถอยหลัง (นับถอยหลังเริ่มต้นที่ 4 นาที 32 วินาที = 272 วินาที ตามภาพเป๊ะๆ)
-  const [timerSeconds, setTimerSeconds] = useState(272);
+  // ตัวนับเวลาถอยหลัง (นับถอยหลังเริ่มต้นที่ 5 นาที = 300 วินาที)
+  const [timerSeconds, setTimerSeconds] = useState(300);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   // Array เก็บ Ref ของทั้ง 6 ช่อง
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // นับเวลาถอยหลัง 1 วินาที
+  // นับเวลาถอยหลัง OTP 1 วินาที
   useEffect(() => {
     const timer = setInterval(() => {
       setTimerSeconds((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // นับเวลา Cooldown ขอรหัสใหม่
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const cooldownTimer = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(cooldownTimer);
+  }, [resendCooldown]);
+
+  // จัดการการกดขอรหัส OTP ใหม่
+  const handleResendClick = () => {
+    if (resendCooldown > 0) return;
+    setOtpCode('');
+    setError(null);
+    setTimerSeconds(300);
+    setResendCooldown(30);
+    inputRefs.current[0]?.focus();
+    onResendOtp?.();
+  };
 
   // แปลงวินาทีเป็นรูปแบบ M:SS เช่น 4:32
   const formatTime = (totalSec: number) => {
@@ -194,7 +218,7 @@ export const OtpModal: React.FC<OtpModalProps> = ({
             </p>
           )}
 
-          {/* 5. ตัวนับเวลารหัสหมดอายุ + ปุ่มลัดเติม 123456 */}
+          {/* 5. ตัวนับเวลารหัสหมดอายุ + ปุ่มขอรหัสใหม่ */}
           <div className="flex items-center justify-between text-xs text-slate-400 mt-3 pt-1">
             <div>
               {t.otp.expiresInPrefix}{' '}
@@ -204,17 +228,18 @@ export const OtpModal: React.FC<OtpModalProps> = ({
               {t.otp.expiresInSuffix}
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                setOtpCode('123456');
-                setError(null);
-                inputRefs.current[5]?.focus();
-              }}
-              className="text-[11px] text-emerald-400 hover:text-emerald-300 font-mono transition cursor-pointer"
-            >
-              ⚡ Auto-fill: 123456
-            </button>
+            {onResendOtp && (
+              <button
+                type="button"
+                disabled={resendCooldown > 0}
+                onClick={handleResendClick}
+                className="text-[11px] text-emerald-400 hover:text-emerald-300 disabled:text-slate-600 disabled:cursor-not-allowed font-medium transition cursor-pointer"
+              >
+                {resendCooldown > 0
+                  ? formatMessage(t.otp.resendCooldown, { seconds: resendCooldown })
+                  : t.otp.resendOtp}
+              </button>
+            )}
           </div>
         </div>
 

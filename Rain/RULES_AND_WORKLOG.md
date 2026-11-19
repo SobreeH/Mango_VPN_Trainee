@@ -364,3 +364,30 @@
   - `Rain/portal/src/components/AdminPanel.tsx` *(เพิ่ม UI จัดการ Session Disconnect, Quick Stats, User Status Toggle, Delete User, Policy Edit Modal & Persistence)*
   - `Rain/RULES_AND_WORKLOG.md` *(อัปเดตบันทึกประจำวัน)*
 
+---
+
+### 📅 วันที่: 2026-11-19
+- **Branch**: `feature/login-otp-refactor`
+- **สิ่งที่ทำ**:
+  1. วิเคราะห์และรับฟังฟีดแบคเรื่องความสมจริงของระบบ Enterprise VPN และ Zero-Trust:
+     - แก้ไขหน้า Login ไม่ให้มีปุ่มเลือก Role เด่นหรา (Admin/Staff/Client) ซึ่งขัดกับหลักความปลอดภัยจริงที่ผู้ใช้ต้องกรอกแค่ Username/Password แล้วระบบตรวจสอบสิทธิ์เอง
+     - แก้ไขปุ่มเฉลยรหัส OTP `123456` ที่แปะไว้หน้า OtpModal ซึ่งทำให้ดูไม่เหมือนระบบความปลอดภัยจริง
+  2. ดำเนินการรีแฟกเตอร์ตาม Implementation Plan:
+     - แตก Branch ใหม่ `feature/login-otp-refactor` ตามกฎข้อที่ 1
+     - อัปเดต `translations.ts` เพิ่มคำแปลทั้งภาษาไทยและอังกฤษสำหรับ SMS OTP Simulator, ปุ่มขอรหัสใหม่ (Resend OTP) และป้ายกำกับระดับสิทธิ์ Zero-Trust
+     - ปรับปรุง `LoginForm.tsx`: ย้ายปุ่มสลับบัญชีทดสอบไปไว้ในแถบพับเก็บได้สำหรับนักพัฒนา (Developer Demo Collapsible Drawer) ด้านล่างสุด คืนความคลีนและเรียบหรูระดับโปรดักชันให้กับหน้า Login
+     - ปรับปรุง `OtpModal.tsx`: ลบปุ่ม `⚡ Auto-fill: 123456` ออก 100%, เพิ่มปุ่ม "ขอรหัสใหม่" พร้อมระบบ Cooldown 30 วินาทีและรีเซ็ตเวลานับถอยหลัง 5 นาที
+     - ปรับปรุง `App.tsx`: เพิ่มระบบ Dynamic 6-Digit OTP Generator (`Math.random()`), จำลองระบบรับ SMS Notification เด้งขึ้นมาบนหน้าจอแบบเรียลไทม์, และมีระบบตรวจสอบความถูกต้องจริงของรหัส OTP หากกรอกผิดจะขึ้นแจ้งเตือนสีแดงและไม่อนุญาตให้ผ่าน
+     - ปรับปรุง `Sidebar.tsx` และ `VpnDashboard.tsx`: เสริมความชัดเจนของแนวคิด Zero-Trust โดยระบุป้ายสิทธิ์การเข้าถึง (Restricted Web Portal vs Corporate Subnets vs Full Access) ของ Client, Staff, และ Admin ไว้อย่างชัดเจนทั้งบนแถบข้าง แผนภาพอุโมงค์ และกล่อง Allowed Networks
+  3. ตรวจสอบความถูกต้องและทดสอบคอมไพล์ผ่าน 100%:
+     - `npm --workspace=@mango/portal run build` (ผ่านฉลุย ไม่มี Error)
+- **ไฟล์ที่สร้าง/แก้ไข**:
+  - `Rain/portal/src/i18n/translations.ts`
+  - `Rain/portal/src/components/LoginForm.tsx`
+  - `Rain/portal/src/components/OtpModal.tsx`
+  - `Rain/portal/src/App.tsx`
+  - `Rain/portal/src/components/Sidebar.tsx`
+  - `Rain/portal/src/components/VpnDashboard.tsx`
+  - `Rain/RULES_AND_WORKLOG.md`
+
+

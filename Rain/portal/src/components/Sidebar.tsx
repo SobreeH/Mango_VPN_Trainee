@@ -113,13 +113,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="pt-4 border-t border-slate-800/80 space-y-3">
         {/* ข้อมูลผู้ใช้และ Role */}
         <div className="px-2">
-          <div className="font-semibold text-white text-sm tracking-wide">
+          <div className="font-semibold text-white text-sm tracking-wide truncate">
             {user.username}
           </div>
-          <div className="mt-1">
-            <span className="inline-block text-[10px] font-bold font-mono px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800/60 uppercase">
+          <div className="mt-1 flex items-center space-x-1.5">
+            <span
+              className={`inline-block text-[10px] font-bold font-mono px-2 py-0.5 rounded-full border uppercase ${
+                user.role === 'ADMIN'
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                  : user.role === 'STAFF'
+                  ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
+                  : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+              }`}
+            >
               {user.role}
             </span>
+          </div>
+          <div className="mt-1 text-[10px] text-slate-400 font-mono">
+            {user.role === 'CLIENT'
+              ? t.dashboard.accessRestricted
+              : user.role === 'STAFF'
+              ? t.dashboard.accessCorporate
+              : t.dashboard.accessFull}
           </div>
         </div>
 

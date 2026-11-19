@@ -39,6 +39,8 @@ export interface Translations {
     downloadAgentAlert: string;
     contactAdmin: string;
     contactAdminAlert: string;
+    demoAccountsTitle: string;
+    demoAccountsHint: string;
   };
   otp: {
     backTitle: string;
@@ -48,6 +50,8 @@ export interface Translations {
     incompleteError: string;
     expiresInPrefix: string;
     expiresInSuffix: string;
+    resendOtp: string;
+    resendCooldown: string;
     submit: string;
     expiredBack: string;
   };
@@ -82,6 +86,9 @@ export interface Translations {
   toasts: {
     otpSent: string;
     devMockOtp: string;
+    smsOtpReceived: string;
+    invalidOtpCode: string;
+    otpResentSuccess: string;
     invalidCredentials: string;
     loginSuccessWelcome: string;
     loginSuccessAs: string;
@@ -110,6 +117,12 @@ export interface Translations {
     duration: string;
     allowedNetworks: string;
     allNetworks: string;
+    accessRestricted: string;
+    accessCorporate: string;
+    accessFull: string;
+    roleClientLabel: string;
+    roleStaffLabel: string;
+    roleAdminLabel: string;
   };
   admin: {
     stats: {
@@ -273,6 +286,8 @@ export const translations: Record<Language, Translations> = {
       downloadAgentAlert: 'ดาวน์โหลด Agent: กรุณารัน npm run mock:agent บนเครื่องของคุณ',
       contactAdmin: 'ติดต่อ Admin',
       contactAdminAlert: 'ติดต่อ Admin: admin@mangovpn.internal',
+      demoAccountsTitle: 'ข้อมูลบัญชีทดสอบสำหรับนักพัฒนา (Developer Demo)',
+      demoAccountsHint: 'คลิกเพื่อเลือกบัญชีสำหรับทดสอบระบบ',
     },
     otp: {
       backTitle: 'ย้อนกลับ',
@@ -282,6 +297,8 @@ export const translations: Record<Language, Translations> = {
       incompleteError: 'กรุณากรอกรหัส OTP ให้ครบ 6 หลัก',
       expiresInPrefix: 'รหัสหมดอายุใน',
       expiresInSuffix: 'นาที',
+      resendOtp: 'ขอรหัสใหม่',
+      resendCooldown: 'ขอรหัสใหม่ได้ใน {seconds} วินาที',
       submit: 'ยืนยัน',
       expiredBack: 'รหัสหมดอายุ? เข้าสู่ระบบใหม่',
     },
@@ -316,6 +333,9 @@ export const translations: Record<Language, Translations> = {
     toasts: {
       otpSent: 'ส่งรหัสยืนยัน OTP ไปที่ {phone}',
       devMockOtp: 'โหมดจำลอง (Dev Mode): ใช้ OTP เลข 123456 ได้เลยครับ',
+      smsOtpReceived: '💬 [SMS Gateway] รหัส OTP สำหรับ MANGO VPN คือ: {otp} (หมดอายุใน 5 นาที)',
+      invalidOtpCode: 'รหัส OTP ไม่ถูกต้อง กรุณาตรวจสอบรหัสจาก SMS และลองใหม่อีกครั้ง',
+      otpResentSuccess: 'ส่งรหัส OTP ชุดใหม่ไปยังเบอร์มือถือของคุณแล้ว',
       invalidCredentials: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง (ลองใช้: admin_user / MangoVPN2026!)',
       loginSuccessWelcome: 'เข้าสู่ระบบสำเร็จ ยินดีต้อนรับ {username} ({role})',
       loginSuccessAs: 'เข้าสู่ระบบสำเร็จในฐานะ {username} ({role})',
@@ -344,6 +364,12 @@ export const translations: Record<Language, Translations> = {
       duration: 'เวลาเชื่อมต่อ',
       allowedNetworks: 'เครือข่ายที่เข้าถึงได้',
       allNetworks: '0.0.0.0/0 (ทุกเครือข่าย)',
+      accessRestricted: 'เข้าถึงเฉพาะ Web Portal ภายใน (Restricted)',
+      accessCorporate: 'เข้าถึง Internal Subnets ของออฟฟิศ (Corporate)',
+      accessFull: 'เข้าถึงทุกโครงสร้างเครือข่าย (Full Access)',
+      roleClientLabel: 'CLIENT · RESTRICTED',
+      roleStaffLabel: 'STAFF · CORPORATE SUBNET',
+      roleAdminLabel: 'ADMIN · FULL INFRASTRUCTURE',
     },
     admin: {
       stats: {
@@ -505,6 +531,8 @@ export const translations: Record<Language, Translations> = {
       downloadAgentAlert: 'Download Agent: Please run npm run mock:agent on your machine',
       contactAdmin: 'Contact Admin',
       contactAdminAlert: 'Contact Admin: admin@mangovpn.internal',
+      demoAccountsTitle: 'Developer Demo Accounts',
+      demoAccountsHint: 'Click to auto-fill test credentials',
     },
     otp: {
       backTitle: 'Back',
@@ -514,6 +542,8 @@ export const translations: Record<Language, Translations> = {
       incompleteError: 'Please enter all 6 digits of the OTP',
       expiresInPrefix: 'Code expires in',
       expiresInSuffix: 'min',
+      resendOtp: 'Resend Code',
+      resendCooldown: 'Resend in {seconds}s',
       submit: 'Verify',
       expiredBack: 'Code expired? Sign in again',
     },
@@ -548,6 +578,9 @@ export const translations: Record<Language, Translations> = {
     toasts: {
       otpSent: 'OTP verification code sent to {phone}',
       devMockOtp: 'Dev Mock Mode: You can use OTP 123456',
+      smsOtpReceived: '💬 [SMS Gateway] Your MANGO VPN OTP is: {otp} (expires in 5 mins)',
+      invalidOtpCode: 'Invalid OTP code. Please check your SMS and try again.',
+      otpResentSuccess: 'A new OTP code has been sent to your phone.',
       invalidCredentials: 'Invalid username or password (try: admin_user / MangoVPN2026!)',
       loginSuccessWelcome: 'Signed in successfully. Welcome {username} ({role})',
       loginSuccessAs: 'Signed in as {username} ({role})',
@@ -576,6 +609,12 @@ export const translations: Record<Language, Translations> = {
       duration: 'Duration',
       allowedNetworks: 'Allowed Networks',
       allNetworks: '0.0.0.0/0 (All Networks)',
+      accessRestricted: 'Internal Web Portal only (Restricted)',
+      accessCorporate: 'Internal Office Subnets (Corporate)',
+      accessFull: 'Full Infrastructure Access (Full Access)',
+      roleClientLabel: 'CLIENT · RESTRICTED',
+      roleStaffLabel: 'STAFF · CORPORATE SUBNET',
+      roleAdminLabel: 'ADMIN · FULL INFRASTRUCTURE',
     },
     admin: {
       stats: {

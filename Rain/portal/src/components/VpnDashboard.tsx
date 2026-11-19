@@ -129,10 +129,25 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
       </div>
 
       {/* 2. ข้อความต้อนรับผู้ใช้ */}
-      <div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-white tracking-tight">
           {formatMessage(t.dashboard.greeting, { username: user.username })}
         </h1>
+        <span
+          className={`text-xs font-mono font-semibold px-3 py-1 rounded-full border ${
+            user.role === 'ADMIN'
+              ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+              : user.role === 'STAFF'
+              ? 'bg-sky-500/10 text-sky-300 border-sky-500/30'
+              : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+          }`}
+        >
+          {user.role === 'ADMIN'
+            ? t.dashboard.roleAdminLabel
+            : user.role === 'STAFF'
+            ? t.dashboard.roleStaffLabel
+            : t.dashboard.roleClientLabel}
+        </span>
       </div>
 
       {/* 3. การ์ดแผนภาพอุโมงค์ VPN (Secure Tunnel Diagram Card) */}
@@ -171,12 +186,18 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
             </div>
           </div>
 
-          {/* ฝั่งขวา: Private Network */}
+          {/* ฝั่งขวา: Private Network ตามสิทธิ์ของ Role */}
           <div className="flex flex-col items-center space-y-2 z-10">
             <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-200">
               <Building2 className="w-6 h-6" />
             </div>
-            <span className="text-xs text-slate-400 font-medium">{t.dashboard.privateNetwork}</span>
+            <span className="text-xs text-slate-400 font-medium text-center">
+              {user.role === 'CLIENT'
+                ? 'Web Portal (10.13.13.100)'
+                : user.role === 'STAFF'
+                ? 'Office Subnets (10.0.0.0/8)'
+                : t.dashboard.privateNetwork}
+            </span>
           </div>
         </div>
 
@@ -296,10 +317,17 @@ export const VpnDashboard: React.FC<VpnDashboardProps> = ({
         {/* คอลัมน์ขวา: เครือข่ายที่เข้าถึงได้ & Public Key */}
         <div className="bg-[#080d0a] border border-slate-800/80 rounded-xl p-4 space-y-4 text-xs">
           <div>
-            <div className="text-emerald-400 font-semibold text-xs mb-1.5">
-              {t.dashboard.allowedNetworks}
+            <div className="text-emerald-400 font-semibold text-xs mb-1.5 flex items-center justify-between">
+              <span>{t.dashboard.allowedNetworks}</span>
+              <span className="text-[10px] text-slate-400 font-sans font-normal">
+                {user.role === 'CLIENT'
+                  ? t.dashboard.accessRestricted
+                  : user.role === 'STAFF'
+                  ? t.dashboard.accessCorporate
+                  : t.dashboard.accessFull}
+              </span>
             </div>
-            <div className="font-mono text-slate-300 text-xs tracking-wide">
+            <div className="font-mono text-slate-300 text-xs tracking-wide bg-slate-950/60 p-2 rounded-lg border border-slate-800/80">
               {user.role === 'CLIENT'
                 ? '10.13.13.100/32 : 80, 443'
                 : user.role === 'STAFF'

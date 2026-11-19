@@ -38,6 +38,7 @@ export default function App() {
   const [password, setPassword] = useState('MangoVPN2026!');
   const [mfaChallenge, setMfaChallenge] = useState<LoginResponse | null>(null);
   const [otpCode, setOtpCode] = useState('');
+  const [mockExpectedOtp, setMockExpectedOtp] = useState<string>('');
   const [authData, setAuthData] = useState<AuthTokenResponse | null>(null);
 
   // แท็บเมนูที่เลือกในแถบ Sidebar ด้านซ้าย (connect | history | devices | agent)
@@ -199,6 +200,10 @@ export default function App() {
       }
 
       if (account && password === 'MangoVPN2026!') {
+        // สุ่มรหัส OTP 6 หลักใหม่ทุกครั้ง (Dynamic 6-Digit Code)
+        const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+        setMockExpectedOtp(generatedOtp);
+
         setMfaChallenge({
           requiresOtp: true,
           challengeId: 'mock-challenge-dev',
@@ -206,13 +211,29 @@ export default function App() {
           expiresInSeconds: 300,
           message: 'Dev Mock Mode',
         });
-        showToast(t.toasts.devMockOtp, 'info');
+        // จำลองการส่ง SMS Notification เข้ามาที่หน้าจอ
+        showToast(
+          formatMessage(t.toasts.smsOtpReceived, { otp: generatedOtp }),
+          'info',
+        );
       } else {
         showToast(t.toasts.invalidCredentials, 'error');
       }
     } finally {
       setLoading(false);
     }
+  };
+
+  // ฟังก์ชันขอรหัส OTP ใหม่ (Resend OTP Generator)
+  const handleResendOtp = () => {
+    if (!mfaChallenge) return;
+    const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    setMockExpectedOtp(newOtp);
+    setOtpCode('');
+    showToast(
+      formatMessage(t.toasts.smsOtpReceived, { otp: newOtp }),
+      'info',
+    );
   };
 
   // ฟังก์ชันยืนยัน OTP Step 3 -> Step 4
@@ -222,8 +243,15 @@ export default function App() {
     setLoading(true);
 
     try {
-      // Dev Mock Mode
+      // Dev Mock Mode: ตรวจสอบความถูกต้องของรหัส OTP ที่สุ่มขึ้นมา
       if (mfaChallenge.challengeId === 'mock-challenge-dev') {
+        const cleanOtp = otpCode.trim();
+        if (cleanOtp !== mockExpectedOtp) {
+          showToast(t.toasts.invalidOtpCode, 'error');
+          setLoading(false);
+          return;
+        }
+
         const cleanUsername = username.trim();
         let demoAccount = DEMO_ACCOUNTS[cleanUsername];
         if (!demoAccount) {
@@ -646,6 +674,7 @@ export default function App() {
             loading={loading}
             onVerify={handleVerifyOtp}
             onBack={() => setMfaChallenge(null)}
+            onResendOtp={handleResendOtp}
           />
         )}
       </div>
