@@ -9,10 +9,15 @@ export interface WriteAuditLogInput {
   metadata?: Record<string, unknown> | null;
 }
 
+let lastAuditTimestampMs = 0;
+
 export async function writeAuditLog(
   prisma: PrismaClient | Prisma.TransactionClient,
   input: WriteAuditLogInput,
 ) {
+  const nowMs = Math.max(Date.now(), lastAuditTimestampMs + 1);
+  lastAuditTimestampMs = nowMs;
+
   return prisma.auditLog.create({
     data: {
       actorUserId: input.actorUserId ?? null,
@@ -21,6 +26,7 @@ export async function writeAuditLog(
       targetId: input.targetId ?? null,
       ipAddress: input.ipAddress ?? null,
       metadata: (input.metadata ?? undefined) as Prisma.InputJsonValue | undefined,
+      createdAt: new Date(nowMs),
     },
   });
 }
