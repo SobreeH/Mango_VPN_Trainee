@@ -31,8 +31,9 @@ export function PoliciesTab({ apiBaseUrl, accessToken, auth }: PoliciesTabProps)
   });
 
   const createMutation = useMutation({
-    mutationFn: () =>
-      createPolicy(
+    mutationFn: () => {
+      const parsedPriority = Number.parseInt(priority, 10);
+      return createPolicy(
         apiBaseUrl,
         accessToken,
         {
@@ -42,10 +43,11 @@ export function PoliciesTab({ apiBaseUrl, accessToken, auth }: PoliciesTabProps)
           protocol,
           portRange: portRange.trim() ? portRange.trim() : null,
           action,
-          priority: Number.parseInt(priority, 10) || 100,
+          priority: Number.isNaN(parsedPriority) ? 100 : parsedPriority,
         },
         auth,
-      ),
+      );
+    },
     onSuccess: () => {
       setName('');
       setTargetCidr('');

@@ -101,11 +101,11 @@ export function AuditLogsTab({ apiBaseUrl, accessToken, auth }: AuditLogsTabProp
 
       {query.isLoading ? (
         <p className="text-sm text-slate-400">Loading audit logs...</p>
-      ) : logs.length === 0 ? (
+      ) : logs.length === 0 && !query.isError ? (
         <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-6 text-center text-sm text-slate-400">
           No audit logs found.
         </div>
-      ) : (
+      ) : logs.length > 0 ? (
         <div className="overflow-x-auto rounded-lg border border-slate-800">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-950 text-xs uppercase text-slate-400">
@@ -140,7 +140,7 @@ export function AuditLogsTab({ apiBaseUrl, accessToken, auth }: AuditLogsTabProp
             </tbody>
           </table>
         </div>
-      )}
+      ) : null}
 
       <div className="flex items-center justify-between text-xs text-slate-400">
         <span>

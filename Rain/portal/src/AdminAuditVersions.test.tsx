@@ -102,18 +102,30 @@ describe('Portal Admin Audit Logs & Agent Versions (fetch seam)', () => {
   });
 
   it('renders honest empty state and real error state on Audit Logs without mock fallbacks', async () => {
-    fetchMock.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          items: [],
-          total: 0,
-          page: 1,
-          pageSize: 20,
-          totalPages: 1,
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
-    );
+    let auditCalls = 0;
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/audit-logs')) {
+        auditCalls += 1;
+        if (auditCalls === 1) {
+          return new Response(
+            JSON.stringify({
+              items: [],
+              total: 0,
+              page: 1,
+              pageSize: 20,
+              totalPages: 1,
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          );
+        }
+        return new Response(JSON.stringify({ message: 'Database unavailable' }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify({ message: 'Not found' }), { status: 404 });
+    });
 
     renderWithQuery(
       <App
@@ -131,19 +143,13 @@ describe('Portal Admin Audit Logs & Agent Versions (fetch seam)', () => {
 
     expect(await screen.findByText(/No audit logs found/i)).toBeInTheDocument();
 
-    fetchMock.mockResolvedValueOnce(
-      new Response(JSON.stringify({ message: 'Database unavailable' }), {
-        status: 503,
-        headers: { 'Content-Type': 'application/json' },
-      }),
-    );
-
     fireEvent.change(screen.getByLabelText(/Action filter/i), {
       target: { value: 'auth.login' },
     });
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(/Database unavailable/i);
+    expect(screen.queryByText(/No audit logs found/i)).not.toBeInTheDocument();
   });
 
   it('creates and toggles Agent Versions for ADMIN and handles errors honestly', async () => {

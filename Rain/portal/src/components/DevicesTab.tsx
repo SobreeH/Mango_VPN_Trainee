@@ -41,11 +41,11 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
 
       {listQuery.isLoading ? (
         <p className="text-sm text-slate-400">Loading devices...</p>
-      ) : devices.length === 0 ? (
+      ) : devices.length === 0 && !listQuery.error ? (
         <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-6 text-center text-sm text-slate-400">
           No devices found.
         </div>
-      ) : (
+      ) : devices.length > 0 ? (
         <div className="overflow-x-auto rounded-lg border border-slate-800">
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-900 text-slate-400">
@@ -90,7 +90,7 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
             </tbody>
           </table>
         </div>
-      )}
+      ) : null}
     </section>
   );
 }

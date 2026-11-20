@@ -219,7 +219,7 @@ describe('Portal Admin Policies Tab (fetch seam)', () => {
       target: { value: PolicyAction.DENY },
     });
     fireEvent.change(screen.getByLabelText(/Priority/i), {
-      target: { value: '10' },
+      target: { value: '0' },
     });
 
     fireEvent.click(screen.getByRole('button', { name: /Create Policy/i }));
@@ -227,6 +227,7 @@ describe('Portal Admin Policies Tab (fetch seam)', () => {
     await waitFor(() => {
       expect(screen.getByText('Deny Production DB')).toBeInTheDocument();
       expect(screen.getByText('10.99.0.0/16')).toBeInTheDocument();
+      expect(screen.getByText('Priority 0')).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByRole('button', { name: /Delete/i }));

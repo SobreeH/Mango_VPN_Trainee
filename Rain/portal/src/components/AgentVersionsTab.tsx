@@ -162,11 +162,11 @@ export function AgentVersionsTab({ apiBaseUrl, accessToken, auth }: AgentVersion
 
       {listQuery.isLoading ? (
         <p className="text-sm text-slate-400">Loading agent versions...</p>
-      ) : versions.length === 0 ? (
+      ) : versions.length === 0 && !listQuery.error ? (
         <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-6 text-center text-sm text-slate-400">
           No agent versions registered.
         </div>
-      ) : (
+      ) : versions.length > 0 ? (
         <div className="overflow-x-auto rounded-lg border border-slate-800">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-950 text-xs uppercase text-slate-400">
@@ -233,7 +233,7 @@ export function AgentVersionsTab({ apiBaseUrl, accessToken, auth }: AgentVersion
             </tbody>
           </table>
         </div>
-      )}
+      ) : null}
     </section>
   );
 }

@@ -229,5 +229,31 @@ describe('Portal Admin Users, Devices & Sessions Tabs (fetch seam)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Disconnect/i }));
     expect(await screen.findByRole('alert')).toHaveTextContent('VPN daemon unreachable');
+    expect(screen.queryByText(/No VPN sessions found/i)).not.toBeInTheDocument();
+  });
+
+  it('does not render false "No users found" empty state when GET /api/users fails', async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/audit-logs')) {
+        return new Response(
+          JSON.stringify({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 1 }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (url.endsWith('/api/users')) {
+        return new Response(JSON.stringify({ message: 'Users service offline' }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify({ message: 'Not found' }), { status: 404 });
+    });
+
+    renderWithQuery(<App initialSession={adminSession} />);
+    fireEvent.click(screen.getByRole('tab', { name: /Users/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Users service offline/i);
+    expect(screen.queryByText(/No users found/i)).not.toBeInTheDocument();
   });
 });
