@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { RoleName } from '@mango/shared';
 import { AgentStatusCard } from './AgentStatusCard';
 
 describe('AgentStatusCard (fetch seam)', () => {
@@ -216,7 +217,7 @@ describe('AgentStatusCard (fetch seam)', () => {
         ),
       );
 
-    render(<AgentStatusCard accessToken="jwt-access-token" />);
+    render(<AgentStatusCard accessToken="jwt-access-token" userRole={RoleName.STAFF} />);
 
     await waitFor(() => {
       expect(screen.getByLabelText(/agent pairing token/i)).toBeInTheDocument();
@@ -238,6 +239,8 @@ describe('AgentStatusCard (fetch seam)', () => {
     });
     expect(screen.getByText('10.20.0.0/16')).toBeInTheDocument();
     expect(screen.getByText(/^connected$/i)).toBeInTheDocument();
+    expect(screen.getByText(/connected role/i)).toBeInTheDocument();
+    expect(screen.getByText('STAFF')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /disconnect vpn/i }));
 
@@ -245,6 +248,7 @@ describe('AgentStatusCard (fetch seam)', () => {
       expect(screen.getByText(/^disconnected$/i)).toBeInTheDocument();
     });
     expect(screen.queryByText('10.13.13.4')).not.toBeInTheDocument();
+    expect(screen.queryByText(/connected role/i)).not.toBeInTheDocument();
   });
 
   it('surfaces connect errors honestly without faking connected state', async () => {
@@ -300,7 +304,7 @@ describe('AgentStatusCard (fetch seam)', () => {
         ),
       );
 
-    render(<AgentStatusCard accessToken="jwt-access-token" />);
+    render(<AgentStatusCard accessToken="jwt-access-token" userRole={RoleName.STAFF} />);
 
     await waitFor(() => {
       expect(screen.getByLabelText(/agent pairing token/i)).toBeInTheDocument();

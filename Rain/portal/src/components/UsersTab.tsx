@@ -1,14 +1,16 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { RoleName, type UserDto } from '@mango/shared';
+import type { AuthRefreshContext } from '../api/auth';
 import { createUser, fetchUsers, updateUserStatus } from '../lib/adminApi';
 
 interface UsersTabProps {
   apiBaseUrl: string;
   accessToken: string;
+  auth?: AuthRefreshContext;
 }
 
-export function UsersTab({ apiBaseUrl, accessToken }: UsersTabProps) {
+export function UsersTab({ apiBaseUrl, accessToken, auth }: UsersTabProps) {
   const queryClient = useQueryClient();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -17,17 +19,22 @@ export function UsersTab({ apiBaseUrl, accessToken }: UsersTabProps) {
 
   const listQuery = useQuery({
     queryKey: ['admin-users', apiBaseUrl],
-    queryFn: () => fetchUsers(apiBaseUrl, accessToken),
+    queryFn: () => fetchUsers(apiBaseUrl, accessToken, auth),
   });
 
   const createMutation = useMutation({
     mutationFn: () =>
-      createUser(apiBaseUrl, accessToken, {
-        username,
-        email,
-        password,
-        role,
-      }),
+      createUser(
+        apiBaseUrl,
+        accessToken,
+        {
+          username,
+          email,
+          password,
+          role,
+        },
+        auth,
+      ),
     onSuccess: () => {
       setUsername('');
       setEmail('');
@@ -39,7 +46,7 @@ export function UsersTab({ apiBaseUrl, accessToken }: UsersTabProps) {
 
   const statusMutation = useMutation({
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
-      updateUserStatus(apiBaseUrl, accessToken, id, { isActive }),
+      updateUserStatus(apiBaseUrl, accessToken, id, { isActive }, auth),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['admin-users', apiBaseUrl] });
       void queryClient.invalidateQueries({ queryKey: ['admin-sessions', apiBaseUrl] });

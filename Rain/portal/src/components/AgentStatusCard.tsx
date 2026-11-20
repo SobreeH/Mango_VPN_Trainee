@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { AlertCircle, CheckCircle2, Key, Power, RefreshCw, ShieldCheck, WifiOff } from 'lucide-react';
-import type { AgentHealthResponse, AgentStatusResponse } from '@mango/shared';
+import type { AgentHealthResponse, AgentStatusResponse, RoleName } from '@mango/shared';
 import {
   AgentHttpError,
   checkAgentHealth,
@@ -9,6 +9,7 @@ import {
   fetchAgentStatus,
   requestConnectTicket,
 } from '../api/agent';
+import type { AuthRefreshContext } from '../api/auth';
 
 type AgentViewState =
   | { kind: 'checking' }
@@ -18,9 +19,11 @@ type AgentViewState =
 
 export interface AgentStatusCardProps {
   accessToken?: string;
+  userRole?: RoleName;
+  auth?: AuthRefreshContext;
 }
 
-export function AgentStatusCard({ accessToken }: AgentStatusCardProps) {
+export function AgentStatusCard({ accessToken, userRole, auth }: AgentStatusCardProps) {
   const [view, setView] = useState<AgentViewState>({ kind: 'checking' });
   const [pairingToken, setPairingToken] = useState('');
   const [isPairing, setIsPairing] = useState(false);
@@ -101,7 +104,7 @@ export function AgentStatusCard({ accessToken }: AgentStatusCardProps) {
     setTunnelError(null);
     setIsTunnelBusy(true);
     try {
-      const { ticket } = await requestConnectTicket(accessToken);
+      const { ticket } = await requestConnectTicket(accessToken, auth);
       const res = await connectAgent(pairingToken.trim(), ticket);
       setView({
         ...view,
@@ -262,6 +265,15 @@ export function AgentStatusCard({ accessToken }: AgentStatusCardProps) {
                 {view.status.state}
               </span>
             </div>
+
+            {view.status.state === 'connected' && userRole && (
+              <div className="flex items-center justify-between text-slate-400">
+                <span>Connected Role</span>
+                <span className="rounded bg-amber-500/15 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-amber-300">
+                  {userRole}
+                </span>
+              </div>
+            )}
 
             {view.status.assignedIp && (
               <div className="flex items-center justify-between text-slate-400">

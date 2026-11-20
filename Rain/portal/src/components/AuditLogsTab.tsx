@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { AuditLogDto } from '@mango/shared';
+import type { AuthRefreshContext } from '../api/auth';
 import { fetchAuditLogs } from '../lib/adminApi';
 
 interface AuditLogsTabProps {
   apiBaseUrl: string;
   accessToken: string;
+  auth?: AuthRefreshContext;
 }
 
-export function AuditLogsTab({ apiBaseUrl, accessToken }: AuditLogsTabProps) {
+export function AuditLogsTab({ apiBaseUrl, accessToken, auth }: AuditLogsTabProps) {
   const [page, setPage] = useState(1);
   const [actionFilter, setActionFilter] = useState('');
   const [targetTypeFilter, setTargetTypeFilter] = useState('');
@@ -18,13 +20,18 @@ export function AuditLogsTab({ apiBaseUrl, accessToken }: AuditLogsTabProps) {
   const query = useQuery({
     queryKey: ['audit-logs', apiBaseUrl, page, actionFilter, targetTypeFilter, searchFilter],
     queryFn: () =>
-      fetchAuditLogs(apiBaseUrl, accessToken, {
-        page,
-        pageSize: 20,
-        action: actionFilter || undefined,
-        targetType: targetTypeFilter || undefined,
-        search: searchFilter || undefined,
-      }),
+      fetchAuditLogs(
+        apiBaseUrl,
+        accessToken,
+        {
+          page,
+          pageSize: 20,
+          action: actionFilter || undefined,
+          targetType: targetTypeFilter || undefined,
+          search: searchFilter || undefined,
+        },
+        auth,
+      ),
   });
 
   const logs = query.data?.items ?? [];
