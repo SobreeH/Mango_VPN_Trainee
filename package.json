@@ -16,6 +16,9 @@
     "lint": "npm run --workspaces --if-present lint",
     "test": "npm run --workspaces --if-present test",
     "mock:agent": "node scripts/mock-agent.js",
+    "mock:daemon": "node scripts/mock-daemon.js",
+    "db:start": "node scripts/dev-db.mjs start",
+    "db:reset-local": "node scripts/dev-db.mjs reset",
     "db:generate": "npm --workspace=@mango/api run prisma:generate",
     "db:migrate": "npm --workspace=@mango/api run prisma:migrate",
     "db:seed": "npm --workspace=@mango/rain-admin run seed",
@@ -24,6 +27,7 @@
     "docker:logs": "docker compose logs -f"
   },
   "devDependencies": {
+    "embedded-postgres": "16.16.0-beta.19",
     "typescript": "^5.4.5"
   },
   "engines": {

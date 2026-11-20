@@ -1,6 +1,11 @@
 # MANGO VPN - Development Environment Health Check Script
 # Tests all installed tools, programs, and dependencies for Rain and Sobree
 
+param(
+    [ValidateSet("All", "Rain", "Sobree")]
+    [string]$Role = "All"
+)
+
 Write-Host ""
 Write-Host "============================================================" -ForegroundColor Cyan
 Write-Host "   MANGO VPN - Development Environment Readiness Check      " -ForegroundColor Yellow
@@ -15,7 +20,8 @@ function Test-Tool {
         [string]$Command,
         [string[]]$ArgumentList,
         [string]$RequiredFor,
-        [string]$MinVersionDesc
+        [string]$MinVersionDesc,
+        [switch]$Optional
     )
 
     $installed = $false
@@ -34,6 +40,8 @@ function Test-Tool {
         $installed = $false
         $versionOutput = "Not installed or not in PATH"
     }
+
+    if ($Optional -and -not $installed) { $status = "OPTIONAL" }
 
     [PSCustomObject]@{
         Tool            = $Name
@@ -54,13 +62,14 @@ $results += Test-Tool -Name "npm" -Command "npm" -ArgumentList @("-v") -Required
 $results += Test-Tool -Name "Git" -Command "git" -ArgumentList @("--version") -RequiredFor "Both (Rain & Sobree)" -MinVersionDesc ">= 2.30.0"
 
 # 4. Docker CLI
-$results += Test-Tool -Name "Docker CLI" -Command "docker" -ArgumentList @("-v") -RequiredFor "Sobree (Senior Dev)" -MinVersionDesc ">= 24.0.0"
+$toolOptional = $Role -eq "Rain"
+$results += Test-Tool -Name "Docker CLI" -Command "docker" -ArgumentList @("-v") -RequiredFor "Sobree (Senior Dev)" -MinVersionDesc ">= 24.0.0" -Optional:$toolOptional
 
 # 5. Docker Compose
-$results += Test-Tool -Name "Docker Compose" -Command "docker" -ArgumentList @("compose", "version") -RequiredFor "Sobree (Senior Dev)" -MinVersionDesc ">= v2.20.0"
+$results += Test-Tool -Name "Docker Compose" -Command "docker" -ArgumentList @("compose", "version") -RequiredFor "Sobree (Senior Dev)" -MinVersionDesc ">= v2.20.0" -Optional:$toolOptional
 
 # 6. Go Toolchain
-$results += Test-Tool -Name "Go Toolchain" -Command "go" -ArgumentList @("version") -RequiredFor "Sobree (Senior Dev)" -MinVersionDesc ">= 1.22.0"
+$results += Test-Tool -Name "Go Toolchain" -Command "go" -ArgumentList @("version") -RequiredFor "Sobree (Senior Dev)" -MinVersionDesc ">= 1.22.0" -Optional:$toolOptional
 
 Write-Host "Detailed Tool Status:" -ForegroundColor White
 $results | Format-Table -AutoSize -Property Tool, Status, RequiredFor, Requirement, DetectedVersion
@@ -69,10 +78,18 @@ $results | Format-Table -AutoSize -Property Tool, Status, RequiredFor, Requireme
 Write-Host "Checking Docker Desktop Process..." -ForegroundColor White
 $dockerProc = Get-Process "Docker Desktop" -ErrorAction SilentlyContinue
 if ($dockerProc) {
-    Write-Host "  [OK] Docker Desktop process is RUNNING." -ForegroundColor Green
+    if ($Role -eq "Rain") {
+        Write-Host "  [OPTIONAL] Docker Desktop process is RUNNING (not required for Rain Track A)." -ForegroundColor DarkGray
+    } else {
+        Write-Host "  [OK] Docker Desktop process is RUNNING." -ForegroundColor Green
+    }
 } else {
-    Write-Host "  [NOTICE] Docker Desktop is not currently running." -ForegroundColor Yellow
-    Write-Host "           (Launch Docker Desktop when you need to start PostgreSQL or WireGuard)" -ForegroundColor DarkGray
+    if ($Role -eq "Rain") {
+        Write-Host "  [OPTIONAL] Docker Desktop is not currently running (not required for Rain Track A)." -ForegroundColor DarkGray
+    } else {
+        Write-Host "  [NOTICE] Docker Desktop is not currently running." -ForegroundColor Yellow
+        Write-Host "           (Launch Docker Desktop when you need to start PostgreSQL or WireGuard)" -ForegroundColor DarkGray
+    }
 }
 
 Write-Host ""
@@ -84,16 +101,23 @@ $npmOk = ($results | Where-Object { $_.Tool -eq "npm" }).Status -eq "READY"
 
 if ($nodeOk -and $npmOk) {
     Write-Host "  [READY] Rain (Junior Dev): All required tools are INSTALLED!" -ForegroundColor Green
-    Write-Host "          Rain can immediately run: npm run mock:agent, npm run dev:portal, npm run dev:api" -ForegroundColor DarkGreen
+    Write-Host "          Rain can immediately run: npm run db:start, npm run mock:daemon, npm run mock:agent, npm run dev:portal, npm run dev:api" -ForegroundColor DarkGreen
 } else {
     Write-Host "  [BLOCKED] Rain (Junior Dev): Missing Node.js or npm. Please install Node.js >= 20 LTS." -ForegroundColor Red
+}
+
+if ($Role -eq "Rain") {
+    Write-Host "  [INFO] Rain Track A: Docker, Docker Compose, Docker Desktop, and Go are OPTIONAL." -ForegroundColor Cyan
+    Write-Host "         Start local services with: npm run db:start + npm run mock:daemon" -ForegroundColor Cyan
 }
 
 # Sobree readiness: needs Node, npm, Docker, Go
 $dockerOk = ($results | Where-Object { $_.Tool -eq "Docker CLI" }).Status -eq "READY"
 $goOk = ($results | Where-Object { $_.Tool -eq "Go Toolchain" }).Status -eq "READY"
 
-if ($nodeOk -and $npmOk -and $dockerOk -and $goOk) {
+if ($Role -eq "Rain") {
+    Write-Host "  [SKIPPED] Sobree readiness is not required in Rain mode." -ForegroundColor DarkGray
+} elseif ($nodeOk -and $npmOk -and $dockerOk -and $goOk) {
     Write-Host "  [READY] Sobree (Senior Dev): All systems tools (Node, Go, Docker) are INSTALLED!" -ForegroundColor Green
 } else {
     Write-Host "  [PARTIAL] Sobree (Senior Dev):" -ForegroundColor Yellow
