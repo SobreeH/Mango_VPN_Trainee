@@ -253,6 +253,7 @@ export interface VpnConnectRequest {
   deviceFingerprint: string;
   hostname: string;
   agentVersion: string;
+  platform?: string;
 }
 
 export interface VpnConnectResponse {

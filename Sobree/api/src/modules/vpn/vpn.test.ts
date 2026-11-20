@@ -222,6 +222,7 @@ describe('VPN Connect & Disconnect HTTP Seam (app.inject against PostgreSQL)', (
     await prisma.vpnPeer.deleteMany();
     await prisma.device.deleteMany();
     await prisma.vpnPolicy.deleteMany();
+    await prisma.agentVersion.deleteMany();
     await prisma.connectTicket.deleteMany();
     await prisma.authRateLimit.deleteMany();
     await prisma.refreshToken.deleteMany();
@@ -543,5 +544,92 @@ describe('VPN Connect & Disconnect HTTP Seam (app.inject against PostgreSQL)', (
     expect(res2.json().assignedIp).toBe(assignedIp);
     expect(removedPeers).toEqual([{ publicKey: firstKey }]);
     expect(addedPeers[1]).toMatchObject({ publicKey: secondKey, assignedIp });
+  });
+
+  it('enforces the mandatory agent version per platform when platform is provided', async () => {
+    await prisma.agentVersion.create({
+      data: {
+        version: '3.0.0',
+        platform: 'linux-x64',
+        checksumSha256: 'd'.repeat(64),
+        downloadUrl: 'https://downloads.mango.local/agent-linux-3.0.0.tar.gz',
+        isActive: true,
+        isMandatory: true,
+      },
+    });
+
+    const { rawTicket } = await seedUserAndTicket({ username: 'judy' });
+    const outdatedRes = await app.inject({
+      method: 'POST',
+      url: '/api/vpn/connect',
+      payload: {
+        ticket: rawTicket,
+        publicKey: generateWgPublicKey(),
+        deviceFingerprint: 'fp-judy-linux',
+        hostname: 'JUDY-LINUX',
+        agentVersion: '2.0.0',
+        platform: 'linux-x64',
+      },
+    });
+    expect(outdatedRes.statusCode).toBe(426);
+    expect(outdatedRes.json()).toMatchObject({ error: 'AGENT_VERSION_OUTDATED' });
+    expect(outdatedRes.json().message).toContain('linux-x64');
+
+    const { rawTicket: freshTicket } = await seedUserAndTicket({ username: 'kevin' });
+    const upToDateRes = await app.inject({
+      method: 'POST',
+      url: '/api/vpn/connect',
+      payload: {
+        ticket: freshTicket,
+        publicKey: generateWgPublicKey(),
+        deviceFingerprint: 'fp-kevin-linux',
+        hostname: 'KEVIN-LINUX',
+        agentVersion: '3.0.0',
+        platform: 'linux-x64',
+      },
+    });
+    expect(upToDateRes.statusCode).toBe(200);
+  });
+
+  it('defaults platform to windows-x64 when platform is omitted', async () => {
+    await prisma.agentVersion.create({
+      data: {
+        version: '3.0.0',
+        platform: 'windows-x64',
+        checksumSha256: 'e'.repeat(64),
+        downloadUrl: 'https://downloads.mango.local/agent-windows-3.0.0.msi',
+        isActive: true,
+        isMandatory: true,
+      },
+    });
+
+    const { rawTicket } = await seedUserAndTicket({ username: 'laura' });
+    const outdatedRes = await app.inject({
+      method: 'POST',
+      url: '/api/vpn/connect',
+      payload: {
+        ticket: rawTicket,
+        publicKey: generateWgPublicKey(),
+        deviceFingerprint: 'fp-laura-win',
+        hostname: 'LAURA-PC',
+        agentVersion: '2.0.0',
+      },
+    });
+    expect(outdatedRes.statusCode).toBe(426);
+    expect(outdatedRes.json().message).toContain('windows-x64');
+
+    const { rawTicket: freshTicket } = await seedUserAndTicket({ username: 'mike' });
+    const upToDateRes = await app.inject({
+      method: 'POST',
+      url: '/api/vpn/connect',
+      payload: {
+        ticket: freshTicket,
+        publicKey: generateWgPublicKey(),
+        deviceFingerprint: 'fp-mike-win',
+        hostname: 'MIKE-PC',
+        agentVersion: '3.0.0',
+      },
+    });
+    expect(upToDateRes.statusCode).toBe(200);
   });
 });
