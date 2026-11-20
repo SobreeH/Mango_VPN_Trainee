@@ -185,27 +185,129 @@ The `vpn-gateway` service needs `NET_ADMIN` and `wg`/`nft` on Linux. Run the dae
 
 ### Full Docker stack
 
+Before building the `portal` image, ensure `Rain/portal/nginx.conf` exists (see the snippet below—`Rain/portal/Dockerfile` expects it on line 25):
+
+```nginx
+server {
+  listen 3000;
+  server_name _;
+  root /usr/share/nginx/html;
+  index index.html;
+
+  location = /env-config.js {
+    add_header Cache-Control "no-store, no-cache, must-revalidate";
+    try_files $uri =404;
+  }
+
+  location / {
+    try_files $uri $uri/ /index.html;
+  }
+}
+```
+
+Then start the full stack, verify container healthchecks, and seed the initial `ADMIN` user:
+
 ```powershell
 npm run docker:up        # postgres, vpn-gateway, api, portal
+docker compose ps        # verify all 4 services are healthy/running
 npm run docker:logs
+
+# Seed the database (against host-mapped postgres :15432)
+$env:DATABASE_URL="postgresql://mango:<password>@localhost:15432/mangovpn?schema=public"
+$env:SEED_ADMIN_USERNAME="admin"
+$env:SEED_ADMIN_PASSWORD="<at-least-12-characters>"
+npm run db:seed
+
 npm run docker:down
 ```
 
-> [!WARNING]
-> `Rain/portal/Dockerfile` copies `Rain/portal/nginx.conf`, but that file is not in the repository yet. The portal image will not build until it is added. Track this before you rely on the `portal` service.
+> [!NOTE]
+> `docker-compose.yml` publishes `vpn-gateway` UDP `51820`, while daemon HTTP `:50051` stays private on the internal `mango-net` Docker network (`VPN_DAEMON_URL=http://vpn-gateway:50051` for the `api` container). If you run `npm run dev:api` directly on the Windows host and want it to reach a containerized `vpn-gateway`, either run `api` in Docker (`docker compose up -d api`) or temporarily bind `127.0.0.1:50051:50051` in a local Compose override.
 
 ---
 
 ## 7. Verify the Setup
 
 ```powershell
-npm run build
-npm test
+# 1. Security & anti-mock guardrails (must report 0 violations)
 node scripts/check-guardrails.mjs
+
+# 2. Full TypeScript monorepo build (@mango/shared first)
+npm run build
+
+# 3. Vitest suite (requires DATABASE_URL pointing at a v2-migrated PostgreSQL DB)
+$env:DATABASE_URL="postgresql://mango:<password>@localhost:15432/mangovpn?schema=public"
+npm test
+```
+
+If your local `mangovpn` database still contains older v1 tables/migrations and tests fail with missing v2 types or tables (such as `type "public.RoleName" does not exist` or `table "public.connect_tickets" does not exist`), reset it to the v2 schema and re-seed:
+
+```powershell
+npx prisma migrate reset --force --schema=Sobree/api/prisma/schema.prisma
+npm run db:seed
 ```
 
 For Go changes, run the vet and tests in each module:
 ```powershell
-cd Sobree/agent-windows; go vet ./...; go test ./...
-cd ../vpn-daemon; go vet ./...; go test ./...
+cd Sobree/agent-windows; go vet ./...; go test ./...; cd ../..
+cd Sobree/vpn-daemon; go vet ./...; go test ./...; cd ../..
 ```
+
+---
+
+## 8. Interactive Walkthrough (Login -> TOTP -> Connect -> Admin -> Revoke)
+
+1. **Start services locally**:
+   - **UI/Admin dev**: Run `npm run mock:agent` (copy the printed `PairingToken`), `npm run dev:api`, and `npm --workspace=@mango/portal run dev -- --port 3000`.
+   - **Real Windows tunnel dev**: Run `docker compose up -d postgres vpn-gateway api`, then in an **Administrator** PowerShell run `Sobree/agent-windows` with **WireGuard for Windows** installed:
+     ```powershell
+     $env:AGENT_LISTEN_ADDR="127.0.0.1:47821"
+     $env:AGENT_ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:3000"
+     $env:AGENT_PAIRING_TOKEN="<your-chosen-local-pairing-token>"
+     $env:API_URL="http://localhost:4000"
+     cd Sobree/agent-windows; go run .
+     ```
+2. **Sign in (`http://localhost:3000`)**: Enter your seeded `ADMIN` username/password (`POST /api/auth/login`).
+3. **Complete TOTP MFA**: On first login (`MFA_SETUP_REQUIRED`), scan the QR code (`otpauthUri`) in an authenticator app and enter the 6-digit code (`POST /api/auth/verify-otp`).
+4. **Pair the local agent**: Paste the `PairingToken` into the Portal's pairing-token field (`X-Mango-Agent-Token`).
+5. **Connect VPN**: Click **Connect VPN** -> Portal requests a 60s single-use ticket (`POST /api/vpn/ticket`) -> agent generates an in-memory Curve25519 keypair -> `POST /api/vpn/connect` allocates a `10.13.13.0/24` IP and programs `wg0` + `nftables` -> `AgentStatusCard` displays **Connected**. *(Note: `POST /api/vpn/connect` requires `vpn-gateway` reachable at `VPN_DAEMON_URL`, otherwise it marks the session disconnected and returns `502`.)*
+6. **Test Admin Console & Real-Time Revocation**: Exercise **Users**, **Devices**, **Sessions**, **Policies**, **Audit Logs**, and **Agent Versions**, then trigger **Revoke Device** or **Disconnect Session** and confirm immediate peer removal.
+
+---
+
+## 9. Debugging & Troubleshooting Cheat Sheet
+
+| Symptom | Cause | Fix / Command |
+| :--- | :--- | :--- |
+| API refuses to start | Missing or short secret in `.env` (`Sobree/api/src/config.ts`) | Ensure `JWT_SECRET`, `REFRESH_SECRET`, `DAEMON_SHARED_SECRET` are `>= 32` chars and `TOTP_ENCRYPTION_KEY` is `64` hex chars. |
+| `RoleName` or `connect_tickets` does not exist | Local `mangovpn` DB still has v1 schema/migrations | Run `npx prisma migrate reset --force --schema=Sobree/api/prisma/schema.prisma` and `npm run db:seed`. |
+| `403 FORBIDDEN_ORIGIN` from agent | Portal running on Vite default `:5173` instead of `:3000` | Start portal with `-- --port 3000` or add the origin to `AGENT_ALLOWED_ORIGINS` and `CORS_ORIGIN`. |
+| `401 Unauthorized` from agent | Missing/mismatched `X-Mango-Agent-Token` | Paste `PairingToken` from `npm run mock:agent`, or set `$env:AGENT_PAIRING_TOKEN` explicitly before `go run .` (Go agent does not print ephemeral tokens). |
+| `426` (`AGENT_VERSION_OUTDATED` / `INACTIVE`) | `windows-x64` agent version blocked or outdated in `agent_versions` | Activate or update version `2.0.0` for `windows-x64` in the Portal's **Agent Versions** tab. |
+| `502` on Connect / Policy Sync / Revoke | `api` cannot reach `vpn-gateway` or `DAEMON_SHARED_SECRET` mismatch | Check `docker compose ps vpn-gateway`, `docker compose logs vpn-gateway`, and `VPN_DAEMON_URL`. |
+
+**Quick live diagnostics**:
+```powershell
+# Inspect WireGuard peers and nftables policy chain inside vpn-gateway
+docker exec mango-vpn-gateway wg show
+docker exec mango-vpn-gateway nft list table inet mango_vpn
+
+# Probe local Windows Agent / mock-agent loopback endpoints
+Invoke-RestMethod http://127.0.0.1:47821/health
+Invoke-RestMethod http://127.0.0.1:47821/status -Headers @{ "X-Mango-Agent-Token" = "<your-token>" }
+```
+
+---
+
+## 10. Pre-Ship & Cloud Deployment Checklist
+
+1. **Resolve remaining repo blockers on a feature/fix branch** (never commit directly to `main`):
+   - Add `Rain/portal/nginx.conf` so `docker compose build portal` succeeds.
+   - Update `.github/workflows/ci.yml` from `go-version: '1.23'` to `'1.26'` (matching `Sobree/agent-windows/go.mod`) and run `go test ./...` for `Sobree/agent-windows`.
+   - Align the `MANGO_AGENT_*` / `MANGO_API_URL` comments in `.env.example` with the actual env vars read by `Sobree/agent-windows/main.go` (`AGENT_LISTEN_ADDR`, `AGENT_ALLOWED_ORIGINS`, `AGENT_PAIRING_TOKEN`, `API_URL`).
+2. **Deploy Linux gateway & control plane (AWS EC2 — Profile B in `.env.example`)**:
+   - Open **UDP `51820`** (WireGuard) and **HTTPS `443`** (reverse proxy/ALB -> Portal `:3000` and API `:4000`); keep `:50051` and `:5432` internal to `mango-net`.
+   - Set `NODE_ENV=production`, strong secrets, `WG_SERVER_ENDPOINT=<AWS_PUBLIC_IP_OR_DNS>:51820`, `CORS_ORIGIN=https://vpn.example.com`, and `VITE_API_URL=https://api.vpn.example.com`, then run `docker compose up -d --build` and `npm run db:seed`.
+3. **Build & roll out the Windows Agent (`Sobree/agent-windows`)**:
+   - Build binary (`$env:GOOS="windows"; $env:GOARCH="amd64"; go build -trimpath -ldflags="-s -w" -o mango-agent-windows.exe .`) and record SHA-256 (`Get-FileHash`).
+   - Register the release in Admin **Agent Versions** (`platform`: `windows-x64`) and configure client env vars (`AGENT_LISTEN_ADDR`, `AGENT_ALLOWED_ORIGINS`, `AGENT_PAIRING_TOKEN`, `API_URL`).
