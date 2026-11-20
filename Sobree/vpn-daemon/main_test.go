@@ -414,3 +414,45 @@ func TestSyncPoliciesRejectsInvalidRule(t *testing.T) {
 		t.Fatalf("expected 0 commands on invalid policy, got %d", len(runner.calls))
 	}
 }
+
+type gatewayInitRunner struct {
+	calls        []recordedCmd
+	linkMissing  bool
+}
+
+func (g *gatewayInitRunner) Run(_ context.Context, name string, args ...string) ([]byte, error) {
+	g.calls = append(g.calls, recordedCmd{name: name, args: args})
+	if g.linkMissing && name == "ip" && len(args) >= 2 && args[0] == "link" && args[1] == "show" {
+		return []byte("Device \"wg0\" does not exist."), errors.New("exit status 1")
+	}
+	return []byte{}, nil
+}
+
+func TestInitGatewayCreatesInterfaceAndNftables(t *testing.T) {
+	runner := &gatewayInitRunner{linkMissing: true}
+	err := InitGateway(context.Background(), GatewayConfig{
+		Interface:   "wg0",
+		GatewayCIDR: "10.13.13.1/24",
+		ListenPort:  51820,
+		Runner:      runner,
+	})
+	if err != nil {
+		t.Fatalf("InitGateway failed: %v", err)
+	}
+
+	wantCalls := []recordedCmd{
+		{name: "ip", args: []string{"link", "show", "dev", "wg0"}},
+		{name: "ip", args: []string{"link", "add", "dev", "wg0", "type", "wireguard"}},
+		{name: "ip", args: []string{"addr", "replace", "10.13.13.1/24", "dev", "wg0"}},
+		{name: "wg", args: []string{"set", "wg0", "listen-port", "51820"}},
+		{name: "ip", args: []string{"link", "set", "up", "dev", "wg0"}},
+		{name: "nft", args: []string{"add", "table", "inet", "mango_vpn"}},
+		{name: "nft", args: []string{"add", "chain", "inet", "mango_vpn", "forward", "{", "type", "filter", "hook", "forward", "priority", "0", ";", "policy", "drop", ";", "}"}},
+		{name: "nft", args: []string{"flush", "chain", "inet", "mango_vpn", "forward"}},
+		{name: "nft", args: []string{"add", "rule", "inet", "mango_vpn", "forward", "ct", "state", "established,related", "accept"}},
+	}
+
+	if !reflect.DeepEqual(runner.calls, wantCalls) {
+		t.Fatalf("unexpected command sequence:\ngot:  %+v\nwant: %+v", runner.calls, wantCalls)
+	}
+}

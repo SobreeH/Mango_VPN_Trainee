@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // CommandRunner abstracts OS-level command execution (wg, nft) for testing.
@@ -34,6 +35,78 @@ type DaemonConfig struct {
 	SharedSecret string
 	Interface    string
 	Runner       CommandRunner
+}
+
+// GatewayConfig configures WireGuard interface and nftables startup initialization.
+type GatewayConfig struct {
+	Interface   string
+	GatewayCIDR string
+	ListenPort  int
+	PrivateKey  string
+	Runner      CommandRunner
+}
+
+// InitGateway ensures the WireGuard interface and inet mango_vpn nftables table exist.
+func InitGateway(ctx context.Context, cfg GatewayConfig) error {
+	iface := strings.TrimSpace(cfg.Interface)
+	if iface == "" {
+		iface = "wg0"
+	}
+	cidr := strings.TrimSpace(cfg.GatewayCIDR)
+	if cidr == "" {
+		cidr = "10.13.13.1/24"
+	}
+	port := cfg.ListenPort
+	if port <= 0 || port > 65535 {
+		port = 51820
+	}
+	runner := cfg.Runner
+	if runner == nil {
+		runner = execCommandRunner{}
+	}
+
+	if _, err := runner.Run(ctx, "ip", "link", "show", "dev", iface); err != nil {
+		if out, addErr := runner.Run(ctx, "ip", "link", "add", "dev", iface, "type", "wireguard"); addErr != nil {
+			return fmt.Errorf("ip link add failed: %v (%s)", addErr, strings.TrimSpace(string(out)))
+		}
+	}
+
+	if out, err := runner.Run(ctx, "ip", "addr", "replace", cidr, "dev", iface); err != nil {
+		return fmt.Errorf("ip addr replace failed: %v (%s)", err, strings.TrimSpace(string(out)))
+	}
+
+	wgArgs := []string{"set", iface, "listen-port", strconv.Itoa(port)}
+	if privKey := strings.TrimSpace(cfg.PrivateKey); privKey != "" {
+		tmpFile, err := os.CreateTemp("", "mango-wg-key-*")
+		if err != nil {
+			return fmt.Errorf("create temp key file: %w", err)
+		}
+		tmpPath := tmpFile.Name()
+		defer os.Remove(tmpPath)
+
+		if err := tmpFile.Chmod(0o600); err != nil {
+			_ = tmpFile.Close()
+			return fmt.Errorf("chmod temp key file: %w", err)
+		}
+		if _, err := tmpFile.WriteString(privKey + "\n"); err != nil {
+			_ = tmpFile.Close()
+			return fmt.Errorf("write temp key file: %w", err)
+		}
+		if err := tmpFile.Close(); err != nil {
+			return fmt.Errorf("close temp key file: %w", err)
+		}
+		wgArgs = append(wgArgs, "private-key", tmpPath)
+	}
+
+	if out, err := runner.Run(ctx, "wg", wgArgs...); err != nil {
+		return fmt.Errorf("wg set failed: %v (%s)", err, strings.TrimSpace(string(out)))
+	}
+
+	if out, err := runner.Run(ctx, "ip", "link", "set", "up", "dev", iface); err != nil {
+		return fmt.Errorf("ip link set up failed: %v (%s)", err, strings.TrimSpace(string(out)))
+	}
+
+	return applyNftables(ctx, runner, iface, nil)
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {
@@ -465,6 +538,33 @@ func main() {
 	iface := os.Getenv("WG_INTERFACE")
 	if iface == "" {
 		iface = "wg0"
+	}
+
+	listenPort := 51820
+	if rawPort := strings.TrimSpace(os.Getenv("WG_LISTEN_PORT")); rawPort != "" {
+		p, err := strconv.Atoi(rawPort)
+		if err != nil || p <= 0 || p > 65535 {
+			log.Fatalf("WG_LISTEN_PORT must be a valid port (1-65535): %q", rawPort)
+		}
+		listenPort = p
+	}
+
+	gatewayCIDR := strings.TrimSpace(os.Getenv("WG_GATEWAY_CIDR"))
+	if gatewayCIDR == "" {
+		gatewayCIDR = "10.13.13.1/24"
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	err := InitGateway(ctx, GatewayConfig{
+		Interface:   iface,
+		GatewayCIDR: gatewayCIDR,
+		ListenPort:  listenPort,
+		PrivateKey:  os.Getenv("WG_PRIVATE_KEY"),
+		Runner:      execCommandRunner{},
+	})
+	cancel()
+	if err != nil {
+		log.Fatalf("gateway init failed: %v", err)
 	}
 
 	mux := NewMux(DaemonConfig{
