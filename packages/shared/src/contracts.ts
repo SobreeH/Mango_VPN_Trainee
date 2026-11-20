@@ -85,19 +85,68 @@ export interface VpnPolicyDto {
 export interface AuditLogDto {
   id: string;
   actorUserId: string | null;
+  actorUsername?: string | null;
   action: string;
   targetType: string;
   targetId: string | null;
+  ipAddress?: string | null;
   metadata: Record<string, unknown> | null;
   createdAt: string;
+}
+
+export interface AuditLogQuery {
+  page?: number;
+  pageSize?: number;
+  action?: string;
+  targetType?: string;
+  actorUserId?: string;
+  from?: string;
+  to?: string;
+  search?: string;
+}
+
+export interface AuditLogListResponse {
+  items: AuditLogDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
 export interface AgentVersionDto {
   id: string;
   version: string;
   platform: string;
-  checksumSha256: string;
   downloadUrl: string;
-  isMandatory: boolean;
+  sha256Checksum: string;
+  isActive: boolean;
+  isRequired: boolean;
   releasedAt: string;
+}
+
+export interface CreateAgentVersionRequest {
+  version: string;
+  platform: string;
+  downloadUrl: string;
+  sha256Checksum: string;
+  isActive?: boolean;
+  isRequired?: boolean;
+}
+
+export interface UpdateAgentVersionRequest {
+  downloadUrl?: string;
+  sha256Checksum?: string;
+  isActive?: boolean;
+  isRequired?: boolean;
+}
+
+export interface AgentVersionListResponse {
+  items: AgentVersionDto[];
+}
+
+export interface AuthUserDto {
+  id: string;
+  username: string;
+  email: string;
+  role: RoleName;
 }

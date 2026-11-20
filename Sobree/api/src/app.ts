@@ -1,9 +1,10 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import type { PrismaClient } from '@prisma/client';
-import type { HealthResponse } from '@mango/shared';
+import { RoleName, type HealthResponse } from '@mango/shared';
 import { adminPlugin } from '@mango/rain-admin';
 import type { ApiConfig } from './config.js';
+import { createAuthMiddleware } from './middleware/auth.js';
 
 export interface AppDependencies {
   config: ApiConfig;
@@ -39,7 +40,13 @@ export async function buildApp({ config, prisma }: AppDependencies): Promise<Fas
     }
   });
 
-  await app.register(adminPlugin, { prefix: '/api' });
+  const { authenticate, requireRole } = createAuthMiddleware(config, prisma);
+  await app.register(adminPlugin, {
+    prefix: '/api',
+    prisma,
+    authenticate,
+    requireAdmin: requireRole(RoleName.ADMIN),
+  });
 
   app.addHook('onClose', async () => {
     await prisma.$disconnect();
