@@ -1,0 +1,7 @@
+# Security-critical & cross-boundary paths require Sobree's review
+/Sobree/                 @SobreeH
+/packages/shared/        @SobreeH
+/docker-compose.yml      @SobreeH
+/.github/                @SobreeH
+/AGENTS.md               @SobreeH
+/scripts/check-guardrails.mjs @SobreeH

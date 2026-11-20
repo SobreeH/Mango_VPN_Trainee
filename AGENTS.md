@@ -68,6 +68,20 @@ MANGO VPN is a **Zero-Trust Role-Based WireGuard Remote Access & Policy Manageme
 2. **Pull before branching**: Always run `git fetch origin` and ensure the branch starts from the latest `origin/main`.
 3. **Flag cross-folder edits in PR/commit descriptions**: Whenever a commit touches both `Rain/` and `Sobree/` (or `packages/shared/`), clearly list the cross-boundary files so the other developer knows to review them before merging.
 
+### C. Protected Critical Boundaries (Safeguard for Smaller / Lightweight AI Models)
+The following paths are **security-critical** and require explicit human confirmation and `@SobreeH` PR review (enforced via `.github/CODEOWNERS` and `scripts/check-guardrails.mjs`):
+- `Sobree/api/src/modules/auth/` & `Sobree/api/src/middleware/` (JWT, TOTP MFA, RBAC guards, rate-limiting)
+- `Sobree/api/prisma/schema.prisma` (database schema & IPAM constraints)
+- `Sobree/agent-windows/` (loopback PNA/Origin allowlist, pairing token, Curve25519 keygen, WireGuard activation)
+- `Sobree/vpn-daemon/` (authenticated RPC, `wg set`, `nftables` firewall rules)
+- `packages/shared/src/contracts.ts` (shared API & Agent DTO contracts)
+- `docker-compose.yml`, `.github/`, and `scripts/check-guardrails.mjs`
+
+**Mandatory rule for lightweight / smaller-context models**:
+- **DO NOT** modify files in Protected Critical Boundaries unless the developer explicitly asks for that specific change and approves a Change Scope Card first.
+- **DO NOT** weaken auth, `Origin` allowlists, pairing tokens, `nftables` rules, or secret validation to "fix" a build or connection error.
+- **DO NOT** introduce `MOCK_*` fallbacks, hardcoded secret literals, or `SYS_MODULE` to work around a missing backend endpoint — stop and report the gap to the developer.
+
 ---
 
 ## 4. Strict AI Anti-Hallucination & Truthfulness Guardrails
