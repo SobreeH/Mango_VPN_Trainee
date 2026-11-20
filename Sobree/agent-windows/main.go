@@ -1,14 +1,21 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"crypto/ecdh"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -18,13 +25,75 @@ const (
 	pairingTokenHeader = "X-Mango-Agent-Token"
 	defaultListenAddr  = "127.0.0.1:47821"
 	defaultVersion     = "2.0.0"
+	defaultApiBaseURL  = "http://localhost:4000"
+	tunnelIfaceName    = "mango0"
 )
+
+// TunnelConfig holds the WireGuard interface configuration applied by WireGuardRunner.
+type TunnelConfig struct {
+	InterfaceName   string
+	PrivateKeyB64   string
+	AssignedIP      string
+	ServerPublicKey string
+	ServerEndpoint  string
+	AllowedIPs      []string
+	DNS             []string
+}
+
+// WireGuardRunner abstracts local WireGuard tunnel activation/teardown (wireguard.exe / WinTun).
+type WireGuardRunner interface {
+	Activate(ctx context.Context, cfg TunnelConfig) error
+	Deactivate(ctx context.Context, interfaceName string) error
+}
+
+type windowsWireGuardRunner struct{}
+
+func (windowsWireGuardRunner) Activate(ctx context.Context, cfg TunnelConfig) error {
+	confDir := filepath.Join(os.TempDir(), "mango-vpn")
+	if err := os.MkdirAll(confDir, 0o700); err != nil {
+		return err
+	}
+	confPath := filepath.Join(confDir, cfg.InterfaceName+".conf")
+	allowed := strings.Join(cfg.AllowedIPs, ", ")
+	if allowed == "" {
+		allowed = "10.13.13.0/24"
+	}
+	dns := strings.Join(cfg.DNS, ", ")
+	content := fmt.Sprintf("[Interface]\nPrivateKey = %s\nAddress = %s/32\n", cfg.PrivateKeyB64, cfg.AssignedIP)
+	if dns != "" {
+		content += fmt.Sprintf("DNS = %s\n", dns)
+	}
+	content += fmt.Sprintf("\n[Peer]\nPublicKey = %s\nEndpoint = %s\nAllowedIPs = %s\nPersistentKeepalive = 25\n",
+		cfg.ServerPublicKey, cfg.ServerEndpoint, allowed)
+
+	if err := os.WriteFile(confPath, []byte(content), 0o600); err != nil {
+		return err
+	}
+	out, err := exec.CommandContext(ctx, "wireguard.exe", "/installtunnelservice", confPath).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("wireguard.exe install failed: %v (%s)", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+func (windowsWireGuardRunner) Deactivate(ctx context.Context, interfaceName string) error {
+	out, err := exec.CommandContext(ctx, "wireguard.exe", "/uninstalltunnelservice", interfaceName).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("wireguard.exe uninstall failed: %v (%s)", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
 
 // AgentConfig configures the loopback Windows Agent HTTP handler.
 type AgentConfig struct {
-	AllowedOrigins []string
-	PairingToken   string
-	Version        string
+	AllowedOrigins    []string
+	PairingToken      string
+	Version           string
+	ApiBaseURL        string
+	DeviceFingerprint string
+	Hostname          string
+	HTTPClient        *http.Client
+	WgRunner          WireGuardRunner
 }
 
 type agentState struct {
@@ -34,8 +103,10 @@ type agentState struct {
 	state          string
 	privateKey     *ecdh.PrivateKey
 	publicKeyB64   string
+	sessionID      *string
 	assignedIP     *string
 	serverEndpoint *string
+	allowedIPs     []string
 	connectedSince *string
 	bytesReceived  int64
 	bytesSent      int64
@@ -104,6 +175,32 @@ func NewHandler(cfg AgentConfig) http.Handler {
 	if version == "" {
 		version = defaultVersion
 	}
+	apiBaseURL := strings.TrimRight(strings.TrimSpace(cfg.ApiBaseURL), "/")
+	if apiBaseURL == "" {
+		apiBaseURL = defaultApiBaseURL
+	}
+	hostname := strings.TrimSpace(cfg.Hostname)
+	if hostname == "" {
+		h, err := os.Hostname()
+		if err == nil && h != "" {
+			hostname = h
+		} else {
+			hostname = "WINDOWS-CLIENT"
+		}
+	}
+	fingerprint := strings.TrimSpace(cfg.DeviceFingerprint)
+	if fingerprint == "" {
+		sum := sha256.Sum256([]byte(hostname + ":" + version))
+		fingerprint = "win-" + hex.EncodeToString(sum[:12])
+	}
+	httpClient := cfg.HTTPClient
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: 15 * time.Second}
+	}
+	wgRunner := cfg.WgRunner
+	if wgRunner == nil {
+		wgRunner = windowsWireGuardRunner{}
+	}
 
 	priv, pubB64, err := generateCurve25519Keypair()
 	if err != nil {
@@ -116,6 +213,7 @@ func NewHandler(cfg AgentConfig) http.Handler {
 		state:        "disconnected",
 		privateKey:   priv,
 		publicKeyB64: pubB64,
+		allowedIPs:   []string{},
 	}
 
 	mux := http.NewServeMux()
@@ -156,14 +254,36 @@ func NewHandler(cfg AgentConfig) http.Handler {
 			"state":          st.state,
 			"version":        st.version,
 			"publicKey":      st.publicKeyB64,
+			"sessionId":      st.sessionID,
 			"assignedIp":     st.assignedIP,
 			"serverEndpoint": st.serverEndpoint,
+			"allowedIps":     st.allowedIPs,
 			"connectedSince": st.connectedSince,
 			"bytesReceived":  st.bytesReceived,
 			"bytesSent":      st.bytesSent,
 			"lastError":      st.lastError,
 		})
 	}))
+
+	notifyApiDisconnect := func(ctx context.Context, sessionID *string, pubKey string) {
+		payload := map[string]any{
+			"publicKey":         pubKey,
+			"deviceFingerprint": fingerprint,
+		}
+		if sessionID != nil && *sessionID != "" {
+			payload["sessionId"] = *sessionID
+		}
+		body, _ := json.Marshal(payload)
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiBaseURL+"/api/vpn/disconnect", bytes.NewReader(body))
+		if err != nil {
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := httpClient.Do(req)
+		if err == nil {
+			_ = resp.Body.Close()
+		}
+	}
 
 	mux.HandleFunc("POST /connect", requirePairing(func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
@@ -190,30 +310,156 @@ func NewHandler(cfg AgentConfig) http.Handler {
 		st.publicKeyB64 = newPubB64
 		st.state = "connecting"
 		st.lastError = nil
-		assignedIP := st.assignedIP
-		serverEndpoint := st.serverEndpoint
-		connectedSince := st.connectedSince
+		st.mu.Unlock()
+
+		apiPayload, _ := json.Marshal(map[string]string{
+			"ticket":            ticket,
+			"publicKey":         newPubB64,
+			"deviceFingerprint": fingerprint,
+			"hostname":          hostname,
+			"agentVersion":      version,
+		})
+		apiReq, err := http.NewRequestWithContext(r.Context(), http.MethodPost, apiBaseURL+"/api/vpn/connect", bytes.NewReader(apiPayload))
+		if err != nil {
+			errMsg := err.Error()
+			st.mu.Lock()
+			st.state = "error"
+			st.lastError = &errMsg
+			st.mu.Unlock()
+			writeError(w, http.StatusInternalServerError, "CONNECT_REQUEST_FAILED", errMsg)
+			return
+		}
+		apiReq.Header.Set("Content-Type", "application/json")
+
+		apiResp, err := httpClient.Do(apiReq)
+		if err != nil {
+			errMsg := fmt.Sprintf("Failed to reach control plane API: %v", err)
+			st.mu.Lock()
+			st.state = "error"
+			st.lastError = &errMsg
+			st.mu.Unlock()
+			writeError(w, http.StatusBadGateway, "API_UNREACHABLE", errMsg)
+			return
+		}
+		defer apiResp.Body.Close()
+
+		if apiResp.StatusCode < 200 || apiResp.StatusCode >= 300 {
+			var errBody struct {
+				Message string `json:"message"`
+			}
+			_ = json.NewDecoder(apiResp.Body).Decode(&errBody)
+			errMsg := errBody.Message
+			if errMsg == "" {
+				errMsg = fmt.Sprintf("Control plane API returned HTTP %d", apiResp.StatusCode)
+			}
+			st.mu.Lock()
+			st.state = "error"
+			st.lastError = &errMsg
+			st.mu.Unlock()
+			writeError(w, apiResp.StatusCode, "API_CONNECT_REJECTED", errMsg)
+			return
+		}
+
+		var connectData struct {
+			SessionID       string   `json:"sessionId"`
+			AssignedIP      string   `json:"assignedIp"`
+			ServerPublicKey string   `json:"serverPublicKey"`
+			ServerEndpoint  string   `json:"serverEndpoint"`
+			AllowedIPs      []string `json:"allowedIps"`
+			DNS             []string `json:"dns"`
+			ConnectedAt     string   `json:"connectedAt"`
+		}
+		if err := json.NewDecoder(apiResp.Body).Decode(&connectData); err != nil {
+			errMsg := "Invalid response from control plane API"
+			st.mu.Lock()
+			st.state = "error"
+			st.lastError = &errMsg
+			st.mu.Unlock()
+			writeError(w, http.StatusBadGateway, "INVALID_API_RESPONSE", errMsg)
+			return
+		}
+
+		privB64 := base64.StdEncoding.EncodeToString(newPriv.Bytes())
+		if err := wgRunner.Activate(r.Context(), TunnelConfig{
+			InterfaceName:   tunnelIfaceName,
+			PrivateKeyB64:   privB64,
+			AssignedIP:      connectData.AssignedIP,
+			ServerPublicKey: connectData.ServerPublicKey,
+			ServerEndpoint:  connectData.ServerEndpoint,
+			AllowedIPs:      connectData.AllowedIPs,
+			DNS:             connectData.DNS,
+		}); err != nil {
+			errMsg := err.Error()
+			sessID := connectData.SessionID
+			notifyApiDisconnect(r.Context(), &sessID, newPubB64)
+			st.mu.Lock()
+			st.state = "error"
+			st.lastError = &errMsg
+			st.mu.Unlock()
+			writeError(w, http.StatusInternalServerError, "WIREGUARD_ACTIVATE_FAILED", errMsg)
+			return
+		}
+
+		sessID := connectData.SessionID
+		assignedIP := connectData.AssignedIP
+		endpoint := connectData.ServerEndpoint
+		connectedSince := connectData.ConnectedAt
+		if connectedSince == "" {
+			connectedSince = time.Now().UTC().Format(time.RFC3339)
+		}
+
+		st.mu.Lock()
+		st.state = "connected"
+		st.sessionID = &sessID
+		st.assignedIP = &assignedIP
+		st.serverEndpoint = &endpoint
+		st.allowedIPs = connectData.AllowedIPs
+		st.connectedSince = &connectedSince
+		st.lastError = nil
 		st.mu.Unlock()
 
 		writeJSON(w, http.StatusOK, map[string]any{
 			"success":        true,
-			"message":        "Curve25519 keypair generated and Connect Ticket accepted",
-			"state":          "connecting",
+			"message":        "WireGuard tunnel connected",
+			"state":          "connected",
 			"publicKey":      newPubB64,
+			"sessionId":      sessID,
 			"assignedIp":     assignedIP,
-			"serverEndpoint": serverEndpoint,
+			"serverEndpoint": endpoint,
+			"allowedIps":     connectData.AllowedIPs,
 			"connectedSince": connectedSince,
 		})
 	}))
 
-	mux.HandleFunc("POST /disconnect", requirePairing(func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("POST /disconnect", requirePairing(func(w http.ResponseWriter, r *http.Request) {
+		st.mu.RLock()
+		sessID := st.sessionID
+		pubKey := st.publicKeyB64
+		wasConnected := st.state == "connected"
+		st.mu.RUnlock()
+
+		if wasConnected {
+			if err := wgRunner.Deactivate(r.Context(), tunnelIfaceName); err != nil {
+				errMsg := err.Error()
+				st.mu.Lock()
+				st.lastError = &errMsg
+				st.mu.Unlock()
+				writeError(w, http.StatusInternalServerError, "WIREGUARD_DEACTIVATE_FAILED", errMsg)
+				return
+			}
+			notifyApiDisconnect(r.Context(), sessID, pubKey)
+		}
+
 		st.mu.Lock()
 		st.state = "disconnected"
+		st.sessionID = nil
 		st.assignedIP = nil
 		st.serverEndpoint = nil
+		st.allowedIPs = []string{}
 		st.connectedSince = nil
 		st.bytesReceived = 0
 		st.bytesSent = 0
+		st.lastError = nil
 		st.mu.Unlock()
 
 		writeJSON(w, http.StatusOK, map[string]any{
@@ -272,10 +518,16 @@ func main() {
 		log.Printf("Generated ephemeral AGENT_PAIRING_TOKEN for local session")
 	}
 
+	apiBaseURL := os.Getenv("API_URL")
+	if apiBaseURL == "" {
+		apiBaseURL = defaultApiBaseURL
+	}
+
 	handler := NewHandler(AgentConfig{
 		AllowedOrigins: allowedOrigins,
 		PairingToken:   pairingToken,
 		Version:        defaultVersion,
+		ApiBaseURL:     apiBaseURL,
 	})
 
 	log.Printf("MANGO Windows Agent listening on %s", addr)

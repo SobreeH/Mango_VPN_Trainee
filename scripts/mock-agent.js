@@ -15,14 +15,20 @@
 
 const http = require('http');
 const crypto = require('crypto');
+const os = require('os');
 
 const PORT = Number(process.env.AGENT_PORT || 47821);
 const HOST = process.env.AGENT_HOST || '127.0.0.1';
+const API_URL = (process.env.API_URL || 'http://localhost:4000').replace(/\/+$/, '');
 const ALLOWED_ORIGINS = (process.env.AGENT_ALLOWED_ORIGINS || 'http://localhost:3000,http://127.0.0.1:3000')
   .split(',')
   .map((o) => o.trim())
   .filter((o) => o && o !== '*');
 const PAIRING_TOKEN = process.env.AGENT_PAIRING_TOKEN || crypto.randomBytes(32).toString('base64url');
+const HOSTNAME = process.env.AGENT_HOSTNAME || os.hostname() || 'MOCK-WINDOWS-PC';
+const DEVICE_FINGERPRINT =
+  process.env.AGENT_DEVICE_FINGERPRINT ||
+  'mock-' + crypto.createHash('sha256').update(HOSTNAME).digest('hex').slice(0, 24);
 const START_TIME = Date.now();
 
 function generateX25519PublicKeyB64() {
@@ -35,8 +41,10 @@ function generateX25519PublicKeyB64() {
 const agentState = {
   version: '2.0.0-mock',
   state: 'disconnected', // 'disconnected' | 'connecting' | 'connected' | 'disconnecting' | 'error'
+  sessionId: null,
   assignedIp: null,
-  serverEndpoint: '127.0.0.1:51820',
+  serverEndpoint: null,
+  allowedIps: [],
   publicKey: generateX25519PublicKeyB64(),
   connectedSince: null,
   bytesReceived: 0,
@@ -167,8 +175,10 @@ const server = http.createServer(async (req, res) => {
         state: agentState.state,
         version: agentState.version,
         publicKey: agentState.publicKey,
+        sessionId: agentState.sessionId,
         assignedIp: agentState.assignedIp,
         serverEndpoint: agentState.serverEndpoint,
+        allowedIps: agentState.allowedIps,
         connectedSince: agentState.connectedSince,
         bytesReceived: agentState.bytesReceived,
         bytesSent: agentState.bytesSent,
@@ -187,31 +197,81 @@ const server = http.createServer(async (req, res) => {
       agentState.state = 'connecting';
       agentState.lastError = null;
 
-      setTimeout(() => {
-        agentState.state = 'connected';
-        agentState.assignedIp = '10.13.13.' + (Math.floor(Math.random() * 200) + 10) + '/32';
-        agentState.connectedSince = new Date().toISOString();
-        agentState.bytesReceived = 1024;
-        agentState.bytesSent = 512;
-      }, 300).unref();
+      let apiRes;
+      try {
+        apiRes = await fetch(`${API_URL}/api/vpn/connect`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ticket,
+            publicKey: agentState.publicKey,
+            deviceFingerprint: DEVICE_FINGERPRINT,
+            hostname: HOSTNAME,
+            agentVersion: agentState.version,
+          }),
+        });
+      } catch (err) {
+        agentState.state = 'error';
+        agentState.lastError = `Failed to reach control plane API: ${err.message}`;
+        return sendError(res, 502, 'API_UNREACHABLE', agentState.lastError);
+      }
+
+      const apiData = await apiRes.json().catch(() => ({}));
+      if (!apiRes.ok) {
+        agentState.state = 'error';
+        agentState.lastError = apiData.message || `Control plane API returned HTTP ${apiRes.status}`;
+        return sendError(res, apiRes.status, 'API_CONNECT_REJECTED', agentState.lastError);
+      }
+
+      agentState.state = 'connected';
+      agentState.sessionId = apiData.sessionId || null;
+      agentState.assignedIp = apiData.assignedIp || null;
+      agentState.serverEndpoint = apiData.serverEndpoint || null;
+      agentState.allowedIps = Array.isArray(apiData.allowedIps) ? apiData.allowedIps : [];
+      agentState.connectedSince = apiData.connectedAt || new Date().toISOString();
+      agentState.bytesReceived = 0;
+      agentState.bytesSent = 0;
+      agentState.lastError = null;
 
       return sendJson(res, 200, {
         success: true,
-        message: 'Curve25519 keypair generated and Connect Ticket accepted',
-        state: 'connecting',
+        message: 'WireGuard tunnel connected',
+        state: 'connected',
         publicKey: agentState.publicKey,
+        sessionId: agentState.sessionId,
         assignedIp: agentState.assignedIp,
         serverEndpoint: agentState.serverEndpoint,
+        allowedIps: agentState.allowedIps,
         connectedSince: agentState.connectedSince,
       });
     }
 
     if (req.method === 'POST' && pathname === '/disconnect') {
+      if (agentState.state === 'connected') {
+        try {
+          await fetch(`${API_URL}/api/vpn/disconnect`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionId: agentState.sessionId || undefined,
+              publicKey: agentState.publicKey,
+              deviceFingerprint: DEVICE_FINGERPRINT,
+            }),
+          });
+        } catch {
+          // Best-effort notification when API is unreachable
+        }
+      }
+
       agentState.state = 'disconnected';
+      agentState.sessionId = null;
       agentState.assignedIp = null;
+      agentState.serverEndpoint = null;
+      agentState.allowedIps = [];
       agentState.connectedSince = null;
       agentState.bytesReceived = 0;
       agentState.bytesSent = 0;
+      agentState.lastError = null;
 
       return sendJson(res, 200, {
         success: true,

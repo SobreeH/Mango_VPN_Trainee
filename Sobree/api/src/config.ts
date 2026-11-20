@@ -6,6 +6,10 @@ export interface ApiConfig {
   refreshSecret: string;
   totpEncryptionKey: string;
   daemonSharedSecret: string;
+  vpnDaemonUrl: string;
+  wgServerPublicKey: string;
+  wgServerEndpoint: string;
+  wgDns: string[];
   corsOrigin: string | boolean;
 }
 
@@ -48,6 +52,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     throw new Error('Environment variable PORT must be a valid TCP port (1-65535)');
   }
 
+  const wgDns = (env.WG_DNS ?? '1.1.1.1')
+    .split(',')
+    .map((d) => d.trim())
+    .filter(Boolean);
+
   return {
     nodeEnv: env.NODE_ENV ?? 'development',
     port: parsedPort,
@@ -56,6 +65,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     refreshSecret,
     totpEncryptionKey,
     daemonSharedSecret,
+    vpnDaemonUrl: (env.VPN_DAEMON_URL ?? 'http://127.0.0.1:50051').replace(/\/+$/, ''),
+    wgServerPublicKey: env.WG_SERVER_PUBLIC_KEY?.trim() ?? '',
+    wgServerEndpoint: env.WG_SERVER_ENDPOINT?.trim() || '127.0.0.1:51820',
+    wgDns: wgDns.length > 0 ? wgDns : ['1.1.1.1'],
     corsOrigin: env.CORS_ORIGIN ?? 'http://localhost:3000',
   };
 }

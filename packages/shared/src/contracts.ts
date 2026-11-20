@@ -159,6 +159,52 @@ export interface ConnectTicketResponse {
   expiresInSeconds: number;
 }
 
+export interface VpnConnectRequest {
+  ticket: string;
+  publicKey: string;
+  deviceFingerprint: string;
+  hostname: string;
+  agentVersion: string;
+}
+
+export interface VpnConnectResponse {
+  sessionId: string;
+  assignedIp: string;
+  serverPublicKey: string;
+  serverEndpoint: string;
+  allowedIps: string[];
+  dns: string[];
+  connectedAt: string;
+}
+
+export interface VpnDisconnectRequest {
+  sessionId?: string;
+  publicKey?: string;
+  deviceFingerprint?: string;
+}
+
+export interface VpnDisconnectResponse {
+  success: boolean;
+  sessionId: string | null;
+  disconnectedAt: string | null;
+}
+
+export interface DaemonAddPeerRequest {
+  publicKey: string;
+  assignedIp: string;
+  role?: RoleName;
+}
+
+export interface DaemonRemovePeerRequest {
+  publicKey: string;
+}
+
+export interface DaemonPeerResponse {
+  success: boolean;
+  publicKey: string;
+  assignedIp?: string;
+}
+
 export type AgentTunnelState =
   | 'disconnected'
   | 'connecting'
@@ -180,6 +226,8 @@ export interface AgentStatusResponse {
   publicKey: string;
   assignedIp: string | null;
   serverEndpoint: string | null;
+  allowedIps?: string[];
+  sessionId?: string | null;
   connectedSince: string | null;
   bytesReceived: number;
   bytesSent: number;
@@ -197,6 +245,8 @@ export interface AgentConnectResponse {
   publicKey: string;
   assignedIp: string | null;
   serverEndpoint: string | null;
+  allowedIps?: string[];
+  sessionId?: string | null;
   connectedSince: string | null;
 }
 

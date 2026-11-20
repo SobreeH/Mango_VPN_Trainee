@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdh"
 	"encoding/base64"
 	"encoding/json"
@@ -11,11 +12,73 @@ import (
 	"testing"
 )
 
+type fakeWireGuardRunner struct {
+	activated   []TunnelConfig
+	deactivated int
+	activateErr error
+}
+
+func (f *fakeWireGuardRunner) Activate(_ context.Context, cfg TunnelConfig) error {
+	if f.activateErr != nil {
+		return f.activateErr
+	}
+	f.activated = append(f.activated, cfg)
+	return nil
+}
+
+func (f *fakeWireGuardRunner) Deactivate(_ context.Context, _ string) error {
+	f.deactivated++
+	return nil
+}
+
+func newFakeApiServer(status int) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/api/vpn/connect" {
+			if status != http.StatusOK {
+				w.WriteHeader(status)
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"statusCode": status,
+					"error":      "Unauthorized",
+					"message":    "Connect ticket has expired",
+				})
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"sessionId":       "sess-test-1",
+				"assignedIp":      "10.13.13.4",
+				"serverPublicKey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+				"serverEndpoint":  "127.0.0.1:51820",
+				"allowedIps":      []string{"10.20.0.0/16"},
+				"dns":             []string{"1.1.1.1"},
+				"connectedAt":     "2026-11-20T02:00:00Z",
+			})
+			return
+		}
+		if r.URL.Path == "/api/vpn/disconnect" {
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"success":        true,
+				"sessionId":      "sess-test-1",
+				"disconnectedAt": "2026-11-20T02:05:00Z",
+			})
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+}
+
 func newTestAgentHandler() http.Handler {
+	apiSrv := newFakeApiServer(http.StatusOK)
 	return NewHandler(AgentConfig{
-		AllowedOrigins: []string{"http://localhost:3000", "https://portal.mango.internal"},
-		PairingToken:   "test-pairing-token-32bytes-minimum",
-		Version:        "2.0.0-test",
+		AllowedOrigins:    []string{"http://localhost:3000", "https://portal.mango.internal"},
+		PairingToken:      "test-pairing-token-32bytes-minimum",
+		Version:           "2.0.0-test",
+		ApiBaseURL:        apiSrv.URL,
+		DeviceFingerprint: "fp-unit-test",
+		Hostname:          "TEST-HOST",
+		WgRunner:          &fakeWireGuardRunner{},
 	})
 }
 
@@ -193,5 +256,123 @@ func TestConnectGeneratesCurve25519KeypairAndRequiresTicket(t *testing.T) {
 	handler.ServeHTTP(recDisc, reqDisc)
 	if recDisc.Code != http.StatusOK {
 		t.Fatalf("expected 200 on /disconnect, got %d", recDisc.Code)
+	}
+}
+
+func TestConnectRedeemsTicketWithApiAndActivatesTunnel(t *testing.T) {
+	var connectPayload map[string]any
+	var disconnectPayload map[string]any
+
+	apiSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/vpn/connect":
+			_ = json.NewDecoder(r.Body).Decode(&connectPayload)
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"sessionId":       "sess-42",
+				"assignedIp":      "10.13.13.7",
+				"serverPublicKey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+				"serverEndpoint":  "vpn.mango.internal:51820",
+				"allowedIps":      []string{"10.20.0.0/16", "10.30.0.0/16"},
+				"dns":             []string{"1.1.1.1"},
+				"connectedAt":     "2026-11-20T02:00:00Z",
+			})
+		case "/api/vpn/disconnect":
+			_ = json.NewDecoder(r.Body).Decode(&disconnectPayload)
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"success":        true,
+				"sessionId":      "sess-42",
+				"disconnectedAt": "2026-11-20T02:05:00Z",
+			})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer apiSrv.Close()
+
+	wgRunner := &fakeWireGuardRunner{}
+	handler := NewHandler(AgentConfig{
+		AllowedOrigins:    []string{"http://localhost:3000"},
+		PairingToken:      "test-pairing-token-32bytes-minimum",
+		Version:           "2.0.0-test",
+		ApiBaseURL:        apiSrv.URL,
+		DeviceFingerprint: "fp-win11-42",
+		Hostname:          "WIN11-42",
+		WgRunner:          wgRunner,
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/connect", bytes.NewBufferString(`{"ticket":"ticket-42"}`))
+	req.Header.Set("Origin", "http://localhost:3000")
+	req.Header.Set("X-Mango-Agent-Token", "test-pairing-token-32bytes-minimum")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	if connectPayload["ticket"] != "ticket-42" ||
+		connectPayload["deviceFingerprint"] != "fp-win11-42" ||
+		connectPayload["hostname"] != "WIN11-42" ||
+		connectPayload["agentVersion"] != "2.0.0-test" {
+		t.Fatalf("unexpected /api/vpn/connect payload: %+v", connectPayload)
+	}
+
+	if len(wgRunner.activated) != 1 || wgRunner.activated[0].AssignedIP != "10.13.13.7" {
+		t.Fatalf("expected WireGuardRunner.Activate with 10.13.13.7, got %+v", wgRunner.activated)
+	}
+
+	var resp map[string]any
+	_ = json.NewDecoder(rec.Body).Decode(&resp)
+	if resp["state"] != "connected" || resp["assignedIp"] != "10.13.13.7" || resp["sessionId"] != "sess-42" {
+		t.Fatalf("unexpected /connect response: %+v", resp)
+	}
+
+	// Disconnect
+	discReq := httptest.NewRequest(http.MethodPost, "/disconnect", nil)
+	discReq.Header.Set("Origin", "http://localhost:3000")
+	discReq.Header.Set("X-Mango-Agent-Token", "test-pairing-token-32bytes-minimum")
+	discRec := httptest.NewRecorder()
+	handler.ServeHTTP(discRec, discReq)
+
+	if discRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 on disconnect, got %d: %s", discRec.Code, discRec.Body.String())
+	}
+	if wgRunner.deactivated != 1 {
+		t.Fatalf("expected WireGuardRunner.Deactivate once, got %d", wgRunner.deactivated)
+	}
+	if disconnectPayload["sessionId"] != "sess-42" {
+		t.Fatalf("expected sessionId sess-42 in /api/vpn/disconnect, got %+v", disconnectPayload)
+	}
+}
+
+func TestConnectSurfacesApiFailureHonestly(t *testing.T) {
+	apiSrv := newFakeApiServer(http.StatusUnauthorized)
+	defer apiSrv.Close()
+
+	wgRunner := &fakeWireGuardRunner{}
+	handler := NewHandler(AgentConfig{
+		AllowedOrigins:    []string{"http://localhost:3000"},
+		PairingToken:      "test-pairing-token-32bytes-minimum",
+		Version:           "2.0.0-test",
+		ApiBaseURL:        apiSrv.URL,
+		DeviceFingerprint: "fp-err",
+		Hostname:          "ERR-HOST",
+		WgRunner:          wgRunner,
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/connect", bytes.NewBufferString(`{"ticket":"expired-ticket"}`))
+	req.Header.Set("Origin", "http://localhost:3000")
+	req.Header.Set("X-Mango-Agent-Token", "test-pairing-token-32bytes-minimum")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 when API rejects ticket, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if len(wgRunner.activated) != 0 {
+		t.Fatalf("expected no tunnel activation on API failure")
 	}
 }

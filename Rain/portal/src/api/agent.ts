@@ -1,4 +1,6 @@
 import type {
+  AgentConnectResponse,
+  AgentDisconnectResponse,
   AgentErrorResponse,
   AgentHealthResponse,
   AgentStatusResponse,
@@ -68,7 +70,45 @@ export async function requestConnectTicket(accessToken: string): Promise<Connect
     },
   });
   if (!res.ok) {
-    throw new Error(`Failed to obtain connect ticket (${res.status})`);
+    let message = `Failed to obtain connect ticket (${res.status})`;
+    try {
+      const body = (await res.json()) as { message?: string };
+      if (body.message) message = body.message;
+    } catch {
+      // ignore non-JSON body
+    }
+    throw new Error(message);
   }
   return (await res.json()) as ConnectTicketResponse;
+}
+
+export async function connectAgent(
+  pairingToken: string,
+  ticket: string,
+): Promise<AgentConnectResponse> {
+  const res = await fetch(`${AGENT_BASE_URL}/connect`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Mango-Agent-Token': pairingToken,
+    },
+    body: JSON.stringify({ ticket }),
+  });
+  if (!res.ok) {
+    throw await parseAgentError(res, `Agent connect failed (${res.status})`);
+  }
+  return (await res.json()) as AgentConnectResponse;
+}
+
+export async function disconnectAgent(pairingToken: string): Promise<AgentDisconnectResponse> {
+  const res = await fetch(`${AGENT_BASE_URL}/disconnect`, {
+    method: 'POST',
+    headers: {
+      'X-Mango-Agent-Token': pairingToken,
+    },
+  });
+  if (!res.ok) {
+    throw await parseAgentError(res, `Agent disconnect failed (${res.status})`);
+  }
+  return (await res.json()) as AgentDisconnectResponse;
 }

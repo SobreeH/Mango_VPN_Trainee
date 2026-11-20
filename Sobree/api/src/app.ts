@@ -4,15 +4,24 @@ import type { PrismaClient } from '@prisma/client';
 import type { HealthResponse } from '@mango/shared';
 import { adminPlugin } from '@mango/rain-admin';
 import type { ApiConfig } from './config.js';
+import { HttpVpnDaemonClient, type VpnDaemonClient } from './lib/vpn-daemon.js';
 import { registerAuthRoutes } from './modules/auth/auth.routes.js';
 import { registerVpnRoutes } from './modules/vpn/vpn.routes.js';
+
+export type { VpnDaemonClient };
 
 export interface AppDependencies {
   config: ApiConfig;
   prisma: PrismaClient;
+  vpnDaemon?: VpnDaemonClient;
 }
 
-export async function buildApp({ config, prisma }: AppDependencies): Promise<FastifyInstance> {
+export async function buildApp({
+  config,
+  prisma,
+  vpnDaemon,
+}: AppDependencies): Promise<FastifyInstance> {
+  const daemonClient = vpnDaemon ?? new HttpVpnDaemonClient(config);
   const app = Fastify({
     logger: config.nodeEnv !== 'test',
   });
@@ -42,7 +51,7 @@ export async function buildApp({ config, prisma }: AppDependencies): Promise<Fas
   });
 
   await registerAuthRoutes(app, { config, prisma });
-  await registerVpnRoutes(app, { config, prisma });
+  await registerVpnRoutes(app, { config, prisma, vpnDaemon: daemonClient });
   await app.register(adminPlugin, { prefix: '/api' });
 
   app.addHook('onClose', async () => {

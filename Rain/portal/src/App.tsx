@@ -238,7 +238,7 @@ export function App() {
               <p className="text-xs text-slate-400">{step.session.user.email}</p>
             </div>
 
-            <AgentStatusCard />
+            <AgentStatusCard accessToken={step.session.accessToken} />
 
             <button
               type="button"
