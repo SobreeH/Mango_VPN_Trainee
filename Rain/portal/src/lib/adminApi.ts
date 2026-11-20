@@ -4,10 +4,18 @@ import type {
   AuditLogListResponse,
   AuditLogQuery,
   CreateAgentVersionRequest,
+  CreateUserRequest,
   CreateVpnPolicyRequest,
+  DeviceDto,
+  DeviceListResponse,
   UpdateAgentVersionRequest,
+  UpdateUserStatusRequest,
+  UserDto,
+  UserListResponse,
   VpnPolicyDto,
   VpnPolicyListResponse,
+  VpnSessionDto,
+  VpnSessionListResponse,
 } from '@mango/shared';
 
 export const DEFAULT_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
@@ -91,6 +99,72 @@ export function updateAgentVersion(
   return requestJson<AgentVersionDto>(`${apiBaseUrl}/api/agent-versions/${id}`, accessToken, {
     method: 'PATCH',
     body: JSON.stringify(payload),
+  });
+}
+
+export function fetchUsers(
+  apiBaseUrl: string,
+  accessToken: string,
+): Promise<UserListResponse> {
+  return requestJson<UserListResponse>(`${apiBaseUrl}/api/users`, accessToken);
+}
+
+export function createUser(
+  apiBaseUrl: string,
+  accessToken: string,
+  payload: CreateUserRequest,
+): Promise<UserDto> {
+  return requestJson<UserDto>(`${apiBaseUrl}/api/users`, accessToken, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateUserStatus(
+  apiBaseUrl: string,
+  accessToken: string,
+  id: string,
+  payload: UpdateUserStatusRequest,
+): Promise<UserDto> {
+  return requestJson<UserDto>(`${apiBaseUrl}/api/users/${id}/status`, accessToken, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function fetchDevices(
+  apiBaseUrl: string,
+  accessToken: string,
+): Promise<DeviceListResponse> {
+  return requestJson<DeviceListResponse>(`${apiBaseUrl}/api/devices`, accessToken);
+}
+
+export function revokeDevice(
+  apiBaseUrl: string,
+  accessToken: string,
+  id: string,
+): Promise<DeviceDto> {
+  return requestJson<DeviceDto>(`${apiBaseUrl}/api/devices/${id}/revoke`, accessToken, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export function fetchSessions(
+  apiBaseUrl: string,
+  accessToken: string,
+): Promise<VpnSessionListResponse> {
+  return requestJson<VpnSessionListResponse>(`${apiBaseUrl}/api/sessions`, accessToken);
+}
+
+export function disconnectSession(
+  apiBaseUrl: string,
+  accessToken: string,
+  id: string,
+): Promise<VpnSessionDto> {
+  return requestJson<VpnSessionDto>(`${apiBaseUrl}/api/sessions/${id}/disconnect`, accessToken, {
+    method: 'POST',
+    body: JSON.stringify({}),
   });
 }
 

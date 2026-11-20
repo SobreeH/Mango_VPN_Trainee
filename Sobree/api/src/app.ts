@@ -59,6 +59,7 @@ export async function buildApp({
     prisma,
     authenticate,
     requireAdmin: requireRole(RoleName.ADMIN),
+    vpnDaemon: daemonClient,
     syncPolicies: (req) => daemonClient.syncPolicies(req),
   });
 

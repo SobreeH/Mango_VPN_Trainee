@@ -8,6 +8,9 @@ import { AgentStatusCard } from './components/AgentStatusCard';
 import { DEFAULT_API_URL } from './lib/adminApi';
 import { AuditLogsTab } from './components/AuditLogsTab';
 import { AgentVersionsTab } from './components/AgentVersionsTab';
+import { UsersTab } from './components/UsersTab';
+import { DevicesTab } from './components/DevicesTab';
+import { SessionsTab } from './components/SessionsTab';
 import { PoliciesTab } from './components/PoliciesTab';
 
 export interface PortalSession {
@@ -21,7 +24,7 @@ export interface AppProps {
   apiBaseUrl?: string;
 }
 
-type AdminTab = 'audit-logs' | 'agent-versions' | 'policies';
+type AdminTab = 'audit-logs' | 'agent-versions' | 'users' | 'devices' | 'sessions' | 'policies';
 
 const loginSchema = z.object({
   username: z.string().trim().min(1, 'Username is required'),
@@ -274,54 +277,51 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
 
             {step.session.user.role === RoleName.ADMIN && (
               <div className="space-y-4 border-t border-slate-800 pt-4">
-                <div role="tablist" aria-label="Admin Governance" className="flex gap-2 border-b border-slate-800 pb-2">
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={activeTab === 'audit-logs'}
-                    onClick={() => setActiveTab('audit-logs')}
-                    className={`rounded-lg px-4 py-2 text-sm font-medium ${
-                      activeTab === 'audit-logs'
-                        ? 'bg-amber-500 text-slate-950'
-                        : 'text-slate-300 hover:bg-slate-900'
-                    }`}
-                  >
-                    Audit Logs
-                  </button>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={activeTab === 'agent-versions'}
-                    onClick={() => setActiveTab('agent-versions')}
-                    className={`rounded-lg px-4 py-2 text-sm font-medium ${
-                      activeTab === 'agent-versions'
-                        ? 'bg-amber-500 text-slate-950'
-                        : 'text-slate-300 hover:bg-slate-900'
-                    }`}
-                  >
-                    Agent Versions
-                  </button>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={activeTab === 'policies'}
-                    onClick={() => setActiveTab('policies')}
-                    className={`rounded-lg px-4 py-2 text-sm font-medium ${
-                      activeTab === 'policies'
-                        ? 'bg-amber-500 text-slate-950'
-                        : 'text-slate-300 hover:bg-slate-900'
-                    }`}
-                  >
-                    Policies
-                  </button>
+                <div role="tablist" aria-label="Admin Governance" className="flex flex-wrap gap-2 border-b border-slate-800 pb-2">
+                  {(
+                    [
+                      ['audit-logs', 'Audit Logs'],
+                      ['agent-versions', 'Agent Versions'],
+                      ['users', 'Users'],
+                      ['devices', 'Devices'],
+                      ['sessions', 'Sessions'],
+                      ['policies', 'Policies'],
+                    ] as const
+                  ).map(([tabKey, label]) => (
+                    <button
+                      key={tabKey}
+                      type="button"
+                      role="tab"
+                      aria-selected={activeTab === tabKey}
+                      onClick={() => setActiveTab(tabKey)}
+                      className={`rounded-lg px-3 py-2 text-sm font-medium ${
+                        activeTab === tabKey
+                          ? 'bg-amber-500 text-slate-950'
+                          : 'text-slate-300 hover:bg-slate-900'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
 
                 <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
-                  {activeTab === 'audit-logs' ? (
+                  {activeTab === 'audit-logs' && (
                     <AuditLogsTab apiBaseUrl={apiBaseUrl} accessToken={step.session.accessToken} />
-                  ) : activeTab === 'agent-versions' ? (
+                  )}
+                  {activeTab === 'agent-versions' && (
                     <AgentVersionsTab apiBaseUrl={apiBaseUrl} accessToken={step.session.accessToken} />
-                  ) : (
+                  )}
+                  {activeTab === 'users' && (
+                    <UsersTab apiBaseUrl={apiBaseUrl} accessToken={step.session.accessToken} />
+                  )}
+                  {activeTab === 'devices' && (
+                    <DevicesTab apiBaseUrl={apiBaseUrl} accessToken={step.session.accessToken} />
+                  )}
+                  {activeTab === 'sessions' && (
+                    <SessionsTab apiBaseUrl={apiBaseUrl} accessToken={step.session.accessToken} />
+                  )}
+                  {activeTab === 'policies' && (
                     <PoliciesTab apiBaseUrl={apiBaseUrl} accessToken={step.session.accessToken} />
                   )}
                 </div>
