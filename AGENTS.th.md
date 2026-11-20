@@ -34,6 +34,7 @@ MANGO VPN คือระบบ **Zero-Trust Role-Based WireGuard Remote Access 
 | [`Sobree/agent-windows/`](Sobree/agent-windows/) | Sobree ⚡ | Go (`golang.org/x/sys/windows/svc`) | Windows Service รันในเครื่อง Client ดักฟังที่ `127.0.0.1:47821` รองรับ Chromium Private Network Access (PNA), สร้างกุญแจ Curve25519 ในแรม, และสั่งเปิดใช้งานอุโมงค์ WireGuard |
 | [`Sobree/vpn-daemon/`](Sobree/vpn-daemon/) | Sobree ⚡ | Go (Linux daemon) | รันบน Linux ทำหน้าที่จัดการ WireGuard (`wg set`) และคุมนโยบายสิทธิ์เครือข่ายด้วย `nftables` ตาม Role, มี HTTP API ที่ยืนยันตัวตนด้วย Bearer บนพอร์ต `:50051` |
 | [`scripts/mock-agent.js`](scripts/mock-agent.js) | ร่วมกัน (เครื่องมือ Dev) | Node.js | สคริปต์จำลอง Agent บน Loopback (`127.0.0.1:47821`) เลียนแบบ `Sobree/agent-windows` เพื่อให้ทดสอบ Frontend ได้โดยไม่ต้องรัน Windows Service หรือมีเคอร์เนล WireGuard จริง |
+| [`scripts/mock-daemon.js`](scripts/mock-daemon.js) | ร่วมกัน (เครื่องมือ Dev) | Node.js | สคริปต์จำลอง Daemon สำหรับ Dev แบบ Loopback (`127.0.0.1:50051`) เลียนแบบ `Sobree/vpn-daemon` โดยไม่บังคับใช้ WireGuard / nftables |
 
 ### ขอบเขตสิ่งที่อยู่ในระบบ (In-Scope) เทียบกับ นอกระบบ (Out-of-Scope)
 - **อยู่ในขอบเขต (IN-SCOPE)**:
@@ -84,7 +85,7 @@ MANGO VPN คือระบบ **Zero-Trust Role-Based WireGuard Remote Access 
 
 ## 4. ปราการป้องกันการหลอนและรักษาความสัตย์จริงของ AI (Anti-Hallucination Guardrails)
 
-AI ผู้ช่วยทุกคนต้องปฏิบัติตามกฎวิศวกรรม 5 ข้อนี้อย่างเคร่งครัด:
+AI ผู้ช่วยทุกคนต้องปฏิบัติตามกฎวิศวกรรม 6 ข้อนี้อย่างเคร่งครัด:
 
 ### กฎข้อที่ 1: ห้ามสร้างข้อความแจ้งเตือนสำเร็จปลอม หรือใส่ Mock หลอกในโค้ด Production
 - **ห้าม** ดัก `catch` ข้อผิดพลาดของ API หรือ Agent แล้วแสดงผลลัพธ์หลอกผู้ใช้ว่า "Success!" หรือเพิ่ม Record ปลอม (เช่น `id: u-${Date.now()}`) เข้าสู่ UI State เด็ดขาด
@@ -107,6 +108,9 @@ AI ผู้ช่วยทุกคนต้องปฏิบัติตา�
 
 ### กฎข้อที่ 5: ปรับปรุง `mock-agent.js` ให้สอดคล้องกับ `Sobree/agent-windows` เสมอ
 - เมื่อใดก็ตามที่มีการแก้ไข Loopback Contract บน `127.0.0.1:47821` (`/health`, `/status`, `/connect`, `/disconnect`, Headers ของ PNA/CORS หรือการตรวจสอบ Token) ใน [`Sobree/agent-windows/main.go`](Sobree/agent-windows/main.go) AI **จะต้อง** อัปเดต [`scripts/mock-agent.js`](scripts/mock-agent.js) ภายใน Branch เดียวกันเสมอ เพื่อให้การทดสอบของฝั่ง Frontend แม่นยำถูกต้อง
+
+### กฎข้อที่ 6: ปรับปรุง `mock-daemon.js` ให้สอดคล้องกับ `Sobree/vpn-daemon` เสมอ
+- เมื่อใดก็ตามที่ Daemon HTTP Contract (Routes, Authentication, Validation หรือ JSON ของ Response/Error) ใน [`Sobree/vpn-daemon/main.go`](Sobree/vpn-daemon/main.go) มีการเปลี่ยนแปลง AI **จะต้อง** อัปเดต [`scripts/mock-daemon.js`](scripts/mock-daemon.js) ภายใน Branch เดียวกันเสมอ Mock นี้ใช้สำหรับ Dev เท่านั้นและต้องเป็น Loopback เท่านั้น ห้ามอ้างอิงจาก `docker-compose.yml` หรือ Dockerfiles และห้ามอ้างว่า Mock ทำหน้าที่บังคับใช้ WireGuard/nftables
 
 ---
 

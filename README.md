@@ -22,7 +22,7 @@ MANGO VPN removes manual `.conf` file handling for corporate VPN users. Users si
 | Monorepo | npm workspaces (`Rain/*`, `Sobree/*`, `packages/*`). npm only; there is no pnpm workspace. |
 | Web portal (`@mango/portal` 0.2.0) | React 18.3, Vite 5, Tailwind CSS 3, TanStack Query 5, Zod 4 |
 | Control plane API (`@mango/api` 0.2.0) | Node.js >= 18, Fastify 4, Prisma 5, bcryptjs, jsonwebtoken |
-| Database | PostgreSQL 16 (`postgres:16-alpine` in Docker Compose) |
+| Database | PostgreSQL 16 (`postgres:16-alpine` in Docker Compose, or embedded via `npm run db:start` for Docker-free Rain) |
 | Windows Agent | Go 1.26 (`Sobree/agent-windows/go.mod`), `golang.org/x/sys/windows/svc` |
 | VPN gateway daemon | Go 1.22 (`Sobree/vpn-daemon/go.mod`), `wg` and `nft` commands |
 | Shared contracts | `@mango/shared` (`packages/shared/src/contracts.ts`) |
@@ -87,8 +87,10 @@ Mango_VPN_Trainee/
 │
 ├── scripts/
 │   ├── mock-agent.js                  # 🧪 Node loopback simulator of the Windows Agent (127.0.0.1:47821)
+│   ├── mock-daemon.js                 # 🧪 Dev-only simulator of the VPN gateway daemon API (127.0.0.1:50051, no wg/nftables enforcement)
+│   ├── dev-db.mjs                     # Docker-free embedded PostgreSQL 16 runner (npm run db:start / db:reset-local; data in .local/postgres)
 │   ├── check-guardrails.mjs           # Scanner for hardcoded secret fallbacks, MOCK_* data, wildcard agent CORS, SYS_MODULE
-│   └── check-environment.ps1          # Tool readiness check (npm run check:env)
+│   └── check-environment.ps1          # Tool readiness check (npm run check:env; use -- -Role Rain for Docker-free Rain)
 │
 ├── docs/agents/                      # Agent skill configuration (issue tracker, triage labels, domain docs)
 ├── .github/                           # CI workflow (ci.yml) and CODEOWNERS
@@ -110,26 +112,38 @@ Mango_VPN_Trainee/
 | **Database seeding** | `Rain/admin/src/seed.ts` | Prisma schema and migrations |
 | **Backend core** | Consumes auth and VPN endpoints | `Sobree/api` (password + TOTP auth, refresh rotation, connect tickets, IPAM) |
 | **Windows Agent** | Uses `scripts/mock-agent.js` for UI testing | `Sobree/agent-windows` (Go Windows Service) |
-| **VPN gateway** | N/A | `Sobree/vpn-daemon` (Linux `wg` + `nftables`) |
+| **VPN gateway** | Optional: `npm run mock:daemon` (`scripts/mock-daemon.js`) for local UI, policy, and connect testing without Docker or `wg`/`nftables` enforcement | `Sobree/vpn-daemon` (Linux `wg` + `nftables`) |
 | **Shared contracts** | Consumes `@mango/shared` | Defines `@mango/shared` |
 
 ---
 
 ## 3. Workflow for Rain
 
-Rain works inside `Rain/` and only reads Sobree's API. The API still needs PostgreSQL and a configured `.env` (see [QUICKSTART.md](QUICKSTART.md)).
+Rain works inside `Rain/` and only reads Sobree's API. **Rain's workflow needs no Docker**: Node.js and Git are enough. `npm run db:start` runs embedded PostgreSQL 16 (data in `.local/postgres`), `npm run mock:daemon` simulates the gateway daemon, and `npm run mock:agent` simulates the Windows Agent. The `.env` file still needs its `POSTGRES_*`, `DATABASE_URL`, and secret values (see [QUICKSTART.md](QUICKSTART.md)).
 
 ```powershell
-# 1. Local Windows Agent simulator (terminal 1). It prints its PairingToken at startup.
+# 1. Embedded PostgreSQL 16 on 127.0.0.1:15432 (terminal 1). Ctrl+C stops it cleanly.
+npm run db:start
+
+# 2. Prepare the schema and admin (setup terminal, while step 1 keeps running)
+npm run db:generate
+npm run db:migrate
+npm run db:seed                      # needs SEED_ADMIN_USERNAME / SEED_ADMIN_PASSWORD
+
+# 3. Dev-only gateway daemon simulator on 127.0.0.1:50051 (terminal 2). No wg/nftables enforcement.
+npm run mock:daemon
+
+# 4. Local Windows Agent simulator (terminal 3). It prints its PairingToken at startup.
 npm run mock:agent
 
-# 2. Management API (terminal 2)
+# 5. Management API (terminal 4)
 npm run dev:api
 
-# 3. Portal UI (terminal 3)
+# 6. Portal UI (terminal 5)
 npm run dev:portal
 ```
 
+- **Docker is not required** for this workflow. `npm run mock:daemon` avoids `502 Bad Gateway` on connect, policy, and revocation calls without Docker, but it does not program WireGuard or `nftables`. Use Docker Compose only for the full stack (Sobree / Track B and C).
 - **Portal UI**: Vite is configured in `Rain/portal/vite.config.ts` to run on `http://localhost:3000`, matching `CORS_ORIGIN` and `AGENT_ALLOWED_ORIGINS`.
 - **Root `.env` auto-loading**: `npm run dev:api` and `npm run db:seed` automatically load `.env` from the monorepo root when present (without overriding shell environment variables).
 - **Agent pairing**: Paste the mock agent's PairingToken into the portal's "Paste X-Mango-Agent-Token" field.
@@ -204,10 +218,14 @@ Run `go vet ./...` and `go test ./...` in each Go module before you push.
 | `npm run dev:portal` | Starts the Vite dev server for `@mango/portal` |
 | `npm run dev:api` | Starts the Fastify API in watch mode (`@mango/api`, which mounts `@mango/rain-admin`) |
 | `npm run mock:agent` | Runs the zero-dependency Windows Agent simulator on `http://127.0.0.1:47821` |
+| `npm run mock:daemon` | Runs the dev-only gateway daemon simulator (`scripts/mock-daemon.js`) on `http://127.0.0.1:50051`. Prints `[DEV MOCK DAEMON – no wg/nftables enforcement]`; it does not program WireGuard or `nftables` |
+| `npm run db:start` | Starts embedded PostgreSQL 16 on `127.0.0.1:15432` (`scripts/dev-db.mjs`) without Docker, storing data in `.local/postgres` and creating `POSTGRES_DB` and `mangovpn_v2_test`. Ctrl+C stops it |
+| `npm run db:reset-local` | Deletes `.local/postgres`. Run it only after `npm run db:start` has stopped |
 | `npm run db:generate` | Generates `@prisma/client` from `Sobree/api/prisma/schema.prisma` |
 | `npm run db:migrate` | Runs `prisma migrate dev` |
 | `npm run db:seed` | Runs `Rain/admin/src/seed.ts` |
 | `npm run check:env` | Runs `scripts/check-environment.ps1` |
+| `npm run check:env -- -Role Rain` | Rain's Docker-free readiness check. Marks Docker, Docker Compose, Docker Desktop, and Go as `OPTIONAL` |
 | `npm run docker:up` / `docker:down` / `docker:logs` | Starts, stops, or tails the Docker Compose stack (`postgres`, `vpn-gateway`, `api`, `portal`) |
 
 The guardrail scanner is not an npm script. Run it with `node scripts/check-guardrails.mjs`. CI runs it first.
@@ -224,7 +242,7 @@ The guardrail scanner is not an npm script. Run it with `node scripts/check-guar
 
 ### Step 1 — Environment & Secrets (`.env`)
 
-1. Verify local prerequisites (`Node.js >= 18`, `npm >= 9`, `Git >= 2.30`, `Docker >= 24`, `Docker Compose >= v2.20`, `Go >= 1.22` / `1.26.0` for `agent-windows`, and **WireGuard for Windows** for real tunnels):
+1. Verify local prerequisites. Rain's Docker-free workflow needs only `Node.js >= 18`, `npm >= 9`, and `Git >= 2.30` (run `npm run check:env -- -Role Rain`). Sobree and the full Docker stack also need `Docker >= 24` (Docker Desktop), `Docker Compose >= v2.20`, `Go >= 1.22` / `1.26.0` for `agent-windows`, and **WireGuard for Windows** for real tunnels (run `npm run check:env`):
    ```powershell
    npm run check:env
    ```
@@ -238,10 +256,15 @@ The guardrail scanner is not an npm script. Run it with `node scripts/check-guar
 
 ### Step 2 — Database Migration & Admin Seed
 
-1. Start PostgreSQL 16 (`mango-postgres` on host port `15432`):
-   ```powershell
-   docker compose up -d postgres
-   ```
+1. Start PostgreSQL 16 on host port `15432`. Pick one option:
+   - **Rain, Docker-free:** keep this running in its own terminal:
+     ```powershell
+     npm run db:start
+     ```
+   - **Sobree / full stack (requires Docker Desktop):**
+     ```powershell
+     docker compose up -d postgres     # container mango-postgres
+     ```
 2. Generate the Prisma client and apply migrations (`npm run db:migrate`, or reset if upgrading from an older v1 schema):
    ```powershell
    npm run db:generate
@@ -277,11 +300,15 @@ cd Sobree/vpn-daemon; go vet ./...; go test ./...; cd ../..
 
 ### Step 4 — Interactive Walkthrough (Browser -> API -> Agent -> Gateway)
 
-- **Mode A — Portal & Admin Dev with `scripts/mock-agent.js` (Rain)**:
-  1. Terminal 1: `npm run mock:agent` (binds `127.0.0.1:47821`, prints `PairingToken`).
-  2. Terminal 2: `npm run dev:api` (Fastify API on `:4000`).
-  3. Terminal 3: `npm run dev:portal` (starts Vite on `:3000` to match default `CORS_ORIGIN` and `AGENT_ALLOWED_ORIGINS`).
-- **Mode B — Full Systems Dev with Go Windows Agent & Linux Gateway Container (Sobree)**:
+- **Mode A — Portal & Admin Dev, Docker-free (Rain)**:
+  1. Terminal 1: `npm run db:start` (embedded PostgreSQL 16 on `127.0.0.1:15432`; keep it running).
+  2. Terminal 2: `npm run mock:daemon` (dev-only gateway simulator on `127.0.0.1:50051`; prints `[DEV MOCK DAEMON – no wg/nftables enforcement]`).
+  3. Terminal 3: `npm run mock:agent` (binds `127.0.0.1:47821`, prints `PairingToken`).
+  4. Terminal 4: `npm run dev:api` (Fastify API on `:4000`).
+  5. Terminal 5: `npm run dev:portal` (starts Vite on `:3000` to match default `CORS_ORIGIN` and `AGENT_ALLOWED_ORIGINS`).
+
+  No Docker is needed. Neither `mock:daemon` nor `mock:agent` activates WireGuard or `nftables` enforcement.
+- **Mode B — Full Systems Dev with Go Windows Agent & Linux Gateway Container (Sobree, requires Docker Desktop)**:
   1. Start database and gateway (plus optional containerized API) — `docker-compose.yml` binds `vpn-gateway` `:50051` to host loopback `127.0.0.1:50051` so host-run `npm run dev:api` can reach it directly:
      ```powershell
      docker compose up -d postgres vpn-gateway
@@ -313,7 +340,7 @@ cd Sobree/vpn-daemon; go vet ./...; go test ./...; cd ../..
 | **`403 FORBIDDEN_ORIGIN` from Windows Agent / mock-agent** | Portal origin is outside `AGENT_ALLOWED_ORIGINS` (`http://localhost:3000`) | Run `npm run dev:portal` (pinned to `:3000`) or add the origin to `AGENT_ALLOWED_ORIGINS` and `CORS_ORIGIN`. |
 | **`401 Unauthorized` from `/status`, `/connect`, `/disconnect`** | Missing or mismatched `X-Mango-Agent-Token` header | Copy the `PairingToken` printed by `npm run mock:agent`, or set `$env:AGENT_PAIRING_TOKEN` explicitly before starting `Sobree/agent-windows`. |
 | **`426` (`AGENT_VERSION_OUTDATED` / `AGENT_VERSION_INACTIVE`)** | `agent_versions` table blocks or requires a newer version for `windows-x64` | Check or activate version `2.0.0` for platform `windows-x64` in the Portal's **Agent Versions** tab. |
-| **`502 Bad Gateway` on Connect, Policy Sync, or Revocation** | `Sobree/api` cannot reach `vpn-gateway` at `VPN_DAEMON_URL` or `DAEMON_SHARED_SECRET` mismatches | Verify `vpn-gateway` is healthy (`docker compose ps vpn-gateway`), reachable at `http://127.0.0.1:50051` (host) or `http://vpn-gateway:50051` (Docker), and `DAEMON_SHARED_SECRET` matches. |
+| **`502 Bad Gateway` on Connect, Policy Sync, or Revocation** | `Sobree/api` cannot reach the gateway daemon at `VPN_DAEMON_URL`, or `DAEMON_SHARED_SECRET` mismatches | Docker-free: confirm `npm run mock:daemon` is running on `http://127.0.0.1:50051`. Docker: verify `vpn-gateway` is healthy (`docker compose ps vpn-gateway`), reachable at `http://vpn-gateway:50051` (inside Docker) or `http://127.0.0.1:50051` (host). In both cases `DAEMON_SHARED_SECRET` must match. |
 
 **Useful live inspection commands**:
 ```powershell

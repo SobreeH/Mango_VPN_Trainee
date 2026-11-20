@@ -28,7 +28,7 @@ MANGO VPN ออกแบบมาเพื่อ **"ขจัดความย
 | **Web Portal** (`@mango/portal`) | **React 18.3, Vite 5, Tailwind CSS 3** | State Management ด้วย TanStack Query v5, Schema Validation ด้วย Zod v4 |
 | **Control Plane API** (`@mango/api`) | **Node.js, Fastify 4, Prisma 5** | Authentication (bcryptjs, JWT, TOTP), IPAM จัดการ IP เครือข่าย VPN |
 | **Admin CRUD Plugin** (`@mango/rain-admin`) | **TypeScript, Fastify Plugin** | Endpoints จัดการ Users, Devices, Sessions, Policies และ DB Seeder |
-| **ฐานข้อมูล (Database)** | **PostgreSQL 16** | รันผ่าน Docker Compose (`postgres:16-alpine`) พอร์ต Host คือ `15432` |
+| **ฐานข้อมูล (Database)** | **PostgreSQL 16** | รันผ่าน Docker Compose (`postgres:16-alpine`) หรือแบบฝังตัวด้วย `npm run db:start` (Rain ไม่ต้องใช้ Docker) พอร์ต Host คือ `15432` |
 | **Windows Client Agent** | **Go 1.26** | รันเป็น Windows Service หรือ Console (`golang.org/x/sys/windows/svc`) พอร์ต `47821` |
 | **Linux VPN Gateway Daemon** | **Go 1.22** | รันบน Linux จัดการ `wg` และกฎไฟร์วอลล์ `nftables` บนพอร์ต `:50051` |
 | **Shared Contracts** | **TypeScript** (`@mango/shared`) | ศูนย์กลางเก็บ DTOs, Enums และ Type สัญญากลางที่ใช้ร่วมกันทุกส่วน |
@@ -76,6 +76,8 @@ Mango_VPN_Trainee/
 │
 ├── scripts/
 │   ├── mock-agent.js                  # 🧪 ตัวจำลอง Windows Agent สำหรับใช้รันทดสอบหน้าเว็บในเครื่อง
+│   ├── mock-daemon.js                 # 🧪 ตัวจำลอง VPN Gateway Daemon สำหรับการพัฒนาเท่านั้น (127.0.0.1:50051, ไม่บังคับใช้ wg/nftables)
+│   ├── dev-db.mjs                     # ตัวรัน PostgreSQL 16 แบบฝังตัวโดยไม่ใช้ Docker (`npm run db:start` / `db:reset-local` ข้อมูลอยู่ที่ `.local/postgres`)
 │   ├── check-guardrails.mjs           # เครื่องมือตรวจจับ Secret หลุด และตรวจห้ามใช้ Mock ใน Production
 │   └── check-environment.ps1          # สคริปต์ตรวจความพร้อมของเครื่องมือในเครื่อง
 │
@@ -124,7 +126,7 @@ flowchart TD
 | **Database Seeder** | พัฒนาและดูแล `Rain/admin/src/seed.ts` | ออกแบบ Prisma Schema และ Migrations |
 | **Core Backend & Auth** | ฝั่งเรียกใช้งาน (Consumes API) | พัฒนา `Sobree/api` (MFA, JWT, IPAM) |
 | **Windows Agent** | ใช้งาน `scripts/mock-agent.js` เพื่อทดสอบ UI | พัฒนา `Sobree/agent-windows` (Go) |
-| **Linux VPN Gateway** | ไม่ต้องดูแล | พัฒนา `Sobree/vpn-daemon` (Go + `nftables`) |
+| **Linux VPN Gateway** | ไม่บังคับ: รัน `scripts/mock-daemon.js` (`npm run mock:daemon`) เพื่อทดสอบ UI/Policy/Connect ในเครื่องได้โดยไม่ใช้ Docker และไม่บังคับใช้ `wg`/`nftables` | พัฒนา `Sobree/vpn-daemon` (Go + `nftables`) |
 | **Shared Contracts** | ใช้งาน Types จาก `@mango/shared` | ออกแบบและดูแลสัญญาใน `@mango/shared` |
 
 ---
@@ -174,31 +176,37 @@ sequenceDiagram
 
 ### 🌧️ สำหรับ Rain (เน้นพัฒนาหน้าบ้าน Portal และ Admin)
 
-Rain สามารถรันระบบทดสอบได้โดยไม่ต้องใช้เครื่อง Linux หรือลงโปรแกรม WireGuard จริง:
+Rain สามารถรันระบบทดสอบได้ **โดยไม่ต้องใช้ Docker** ต้องใช้แค่ Node.js และ Git เท่านั้น ไม่ต้องใช้เครื่อง Linux หรือลงโปรแกรม WireGuard จริง:
 
 ```powershell
-# ขั้นตอนเตรียมฐานข้อมูล (ทำครั้งแรกหรือเมื่อมีการอัปเดต Schema)
-docker compose up -d postgres
+# Terminal 1: PostgreSQL 16 แบบฝังตัวบน 127.0.0.1:15432 (ทิ้งไว้ระหว่างใช้งาน กด Ctrl+C เพื่อหยุด)
+npm run db:start
+
+# Terminal ตั้งค่า (ขณะที่ Terminal 1 ยังทำงานอยู่):
 npm run db:generate
 npm run db:migrate
-npm run db:seed
+npm run db:seed                      # ต้องตั้งค่า SEED_ADMIN_* ก่อน
 
-# เปิด 3 Terminal สำหรับรันระบบทดสอบ:
-# Terminal 1: รัน Mock Agent จำลอง (พอร์ต 47821)
+# Terminal 2: ตัวจำลอง Gateway Daemon (พอร์ต 50051, dev-only ไม่บังคับใช้ wg/nftables)
+npm run mock:daemon
+
+# Terminal 3: รัน Mock Agent จำลอง (พอร์ต 47821)
 npm run mock:agent
 
-# Terminal 2: รัน Backend API (พอร์ต 4000)
+# Terminal 4: รัน Backend API (พอร์ต 4000)
 npm run dev:api
 
-# Terminal 3: รัน Frontend Web Portal (พอร์ต 3000)
+# Terminal 5: รัน Frontend Web Portal (พอร์ต 3000)
 npm --workspace=@mango/portal run dev -- --port 3000
 ```
+
+ขั้นตอนนี้ไม่ต้องใช้ Docker `npm run mock:daemon` ช่วยไม่ให้เจอ `502 Bad Gateway` ตอน Connect, สร้าง Policy และเพิกถอน แต่ **ไม่ได้ตั้งค่า WireGuard หรือ `nftables` จริง** ใช้ Docker Compose เฉพาะเมื่อต้องการรันระบบเต็มรูปแบบ (Sobree / Track B และ C)
 > [!TIP]
 > เมื่อรัน `npm run mock:agent` ตัวจำลองจะพิมพ์ **PairingToken** ออกมา ให้นำโทเคนดังกล่าวไปใส่ในช่องเชื่อมต่อบนหน้าเว็บ Portal เพื่อทำการจับคู่ (Pairing)
 
 ---
 
-### ⚡ สำหรับ Sobree (เน้นพัฒนา Core API, Agent และ Gateway)
+### ⚡ สำหรับ Sobree (เน้นพัฒนา Core API, Agent และ Gateway, ต้องใช้ Docker Desktop)
 
 ```powershell
 # 1. รัน Database
@@ -229,10 +237,14 @@ docker compose up -d vpn-gateway
 | `npm run dev:portal` | เริ่มรันเซิร์ฟเวอร์ Dev ของหน้าเว็บ (`@mango/portal`) |
 | `npm run dev:api` | เริ่มรันเซิร์ฟเวอร์ API (`@mango/api` พร้อม mount `@mango/rain-admin`) |
 | `npm run mock:agent` | รันตัวจำลอง Windows Agent บน `http://127.0.0.1:47821` |
+| `npm run mock:daemon` | รันตัวจำลอง VPN Gateway Daemon (`scripts/mock-daemon.js`) บน `http://127.0.0.1:50051` สำหรับการพัฒนาเท่านั้น จะพิมพ์ `[DEV MOCK DAEMON – no wg/nftables enforcement]` และไม่ได้ตั้งค่า WireGuard หรือ `nftables` จริง |
+| `npm run db:start` | เริ่ม PostgreSQL 16 แบบฝังตัวบน `127.0.0.1:15432` (`scripts/dev-db.mjs`) โดยไม่ใช้ Docker เก็บข้อมูลที่ `.local/postgres` และสร้าง `POSTGRES_DB` กับ `mangovpn_v2_test` ให้อัตโนมัติ กด Ctrl+C เพื่อหยุด |
+| `npm run db:reset-local` | ลบ `.local/postgres` (รันหลังจาก `npm run db:start` หยุดทำงานแล้วเท่านั้น) |
 | `npm run db:generate` | อัปเดต Prisma Client จากไฟล์ `schema.prisma` |
 | `npm run db:migrate` | รัน Migration โครงสร้างฐานข้อมูล |
 | `npm run db:seed` | ใส่ข้อมูลตั้งต้น Role และ Admin ลงฐานข้อมูล |
 | `npm run check:env` | ตรวจสอบความพร้อมของเครื่องมือในเครื่อง |
+| `npm run check:env -- -Role Rain` | ตรวจความพร้อมแบบ Rain ที่ไม่ใช้ Docker โดยกำหนดให้ Docker, Docker Compose, Docker Desktop และ Go เป็น `OPTIONAL` |
 | `npm run docker:up` / `down` | เริ่มหรือหยุดการทำงานของ Docker Compose ทั้งระบบ |
 | `node scripts/check-guardrails.mjs` | รันตัวสแกนความปลอดภัย ตรวจจับ Secret และ Mock หลอก |
 
