@@ -4,15 +4,15 @@ services:
     container_name: mango-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-mango}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mangosecret}
-      POSTGRES_DB: ${POSTGRES_DB:-mangovpn}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
     ports:
-      - "15432:5432"
+      - "${POSTGRES_PORT:-15432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mango} -d ${POSTGRES_DB:-mangovpn}"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -20,31 +20,31 @@ services:
       - mango-net
 
   vpn-gateway:
-    image: linuxserver/wireguard:latest
+    build:
+      context: .
+      dockerfile: Sobree/vpn-daemon/Dockerfile
     container_name: mango-vpn-gateway
     restart: unless-stopped
     cap_add:
       - NET_ADMIN
-      - SYS_MODULE
     sysctls:
       - net.ipv4.ip_forward=1
       - net.ipv4.conf.all.src_valid_mark=1
     environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=UTC
-      - SERVERURL=127.0.0.1
-      - SERVERPORT=51820
-      - PEERS=0
-      - PEERDNS=auto
-      - INTERNAL_SUBNET=10.13.13.0/24
-      - ALLOWEDIPS=0.0.0.0/0
-      - LOG_CONFS=true
+      DAEMON_LISTEN_ADDR: 0.0.0.0:50051
+      DAEMON_SHARED_SECRET: ${DAEMON_SHARED_SECRET:?Set DAEMON_SHARED_SECRET (min 32 chars) in .env}
+      WG_INTERFACE: ${WG_INTERFACE:-wg0}
+      WG_LISTEN_PORT: ${WG_LISTEN_PORT:-51820}
+      WG_GATEWAY_CIDR: ${WG_GATEWAY_CIDR:-10.13.13.1/24}
+      WG_PRIVATE_KEY: ${WG_PRIVATE_KEY:-}
     ports:
-      - "51820:51820/udp"
-    volumes:
-      - wireguard_config:/config
-      - /lib/modules:/lib/modules:ro
+      - "${WG_LISTEN_PORT:-51820}:51820/udp"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:50051/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
     networks:
       - mango-net
 
@@ -55,20 +55,24 @@ services:
     container_name: mango-api
     restart: unless-stopped
     environment:
-      - NODE_ENV=development
-      - PORT=4000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-mango}:${POSTGRES_PASSWORD:-mangosecret}@postgres:5432/${POSTGRES_DB:-mangovpn}?schema=public
-      - JWT_SECRET=mango-vpn-jwt-insecure-secret-key-32chars
-      - JWT_EXPIRES_IN=3600s
-      - REFRESH_SECRET=mango-vpn-refresh-token-insecure-secret
-      - REFRESH_EXPIRES_IN=7d
-      - WG_SERVER_PUBLIC_KEY=bmFub01hbmdvV2lyZUd1YXJkU2VydmVyUHVibGljS2V5PQ==
-      - WG_SERVER_ENDPOINT=127.0.0.1:51820
-      - WG_SERVER_ALLOWED_IPS=10.13.13.0/24
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:?Set POSTGRES_USER in .env}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}?schema=public
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET (min 32 chars) in .env}
+      REFRESH_SECRET: ${REFRESH_SECRET:?Set REFRESH_SECRET (min 32 chars) in .env}
+      TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:?Set TOTP_ENCRYPTION_KEY (64 hex chars) in .env}
+      DAEMON_SHARED_SECRET: ${DAEMON_SHARED_SECRET:?Set DAEMON_SHARED_SECRET (min 32 chars) in .env}
+      VPN_DAEMON_URL: http://vpn-gateway:50051
+      WG_SERVER_PUBLIC_KEY: ${WG_SERVER_PUBLIC_KEY:-}
+      WG_SERVER_ENDPOINT: ${WG_SERVER_ENDPOINT:-127.0.0.1:51820}
+      WG_DNS: ${WG_DNS:-1.1.1.1}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
     ports:
-      - "4000:4000"
+      - "${API_PORT:-4000}:4000"
     depends_on:
       postgres:
+        condition: service_healthy
+      vpn-gateway:
         condition: service_healthy
     networks:
       - mango-net
@@ -77,12 +81,16 @@ services:
     build:
       context: .
       dockerfile: Rain/portal/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:4000}
+        VITE_AGENT_URL: ${VITE_AGENT_URL:-http://127.0.0.1:47821}
     container_name: mango-portal
     restart: unless-stopped
-    ports:
-      - "3000:3000"
     environment:
-      - VITE_API_URL=http://localhost:4000
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:4000}
+      VITE_AGENT_URL: ${VITE_AGENT_URL:-http://127.0.0.1:47821}
+    ports:
+      - "${PORTAL_PORT:-3000}:3000"
     depends_on:
       - api
     networks:
@@ -90,7 +98,6 @@ services:
 
 volumes:
   postgres_data:
-  wireguard_config:
 
 networks:
   mango-net:

@@ -2,70 +2,96 @@
 
 /**
  * MANGO VPN - Local Windows Agent Simulator
- * 
- * Simulates the Go Windows Service (LocalSystem) running on the client machine.
- * Listens on: http://127.0.0.1:47821
- * 
- * Designed for the Junior Developer (Portal Frontend) to develop and test:
- * - Agent installation detection (GET /health)
- * - Private Network Access (PNA) CORS preflights
- * - Tunnel connection orchestration (POST /connect)
- * - Status & telemetry polling (GET /status)
- * - Tunnel disconnection (POST /disconnect)
- * 
+ *
+ * Mirrors Sobree/agent-windows/main.go on http://127.0.0.1:47821:
+ * - Strict Origin allowlist (never wildcard or unconditional reflection)
+ * - Chromium Private Network Access (PNA) preflight headers
+ * - Local pairing token (X-Mango-Agent-Token) on /status, /connect, /disconnect
+ * - In-memory X25519 (Curve25519) keypair generation
+ * - Connect Ticket contract on POST /connect ({ ticket })
+ *
  * ZERO external dependencies. Runs directly with Node.js >= 18.
  */
 
 const http = require('http');
 const crypto = require('crypto');
+const os = require('os');
 
-const PORT = 47821;
-const HOST = '127.0.0.1';
+const PORT = Number(process.env.AGENT_PORT || 47821);
+const HOST = process.env.AGENT_HOST || '127.0.0.1';
+const API_URL = (process.env.API_URL || 'http://localhost:4000').replace(/\/+$/, '');
+const ALLOWED_ORIGINS = (process.env.AGENT_ALLOWED_ORIGINS || 'http://localhost:3000,http://127.0.0.1:3000')
+  .split(',')
+  .map((o) => o.trim())
+  .filter((o) => o && o !== '*');
+const PAIRING_TOKEN = process.env.AGENT_PAIRING_TOKEN || crypto.randomBytes(32).toString('base64url');
+const HOSTNAME = process.env.AGENT_HOSTNAME || os.hostname() || 'MOCK-WINDOWS-PC';
+const DEVICE_FINGERPRINT =
+  process.env.AGENT_DEVICE_FINGERPRINT ||
+  'mock-' + crypto.createHash('sha256').update(HOSTNAME).digest('hex').slice(0, 24);
 const START_TIME = Date.now();
+const DEFAULT_VERSION = '2.0.0';
 
-// In-Memory Simulated State
+function generateX25519PublicKeyB64() {
+  const { publicKey } = crypto.generateKeyPairSync('x25519');
+  const spki = publicKey.export({ format: 'der', type: 'spki' });
+  // Raw 32-byte X25519 public key is the last 32 bytes of SPKI DER
+  return spki.subarray(spki.length - 32).toString('base64');
+}
+
 const agentState = {
-  version: '1.0.0-mock',
+  version: DEFAULT_VERSION,
   state: 'disconnected', // 'disconnected' | 'connecting' | 'connected' | 'disconnecting' | 'error'
+  sessionId: null,
   assignedIp: null,
-  serverEndpoint: '127.0.0.1:51820',
-  publicKey: crypto.randomBytes(32).toString('base64'),
+  serverEndpoint: null,
+  allowedIps: [],
+  publicKey: generateX25519PublicKeyB64(),
   connectedSince: null,
   bytesReceived: 0,
   bytesSent: 0,
   lastError: null,
 };
 
-// Periodic telemetry generator when connected
 setInterval(() => {
   if (agentState.state === 'connected') {
     agentState.bytesReceived += Math.floor(Math.random() * 8192) + 1024;
     agentState.bytesSent += Math.floor(Math.random() * 4096) + 512;
   }
-}, 1000);
+}, 1000).unref();
 
-/**
- * Apply CORS and Chromium Private Network Access (PNA) headers
- */
-function setCorsAndPnaHeaders(req, res) {
-  const origin = req.headers.origin || '*';
-  res.setHeader('Access-Control-Allow-Origin', origin);
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Access-Control-Request-Private-Network');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-
-  // CRITICAL for Chromium Private Network Access (PNA) specification:
-  // Public/local browser contexts communicating with loopback 127.0.0.1
-  res.setHeader('Access-Control-Allow-Private-Network', 'true');
+function isOriginAllowed(origin) {
+  return Boolean(origin && ALLOWED_ORIGINS.includes(origin));
 }
 
-/**
- * Parse incoming JSON body
- */
+function setCorsAndPnaHeaders(req, res, origin) {
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Content-Type, X-Mango-Agent-Token, Access-Control-Request-Private-Network',
+  );
+  if (
+    req.method === 'OPTIONS' ||
+    String(req.headers['access-control-request-private-network'] || '').toLowerCase() === 'true'
+  ) {
+    res.setHeader('Access-Control-Allow-Private-Network', 'true');
+  }
+}
+
+function isValidPairingToken(provided) {
+  if (!provided || typeof provided !== 'string') return false;
+  const a = Buffer.from(provided, 'utf8');
+  const b = Buffer.from(PAIRING_TOKEN, 'utf8');
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
 function parseJsonBody(req) {
   return new Promise((resolve, reject) => {
     let body = '';
-    req.on('data', chunk => {
+    req.on('data', (chunk) => {
       body += chunk;
       if (body.length > 1e6) {
         req.destroy();
@@ -76,7 +102,7 @@ function parseJsonBody(req) {
       if (!body) return resolve({});
       try {
         resolve(JSON.parse(body));
-      } catch (err) {
+      } catch {
         reject(new Error('Invalid JSON'));
       }
     });
@@ -93,12 +119,26 @@ function sendJson(res, statusCode, data) {
   res.end(payload);
 }
 
-const server = http.createServer(async (req, res) => {
-  setCorsAndPnaHeaders(req, res);
+function sendError(res, statusCode, code, message) {
+  return sendJson(res, statusCode, {
+    success: false,
+    error: { code, message },
+  });
+}
 
-  // Handle CORS & PNA Preflight Requests
+const server = http.createServer(async (req, res) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    if (!isOriginAllowed(origin)) {
+      return sendError(res, 403, 'FORBIDDEN_ORIGIN', 'Origin is not in the agent allowlist');
+    }
+    setCorsAndPnaHeaders(req, res, origin);
+  }
+
   if (req.method === 'OPTIONS') {
-    console.log(`[PNA/CORS] Preflight OPTIONS ${req.url} from ${req.headers.origin || 'unknown'}`);
+    if (!origin) {
+      return sendError(res, 403, 'FORBIDDEN_ORIGIN', 'Origin header is required for preflight');
+    }
     res.writeHead(204);
     res.end();
     return;
@@ -107,12 +147,7 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host || '127.0.0.1'}`);
   const pathname = url.pathname;
 
-  console.log(`[Agent] ${req.method} ${pathname}`);
-
   try {
-    // ----------------------------------------------------
-    // GET /health
-    // ----------------------------------------------------
     if (req.method === 'GET' && pathname === '/health') {
       const uptimeSeconds = Math.floor((Date.now() - START_TIME) / 1000);
       return sendJson(res, 200, {
@@ -124,15 +159,27 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
-    // ----------------------------------------------------
-    // GET /status
-    // ----------------------------------------------------
+    // All endpoints below require the local pairing token
+    if (
+      pathname === '/status' ||
+      pathname === '/connect' ||
+      pathname === '/disconnect'
+    ) {
+      const tokenHeader = req.headers['x-mango-agent-token'];
+      if (!isValidPairingToken(tokenHeader)) {
+        return sendError(res, 401, 'INVALID_PAIRING_TOKEN', 'Missing or invalid pairing token');
+      }
+    }
+
     if (req.method === 'GET' && pathname === '/status') {
       return sendJson(res, 200, {
         state: agentState.state,
+        version: agentState.version,
+        publicKey: agentState.publicKey,
+        sessionId: agentState.sessionId,
         assignedIp: agentState.assignedIp,
         serverEndpoint: agentState.serverEndpoint,
-        publicKey: agentState.publicKey,
+        allowedIps: agentState.allowedIps,
         connectedSince: agentState.connectedSince,
         bytesReceived: agentState.bytesReceived,
         bytesSent: agentState.bytesSent,
@@ -140,107 +187,118 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
-    // ----------------------------------------------------
-    // POST /connect
-    // ----------------------------------------------------
     if (req.method === 'POST' && pathname === '/connect') {
       const body = await parseJsonBody(req);
-      const accessToken = body.accessToken;
-
-      if (!accessToken) {
-        return sendJson(res, 400, {
-          success: false,
-          error: {
-            code: 'MISSING_TOKEN',
-            message: 'accessToken is required to initiate VPN connection',
-          },
-        });
+      const ticket = typeof body.ticket === 'string' ? body.ticket.trim() : '';
+      if (!ticket) {
+        return sendError(res, 400, 'MISSING_TICKET', 'Connect ticket is required');
       }
 
-      console.log(`[Agent] Received connect request with accessToken: ${accessToken.slice(0, 16)}...`);
+      agentState.publicKey = generateX25519PublicKeyB64();
       agentState.state = 'connecting';
+      agentState.lastError = null;
 
-      // Simulate WireGuard Adapter Key generation & Backend handshake
-      setTimeout(() => {
-        agentState.state = 'connected';
-        agentState.assignedIp = '10.13.13.' + (Math.floor(Math.random() * 200) + 10) + '/32';
-        agentState.connectedSince = new Date().toISOString();
-        agentState.lastError = null;
-        agentState.bytesReceived = 1024;
-        agentState.bytesSent = 512;
+      let apiRes;
+      try {
+        apiRes = await fetch(`${API_URL}/api/vpn/connect`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ticket,
+            publicKey: agentState.publicKey,
+            deviceFingerprint: DEVICE_FINGERPRINT,
+            hostname: HOSTNAME,
+            agentVersion: agentState.version,
+          }),
+        });
+      } catch (err) {
+        agentState.state = 'error';
+        agentState.lastError = `Failed to reach control plane API: ${err.message}`;
+        return sendError(res, 502, 'API_UNREACHABLE', agentState.lastError);
+      }
 
-        console.log(`[Agent] WireGuard tunnel ESTABLISHED!`);
-        console.log(`[Agent] Assigned IP: ${agentState.assignedIp}`);
-        console.log(`[Agent] Peer Public Key: ${agentState.publicKey}`);
-      }, 300);
+      const apiData = await apiRes.json().catch(() => ({}));
+      if (!apiRes.ok) {
+        agentState.state = 'error';
+        agentState.lastError = apiData.message || `Control plane API returned HTTP ${apiRes.status}`;
+        return sendError(res, apiRes.status, 'API_CONNECT_REJECTED', agentState.lastError);
+      }
+
+      agentState.state = 'connected';
+      agentState.sessionId = apiData.sessionId || null;
+      agentState.assignedIp = apiData.assignedIp || null;
+      agentState.serverEndpoint = apiData.serverEndpoint || null;
+      agentState.allowedIps = Array.isArray(apiData.allowedIps) ? apiData.allowedIps : [];
+      agentState.connectedSince = apiData.connectedAt || new Date().toISOString();
+      agentState.bytesReceived = 0;
+      agentState.bytesSent = 0;
+      agentState.lastError = null;
 
       return sendJson(res, 200, {
         success: true,
-        message: 'WireGuard tunnel connection initiated successfully',
+        message: 'WireGuard tunnel connected',
         state: 'connected',
-        assignedIp: '10.13.13.45/32', // immediate response for mock
+        publicKey: agentState.publicKey,
+        sessionId: agentState.sessionId,
+        assignedIp: agentState.assignedIp,
         serverEndpoint: agentState.serverEndpoint,
-        connectedSince: new Date().toISOString(),
+        allowedIps: agentState.allowedIps,
+        connectedSince: agentState.connectedSince,
       });
     }
 
-    // ----------------------------------------------------
-    // POST /disconnect
-    // ----------------------------------------------------
     if (req.method === 'POST' && pathname === '/disconnect') {
-      console.log(`[Agent] Received disconnect request.`);
-      agentState.state = 'disconnected';
-      const prevIp = agentState.assignedIp;
-      agentState.assignedIp = null;
-      agentState.connectedSince = null;
+      if (agentState.state === 'connected') {
+        try {
+          await fetch(`${API_URL}/api/vpn/disconnect`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionId: agentState.sessionId || undefined,
+              publicKey: agentState.publicKey,
+              deviceFingerprint: DEVICE_FINGERPRINT,
+            }),
+          });
+        } catch {
+          // Best-effort notification when API is unreachable
+        }
+      }
 
-      console.log(`[Agent] WireGuard tunnel TEARDOWN completed. (Previous IP was ${prevIp})`);
+      agentState.state = 'disconnected';
+      agentState.sessionId = null;
+      agentState.assignedIp = null;
+      agentState.serverEndpoint = null;
+      agentState.allowedIps = [];
+      agentState.connectedSince = null;
+      agentState.bytesReceived = 0;
+      agentState.bytesSent = 0;
+      agentState.lastError = null;
 
       return sendJson(res, 200, {
         success: true,
-        message: 'WireGuard tunnel closed successfully',
+        message: 'WireGuard tunnel disconnected',
         state: 'disconnected',
       });
     }
 
-    // Not Found
-    return sendJson(res, 404, {
-      error: {
-        code: 'NOT_FOUND',
-        message: `Endpoint ${pathname} not found on local Windows Agent`,
-      },
-    });
-
+    return sendError(res, 404, 'NOT_FOUND', `Endpoint ${pathname} not found on local Windows Agent`);
   } catch (err) {
-    console.error(`[Agent] Error handling request:`, err);
-    return sendJson(res, 500, {
-      error: {
-        code: 'INTERNAL_ERROR',
-        message: err.message || 'Internal Agent Error',
-      },
-    });
+    return sendError(res, 500, 'INTERNAL_ERROR', err.message || 'Internal Agent Error');
   }
 });
 
-server.listen(PORT, HOST, () => {
-  console.log(`
+if (require.main === module) {
+  server.listen(PORT, HOST, () => {
+    console.log(`
 ============================================================
-  MANGO VPN - Local Windows Agent Simulator
+  MANGO VPN - Local Windows Agent Simulator (v2)
 ============================================================
-  Status:  LISTENING
-  Address: http://${HOST}:${PORT}
-  Service: mango-agent-windows (Mock)
-  PNA:     Access-Control-Allow-Private-Network ENABLED
-
-  Endpoints:
-    - GET  http://${HOST}:${PORT}/health
-    - GET  http://${HOST}:${PORT}/status
-    - POST http://${HOST}:${PORT}/connect
-    - POST http://${HOST}:${PORT}/disconnect
-
-  Junior Dev instructions:
-    Open Portal at http://localhost:3000 to see 'Agent Status: Installed'
+  Address:        http://${HOST}:${PORT}
+  AllowedOrigins: ${ALLOWED_ORIGINS.join(', ')}
+  PairingToken:   ${PAIRING_TOKEN}
 ============================================================
 `);
-});
+  });
+}
 
+module.exports = { server, PAIRING_TOKEN };

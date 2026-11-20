@@ -166,6 +166,7 @@ model AgentVersion {
   platform       String
   checksumSha256 String   @map("checksum_sha256")
   downloadUrl    String   @map("download_url")
+  isActive       Boolean  @default(true) @map("is_active")
   isMandatory    Boolean  @default(false) @map("is_mandatory")
   releasedAt     DateTime @default(now()) @map("released_at")
 
