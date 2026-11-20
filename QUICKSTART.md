@@ -1,166 +1,211 @@
 # 🚀 MANGO VPN - Quick Start & Tool Readiness Guide
 
-[English](QUICKSTART.md) | [ภาษาไทย](QUICKSTART.th.md)
-
-This guide details all **software tools, programs, runtimes, and dependencies** required to develop, run, and test MANGO VPN, along with step-by-step instructions on **how to check if your machine is ready**.
+This guide lists the **tools, runtimes, and configuration** needed to run MANGO VPN v2 locally, and how to check that your machine is ready.
 
 > [!IMPORTANT]
-> **Using an AI Assistant?** Instruct your AI to read [`AGENTS.md`](AGENTS.md) ([ภาษาไทย](AGENTS.th.md)) before starting any task. It defines project scope, cross-boundary collaboration rules (`Rain/`, `Sobree/`, `packages/shared/`), and strict anti-mock guardrails.
+> **Using an AI Assistant?** Instruct your AI to read [`AGENTS.md`](AGENTS.md) before starting any task. It defines project scope, cross-boundary collaboration rules (`Rain/`, `Sobree/`, `packages/shared/`), and the anti-mock guardrails.
 
 ---
 
-## 1. Tool Matrix & Role Requirements
+## 1. Tool Matrix
 
 | Tool / Program | Required For | Min Version | Recommended | Purpose in MANGO VPN | Official Download |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Node.js** | **Both** (Rain & Sobree) | `18.0.0` | `20 LTS` or `22 LTS` | Management API, Web Portal, Shared contracts, TypeScript compiler | [nodejs.org](https://nodejs.org/) |
-| **npm** | **Both** (Rain & Sobree) | `9.0.0` | `10.x` | Monorepo workspaces (`Rain/*`, `Sobree/*`, `packages/*`) | Bundled with Node |
-| **Git** | **Both** (Rain & Sobree) | `2.30.0` | Latest | Version control and monorepo branching | [git-scm.com](https://git-scm.com/) |
-| **Docker Desktop** | **Sobree** (Senior Dev) | `24.0.0` | Latest | PostgreSQL 16 DB container & Linux WireGuard gateway (`NET_ADMIN`) | [docker.com](https://www.docker.com/products/docker-desktop/) |
-| **Go Toolchain** | **Sobree** (Senior Dev) | `1.22.0` | `1.22+` | Windows Service agent (`Sobree/agent-windows`) & Linux VPN daemon (`Sobree/vpn-daemon`) | [go.dev](https://go.dev/dl/) |
-| **WireGuard** | **Sobree** (Senior Dev) | `0.5.3` | Latest | Client tunnel interface testing on Windows | [wireguard.com](https://www.wireguard.com/install/) |
-| **VS Code** *(Optional)* | **Both** | Latest | Latest | Code editing with syntax highlighting & auto-complete | [code.visualstudio.com](https://code.visualstudio.com/) |
+| **Node.js** | **Both** (Rain & Sobree) | `18.0.0` | `20 LTS` or `22 LTS` | Control Plane API, Web Portal (React 18 + Vite), shared contracts, TypeScript compiler | [nodejs.org](https://nodejs.org/) |
+| **npm** | **Both** (Rain & Sobree) | `9.0.0` | `10.x` | Monorepo workspaces (`Rain/*`, `Sobree/*`, `packages/*`). npm only; there is no pnpm workspace. | Bundled with Node |
+| **Git** | **Both** (Rain & Sobree) | `2.30.0` | Latest | Version control and branching | [git-scm.com](https://git-scm.com/) |
+| **Docker Desktop** | **Sobree** (and Rain for full-stack runs) | `24.0.0` | Latest | PostgreSQL 16 container, Linux WireGuard gateway container (`NET_ADMIN`) | [docker.com](https://www.docker.com/products/docker-desktop/) |
+| **Go Toolchain** | **Sobree** | `1.22.0` (daemon) / `1.26.0` (agent) | Latest | Windows Agent (`Sobree/agent-windows/go.mod` requires `go 1.26.0`) and Linux VPN daemon (`Sobree/vpn-daemon/go.mod` requires `go 1.22`) | [go.dev](https://go.dev/dl/) |
+| **WireGuard for Windows** | **Sobree** | Latest | Latest | The agent runs `wireguard.exe /installtunnelservice` to bring up tunnel `mango0` | [wireguard.com](https://www.wireguard.com/install/) |
+| **VS Code** *(Optional)* | **Both** | Latest | Latest | Editing | [code.visualstudio.com](https://code.visualstudio.com/) |
 
 > [!NOTE]
-> **Junior Developer (Rain) Notice**: If you are working on the Web Portal UI (`Rain/portal`) or Admin CRUD (`Rain/admin`), you **only need Node.js and Git**! You can test the entire application using the included Node.js mock agent simulator (`scripts/mock-agent.js`) without installing Go, Docker, or WireGuard.
+> **Rain (Web Portal and Admin)**: You only need **Node.js and Git** to run the portal, the API, and the admin CRUD. Use the Node loopback simulator `scripts/mock-agent.js` in place of the Windows Agent, so Go, Docker, and WireGuard are not required for UI work. PostgreSQL is still required, so start it with Docker or point `DATABASE_URL` at your own instance.
 
 ---
 
-## 2. Automated Readiness Verification Script
+## 2. Automated Readiness Check
 
-We provide a built-in automated PowerShell script that inspects your system and outputs a readiness summary:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/check-environment.ps1
-```
-
-You can also run it via npm:
 ```powershell
 npm run check:env
 ```
 
-### Expected Output Example:
-```text
-============================================================
-   MANGO VPN - Development Environment Readiness Check      
-============================================================
-
-Tool            Status  RequiredFor             Requirement          DetectedVersion
-----            ------  -----------             -----------          ---------------
-Node.js         READY   Both (Rain & Sobree)    >= 18.0.0 (LTS 20+)  v20.12.1
-npm             READY   Both (Rain & Sobree)    >= 9.0.0             10.5.0
-Git             READY   Both (Rain & Sobree)    >= 2.30.0            git version 2.44.0
-Docker CLI      READY   Sobree (Senior Dev)     >= 24.0.0            Docker version 25.0.3
-Docker Compose  READY   Sobree (Senior Dev)     >= v2.20.0           Docker Compose version v2.24.6
-Go Toolchain    READY   Sobree (Senior Dev)     >= 1.22.0            go version go1.22.1 windows/amd64
-
-Role Readiness Summary:
-  [READY] Rain (Junior Dev): All required tools are INSTALLED!
-  [READY] Sobree (Senior Dev): All systems tools are INSTALLED!
-============================================================
-```
+This runs `scripts/check-environment.ps1`, which reports whether Node.js, npm, Git, Docker, Docker Compose, and Go are installed and meet their minimum versions.
 
 ---
 
-## 3. Manual CLI Check Commands
+## 3. Manual CLI Checks
 
-If you prefer to check tools individually in PowerShell or Command Prompt:
-
-### 1. Check Node.js and npm
+### Node.js and npm
 ```powershell
 node -v
 npm -v
 ```
-- **Expected**: `v18.x.x`, `v20.x.x`, or `v22.x.x` (e.g. `v20.12.1`)
-- **If missing**: Download and install the **LTS** version from [nodejs.org](https://nodejs.org/). Make sure to check the box **"Add to PATH"**.
+- **Expected**: `v18.x`, `v20.x`, or `v22.x`, and npm `9.x` or newer.
+- **If missing**: Install the **LTS** release from [nodejs.org](https://nodejs.org/) and keep **"Add to PATH"** checked.
 
-### 2. Check Git
+### Git
 ```powershell
 git --version
 ```
-- **Expected**: `git version 2.x.x`
-- **If missing**: Install from [git-scm.com](https://git-scm.com/).
 
-### 3. Check Docker and Docker Compose (Sobree)
+### Docker and Docker Compose (Sobree)
 ```powershell
 docker -v
 docker compose version
+docker info
 ```
-- **Expected**: `Docker version 24+` and `Docker Compose version v2.+`
-- **Check Daemon Status**:
-  ```powershell
-  docker info
-  ```
-  If it displays `error during connect: ... open //./pipe/dockerDesktopLinuxEngine`, simply launch the **Docker Desktop** application from your Windows Start menu and wait until the whale icon says "Engine running".
+If `docker info` reports `error during connect`, start **Docker Desktop** and wait until the engine is running.
 
-### 4. Check Go Toolchain (Sobree)
+### Go Toolchain (Sobree)
 ```powershell
 go version
 ```
-- **Expected**: `go version go1.22.x windows/amd64`
-- **If missing**: Download the Windows `.msi` installer from [go.dev/dl](https://go.dev/dl/).
+- **If missing**: Install the Windows `.msi` from [go.dev/dl](https://go.dev/dl/). The agent module needs Go 1.26 or newer, so check the `go` line in `Sobree/agent-windows/go.mod` before you install.
 
 ---
 
-## 4. Port Allocation Map
+## 4. Environment Configuration (`.env`)
 
-Ensure the following default local ports are not occupied by other software on your machine:
+All backend and gateway settings come from a single `.env` file at the repository root. The template is [`.env.example`](.env.example).
 
-| Port | Protocol | Component | Used By |
-| :--- | :--- | :--- | :--- |
-| **3000** | TCP (HTTP) | MANGO Web Portal (Vite Dev Server) | Rain |
-| **4000** | TCP (HTTP) | VPN Management API (Fastify Control Plane) | Sobree |
-| **5432** | TCP (PostgreSQL) | PostgreSQL 16 Database Container | Docker / Sobree |
-| **47821** | TCP (HTTP / PNA) | Windows Client Agent (Loopback Listener) | Mock Agent / Go Service |
-| **51820** | UDP (WireGuard) | WireGuard Gateway Tunnel Endpoint | Linux Server / Gateway Container |
-| **50051** | TCP (IPC fallback)| VPN Policy Daemon Socket / RPC | Sobree |
-
-To check if a specific port is in use on Windows:
 ```powershell
-# Example: check if port 4000 is open
+copy .env.example .env
+```
+
+Then replace every placeholder before you start anything:
+
+| Variable | Used By | Notes |
+| :--- | :--- | :--- |
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT` | Docker Compose `postgres` | Host port defaults to `15432`. |
+| `DATABASE_URL` | API and Prisma CLI on the host | Must point at the same database and port. |
+| `JWT_SECRET`, `REFRESH_SECRET` | API | Required, at least 32 characters. The API refuses to start if they are missing or too short. |
+| `TOTP_ENCRYPTION_KEY` | API | Required, exactly 64 hex characters. |
+| `DAEMON_SHARED_SECRET` | API and VPN daemon | Required, at least 32 characters. The API sends it as a Bearer token. |
+| `PORT` / `API_PORT` | API | Defaults to `4000`. |
+| `CORS_ORIGIN` | API | Defaults to `http://localhost:3000`. |
+| `WG_INTERFACE`, `WG_LISTEN_PORT`, `WG_GATEWAY_CIDR`, `WG_PRIVATE_KEY`, `WG_SERVER_PUBLIC_KEY`, `WG_DNS`, `WG_SERVER_ENDPOINT` | VPN gateway | `WG_SERVER_ENDPOINT` is the address clients dial (for example `127.0.0.1:51820` locally). |
+| `VITE_API_URL`, `VITE_AGENT_URL` | Portal | Used by the Docker entrypoint and the Vite build. See below. |
+| `PORTAL_PORT` | Portal container | Defaults to `3000`. |
+
+Generate secrets with:
+```powershell
+openssl rand -base64 32   # JWT_SECRET, REFRESH_SECRET, DAEMON_SHARED_SECRET
+openssl rand -hex 32      # TOTP_ENCRYPTION_KEY (64 hex characters)
+```
+
+### Portal runtime configuration
+
+The portal reads its API and agent URLs at runtime from `window.__MANGO_ENV__`:
+- `Rain/portal/index.html` loads `/env-config.js` before the app bundle.
+- Local Vite dev uses the placeholder [`Rain/portal/public/env-config.js`](Rain/portal/public/env-config.js).
+- In a container, [`Rain/portal/docker-entrypoint.sh`](Rain/portal/docker-entrypoint.sh) overwrites `/usr/share/nginx/html/env-config.js` from `VITE_API_URL` and `VITE_AGENT_URL` at each start. Changing those values does not need a rebuild.
+
+### Seed the first admin
+
+The seed script creates the first ADMIN user. It needs these variables in the environment (not in `.env.example`):
+- `SEED_ADMIN_USERNAME`
+- `SEED_ADMIN_PASSWORD` (at least 12 characters)
+- `SEED_ADMIN_EMAIL` (optional)
+
+Do not put a default password in source or in `.env.example`.
+
+---
+
+## 5. Port Map
+
+| Port | Protocol | Component | Notes |
+| :--- | :--- | :--- | :--- |
+| **3000** | TCP (HTTP) | Web Portal | Docker portal container. For local Vite dev, use `--port 3000` (see below). |
+| **4000** | TCP (HTTP) | Control Plane API (Fastify) | `PORT` |
+| **5432** | TCP (PostgreSQL) | PostgreSQL 16 inside Docker | Container port. Host port is `POSTGRES_PORT` (default `15432`). |
+| **47821** | TCP (HTTP, loopback) | Windows Agent or `mock-agent.js` | Binds `127.0.0.1` only. |
+| **51820** | UDP (WireGuard) | VPN gateway | `WG_LISTEN_PORT` |
+| **50051** | TCP (HTTP) | VPN gateway daemon API | Bearer-authenticated HTTP, not a Unix socket. |
+
+To check whether a port is in use on Windows:
+```powershell
 Get-NetTCPConnection -LocalPort 4000 -ErrorAction SilentlyContinue
 ```
 
 ---
 
-## 5. Recommended VS Code Extensions
+## 6. First-Time Setup
 
-For the best developer experience, we recommend installing these VS Code extensions:
+From the repository root:
 
-1. **Prisma** (`Prisma.prisma`): Syntax highlighting and schema auto-completion for `Sobree/api/prisma/schema.prisma`.
-2. **Tailwind CSS IntelliSense** (`bradlc.vscode-tailwindcss`): Class name auto-completion for `Rain/portal`.
-3. **Go** (`golang.Go`): Rich language support, debugging, and code navigation for Go in `Sobree/`.
-4. **ESLint** (`dbaeumer.vscode-eslint`): Static code quality checks for TypeScript.
-5. **GitLens** (`eamodio.gitlens`): Commit tracking and conflict visualizer.
+```powershell
+# 1. Install all workspaces (npm only)
+npm install
+
+# 2. Build shared contracts first, then every workspace that has a build script
+npm run build
+
+# 3. Create .env from the template and fill in secrets (see section 4)
+copy .env.example .env
+```
+
+### Rain workflow (portal and admin)
+
+```powershell
+docker compose up -d postgres        # database on host port 15432
+npm run db:generate
+npm run db:migrate
+npm run db:seed                      # needs SEED_ADMIN_* variables
+npm run mock:agent                   # Terminal 1: prints its PairingToken on startup
+npm run dev:api                      # Terminal 2: API on :4000
+npm run dev:portal                   # Terminal 3: portal dev server
+```
+
+The API's default `CORS_ORIGIN` and the agent's default allowed origin are `http://localhost:3000`. Vite's own default is `5173`, so start the dev server on port 3000:
+
+```powershell
+npm --workspace=@mango/portal run dev -- --port 3000
+```
+
+Paste the PairingToken printed by the mock agent into the portal's pairing-token field. The portal sends it as the `X-Mango-Agent-Token` header.
+
+### Sobree workflow (API, agent, and gateway)
+
+```powershell
+docker compose up -d postgres
+npm run db:generate
+npm run db:migrate
+npm run dev:api
+
+# Windows Agent (console mode, unless started by the Service Control Manager)
+cd Sobree/agent-windows
+go run .
+
+# Gateway daemon. On Windows, run it in the container instead:
+docker compose up -d vpn-gateway
+```
+
+The `vpn-gateway` service needs `NET_ADMIN` and `wg`/`nft` on Linux. Run the daemon natively only on Linux.
+
+### Full Docker stack
+
+```powershell
+npm run docker:up        # postgres, vpn-gateway, api, portal
+npm run docker:logs
+npm run docker:down
+```
+
+> [!WARNING]
+> `Rain/portal/Dockerfile` copies `Rain/portal/nginx.conf`, but that file is not in the repository yet. The portal image will not build until it is added. Track this before you rely on the `portal` service.
 
 ---
 
-## 6. First-Time Setup Instructions
+## 7. Verify the Setup
 
-Once your tools are verified:
-
-### Step 1: Install Monorepo Dependencies
-From the repository root:
-```powershell
-npm install
-```
-
-### Step 2: Build All Shared Contracts & Packages
 ```powershell
 npm run build
+npm test
+node scripts/check-guardrails.mjs
 ```
 
-### Step 3: Choose Your Workflow
-- **Rain (Junior Dev)**: Open [`Rain/README.md`](file:///e:/Trainee/Mango_VPN_Trainee/Rain/README.md) and run:
-  ```powershell
-  npm run mock:agent   # Terminal 1
-  npm run dev:api      # Terminal 2
-  npm run dev:portal   # Terminal 3
-  ```
-- **Sobree (Senior Dev)**: Open [`Sobree/README.md`](file:///e:/Trainee/Mango_VPN_Trainee/Sobree/README.md) and run:
-  ```powershell
-  docker compose up -d postgres
-  npm run db:generate
-  npm run dev:api
-  ```
-
+For Go changes, run the vet and tests in each module:
+```powershell
+cd Sobree/agent-windows; go vet ./...; go test ./...
+cd ../vpn-daemon; go vet ./...; go test ./...
+```

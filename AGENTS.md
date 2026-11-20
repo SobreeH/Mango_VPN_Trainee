@@ -1,7 +1,5 @@
 # 🤖 MANGO VPN — AI Development & Project Scoping Guide (`AGENTS.md`)
 
-[English](AGENTS.md) | [ภาษาไทย](AGENTS.th.md)
-
 > **Mandatory Reading for All AI Coding Assistants (Antigravity, Cursor, Claude Code, Copilot, OpenCode, etc.)**  
 > This document is the **authoritative governance guide** for AI agents assisting **Rain** and **Sobree** on the MANGO VPN monorepo. It supersedes older "strict zero-touch folder wall" rules in subdirectory guides.
 
@@ -30,19 +28,19 @@ MANGO VPN is a **Zero-Trust Role-Based WireGuard Remote Access & Policy Manageme
 | Package / Path | Primary Lead | Tech Stack | Responsibility |
 | :--- | :--- | :--- | :--- |
 | [`packages/shared/`](packages/shared/) (`@mango/shared`) | Shared (Both) | TypeScript | Single source of truth for all API contracts, DTOs, and enums ([`contracts.ts`](packages/shared/src/contracts.ts)) |
-| [`Sobree/api/`](Sobree/api/) (`@mango/api`) | Sobree ⚡ | Node.js, Fastify, Prisma, PostgreSQL 16 | Control Plane API (`:4000`), 8-table Prisma schema, Step 1–4 Auth/OTP/JWT, Step 5 VPN IPAM (`10.13.13.0/24`), mounts `@mango/rain-admin` |
+| [`Sobree/api/`](Sobree/api/) (`@mango/api`) | Sobree ⚡ | Node.js, Fastify, Prisma, PostgreSQL 16 | Control Plane API (`:4000`), Prisma/PostgreSQL schema, password + TOTP MFA auth, rotating JWT sessions, one-time connect tickets, VPN IPAM (`10.13.13.0/24`), mounts `@mango/rain-admin` under `/api` |
 | [`Rain/admin/`](Rain/admin/) (`@mango/rain-admin`) | Rain 🌧️ | TypeScript, Fastify plugin, Prisma | Admin CRUD endpoints (`/api/users`, `/api/devices`, `/api/sessions`, `/api/policies`, `/api/audit-logs`, `/api/agent-versions`) & DB seeder ([`seed.ts`](Rain/admin/src/seed.ts)) |
 | [`Rain/portal/`](Rain/portal/) (`@mango/portal`) | Rain 🌧️ | React 18, Vite, Tailwind CSS, TanStack Query, Zod | Dark-mode Web Portal (`:3000`): MFA Login, Role-Based Dashboards (`ADMIN`, `STAFF`, `CLIENT`), VPN Connect UI, Admin Management Console |
 | [`Sobree/agent-windows/`](Sobree/agent-windows/) | Sobree ⚡ | Go (`golang.org/x/sys/windows/svc`) | Local Windows Service listening on `127.0.0.1:47821` with Chromium Private Network Access (PNA), in-memory Curve25519 keygen, WireGuard tunnel activation |
-| [`Sobree/vpn-daemon/`](Sobree/vpn-daemon/) | Sobree ⚡ | Go (Linux daemon) | Linux WireGuard & `nftables` policy enforcement daemon (`/var/run/mango-vpn.sock` or loopback TCP `:50051`) |
+| [`Sobree/vpn-daemon/`](Sobree/vpn-daemon/) | Sobree ⚡ | Go (Linux daemon) | Linux WireGuard (`wg set`) & `nftables` role-policy enforcement daemon, bearer-authenticated HTTP API on `:50051` |
 | [`scripts/mock-agent.js`](scripts/mock-agent.js) | Shared (Dev Tool) | Node.js | Local loopback simulator (`127.0.0.1:47821`) mirroring `Sobree/agent-windows` for frontend testing without Windows Service / kernel WireGuard |
 
 ### What Is In-Scope vs. Out-of-Scope
 - **IN-SCOPE**:
-  - The 5-step connection lifecycle (Login -> OTP Challenge -> OTP Verify -> JWT Issuance -> Loopback Agent Connect -> API IPAM & Daemon Peer/Firewall Registration).
+  - The v2 connection lifecycle: password login -> TOTP MFA enrollment/verification -> rotating JWT access + refresh session -> one-time Connect Ticket -> Windows Agent loopback connect (`127.0.0.1:47821`, Origin allowlist + PNA) -> API IPAM & authenticated daemon peer/`nftables` role-policy registration -> Admin CRUD and real-time revocation. No SMS or stdout OTP codes.
   - Role-Based Access Control (`ADMIN`, `STAFF`, `CLIENT`) enforced both in the API/Daemon and reflected accurately in the Portal UI.
   - Admin management of Users, Devices (including revocation), Zero-Trust Policies (`ALLOW`/`DENY`), Active/Historical Sessions (including disconnect), Audit Logs, and Agent Versions.
-  - Security & quality remediation tracked in [`AUDIT_REPORT.md`](AUDIT_REPORT.md), [`FIX_PLAN.md`](FIX_PLAN.md), and [`PROGRESS.md`](PROGRESS.md).
+  - Security & quality remediation tracked as GitHub Issues (see [Agent skills](#agent-skills)).
 - **OUT-OF-SCOPE (Do Not Invent Without Explicit User Approval)**:
   - Billing, payment gateways, subscription tiers, or public sign-up pages (this is an internal/corporate zero-trust system where Admins provision users).
   - Multi-region mesh routing or custom cryptographic protocols outside WireGuard Curve25519 + JWT.
@@ -58,7 +56,7 @@ MANGO VPN is a **Zero-Trust Role-Based WireGuard Remote Access & Policy Manageme
 - **Sobree (`Sobree/`)** primarily drives Control Plane API (`Sobree/api`), Prisma Schema, Go Windows Agent (`Sobree/agent-windows`), and Go Linux Daemon (`Sobree/vpn-daemon`).
 - **Cross-Boundary Permission (UNLOCKED)**:
   - **Either developer's AI may edit files in `packages/shared/`, `Rain/`, or `Sobree/`** when implementing a feature or fix that crosses boundaries.
-  - *Example 1*: If Rain is fixing Admin route authentication (`F11` in [`FIX_PLAN.md`](FIX_PLAN.md)), Rain's AI can import/reuse auth middleware from `Sobree/api` or update `Sobree/api/src/server.ts` and `Rain/admin/src/admin.routes.ts` together.
+  - *Example 1*: If Rain is fixing Admin route authentication, Rain's AI can import/reuse auth middleware from `Sobree/api` or update `Sobree/api/src/app.ts` and `Rain/admin/src/index.ts` together.
   - *Example 2*: If Sobree changes a response payload in `Sobree/api`, Sobree's AI should update `packages/shared/src/contracts.ts` AND update the consuming code in `Rain/portal` or `Rain/admin` so `npm run build` passes across the entire monorepo.
 
 ### B. Git Branching & PR Rule for Cross-Boundary Work
@@ -75,7 +73,7 @@ The following paths are **security-critical** and require explicit human confirm
 - `Sobree/agent-windows/` (loopback PNA/Origin allowlist, pairing token, Curve25519 keygen, WireGuard activation)
 - `Sobree/vpn-daemon/` (authenticated RPC, `wg set`, `nftables` firewall rules)
 - `packages/shared/src/contracts.ts` (shared API & Agent DTO contracts)
-- `docker-compose.yml`, `.github/`, and `scripts/check-guardrails.mjs`
+- `docker-compose.yml`, `.github/`, `AGENTS.md`, and `scripts/check-guardrails.mjs`
 
 **Mandatory rule for lightweight / smaller-context models**:
 - **DO NOT** modify files in Protected Critical Boundaries unless the developer explicitly asks for that specific change and approves a Change Scope Card first.
@@ -97,7 +95,7 @@ All AI assistants must obey these 5 non-negotiable engineering rules:
 
 ### Rule 2: No Silent Stubs Claimed as Complete
 - Do not write `console.log` / `log.Printf("Executing wg set...")` or `time.Sleep` with a hardcoded IP and claim in documentation or commit messages that WireGuard or `nftables` enforcement is complete.
-- If a system boundary cannot be executed on a developer laptop (e.g., Linux `nft` commands while developing on Windows), guard it cleanly, return honest status codes, and mark remaining live-environment verification checkboxes as `[ ]` in [`PROGRESS.md`](PROGRESS.md).
+- If a system boundary cannot be executed on a developer laptop (e.g., Linux `nft` commands while developing on Windows), guard it cleanly, return honest status codes, and report live-environment verification as not yet done in the PR description.
 
 ### Rule 3: No Hardcoded Secrets or Pre-filled Passwords
 - Never commit fallback JWT secrets, database passwords, or default user passwords (e.g., `MangoVPN2026!`) in source code, Dockerfiles, `docker-compose.yml`, or UI form defaults.
@@ -105,7 +103,7 @@ All AI assistants must obey these 5 non-negotiable engineering rules:
 
 ### Rule 4: Contract-First (`@mango/shared`) — No Duplicate Types
 - Any data structure exchanged between `Rain/portal`, `Rain/admin`, `Sobree/api`, and `scripts/mock-agent.js` must be defined in [`packages/shared/src/contracts.ts`](packages/shared/src/contracts.ts).
-- Do not re-declare duplicate local interfaces in `App.tsx`, `AdminPanel.tsx`, or `admin.service.ts` when they belong in `@mango/shared`.
+- Do not re-declare duplicate local interfaces in `Rain/portal/src/App.tsx`, `Rain/portal/src/components/*.tsx`, or `Rain/admin/src/*.ts` when they belong in `@mango/shared`.
 
 ### Rule 5: Keep `mock-agent.js` Synchronized with `Sobree/agent-windows`
 - Whenever the loopback contract on `127.0.0.1:47821` (`/health`, `/status`, `/connect`, `/disconnect`, PNA/CORS headers, or token validation) is changed in [`Sobree/agent-windows/main.go`](Sobree/agent-windows/main.go), the AI **must** update [`scripts/mock-agent.js`](scripts/mock-agent.js) in the same branch so frontend testing stays accurate.
@@ -126,8 +124,8 @@ Before making multi-file edits, present a concise **Change Scope Card** to the d
 - **Out-of-Scope**: [What will NOT be touched to prevent scope creep]
 - **Affected Workspaces & Files**:
   1. `packages/shared`: [e.g., Update `VpnPolicyDto` in `src/contracts.ts`]
-  2. `Sobree/api` / `Rain/admin`: [e.g., Add validation & auth preHandler in `admin.routes.ts`]
-  3. `Rain/portal`: [e.g., Update `AdminPanel.tsx` mutation handler]
+  2. `Sobree/api` / `Rain/admin`: [e.g., Add validation & auth preHandler in `Rain/admin/src/users.ts`]
+  3. `Rain/portal`: [e.g., Update `Rain/portal/src/components/UsersTab.tsx` mutation handler]
   4. `Sobree/agent-windows` / `Sobree/vpn-daemon` / `scripts/mock-agent.js`: [if applicable]
 - **Cross-Dev Impact**: [Yes/No — state if this touches the teammate's primary folder so they can review the PR]
 - **Verification Plan**: [Commands & manual checks that prove the change works]
@@ -167,7 +165,7 @@ An AI assistant must **never** declare a task complete until it has run and pass
    ```
 3. **Truthfulness & Secret Audit**:
    - Confirm no hardcoded secrets/passwords or ungated `MOCK_*` fallbacks were introduced.
-   - Update [`PROGRESS.md`](PROGRESS.md) or [`FIX_PLAN.md`](FIX_PLAN.md) checkboxes only if the acceptance criteria actually passed.
+   - Mark a checklist item or GitHub Issue as done only if its acceptance criteria actually passed.
 
 ---
 
@@ -176,12 +174,12 @@ An AI assistant must **never** declare a task complete until it has run and pass
 While both AIs follow the exact same architectural rules above, adapt your communication style to the developer you are currently helping:
 
 ### 🌧️ When Assisting Rain (`Rain` — Frontend & Admin CRUD Lead)
-- **Language & Tone**: Explain code and architectural concepts in clear, friendly **Thai** (per [`Rain/RULES_AND_WORKLOG.md`](Rain/RULES_AND_WORKLOG.md)).
+- **Language & Tone**: Explain code and architectural concepts in clear, friendly **Thai**.
 - **Step-by-Step Teaching**: Avoid dumping massive multi-component rewrites without explanation. Break changes into clear steps and relate React/TypeScript/Prisma patterns to familiar web concepts (like traditional HTML/PHP request-response flows) when introducing new patterns.
 - **Cross-Boundary Empowerment**: When Rain's task requires fixing an endpoint in `Sobree/api`, updating `packages/shared/src/contracts.ts`, or wiring auth middleware, **do not block Rain**. Explain why the cross-folder edit is needed, make the change cleanly on Rain's feature branch, and note it in the worklog/PR summary for Sobree.
 
 ### ⚡ When Assisting Sobree (`Sobree` — Systems, Security & Control Plane Lead)
-- **Focus**: Emphasize zero-trust security invariants, threat modeling (see [`AUDIT_REPORT.md`](AUDIT_REPORT.md)), concurrency safety (`sync.RWMutex`, Prisma `$transaction`), and clean error handling.
+- **Focus**: Emphasize zero-trust security invariants, threat modeling, concurrency safety (`sync.RWMutex`, Prisma `$transaction`), and clean error handling.
 - **Full-Stack Completeness**: When Sobree updates `Sobree/api`, `Sobree/agent-windows`, or `packages/shared`, ensure `Rain/admin`, `Rain/portal`, and `scripts/mock-agent.js` are updated (or checked via `npm run build`) so Rain's workflow is never broken.
 
 ---
@@ -194,9 +192,9 @@ Copy and paste these prompts into your AI chat when starting a task:
 > "Read `AGENTS.md` first. I want to make the following change: **[describe change]**.  
 > Do not write code yet. First, inspect the relevant files across `packages/shared`, `Sobree/`, and `Rain/`, and give me a **Change Scope Card** showing all affected files, contract/schema impacts, and verification steps."
 
-### B. Prompt for Fixing an Item from `FIX_PLAN.md`
-> "Read `AGENTS.md`, `AUDIT_REPORT.md`, and `FIX_PLAN.md`. We are implementing **[e.g., F11 — Guard the admin API / F12 — Portal tells the truth]**.  
-> Check my current git branch first. Then produce a Change Scope Card, implement the fix across all required folders (`Rain/`, `Sobree/`, `packages/shared/`), verify with `npm run build`, and confirm the acceptance criteria in `FIX_PLAN.md`."
+### B. Prompt for Fixing a GitHub Issue
+> "Read `AGENTS.md`. We are implementing **[GitHub Issue number and title]**.  
+> Check my current git branch first. Then produce a Change Scope Card, implement the fix across all required folders (`Rain/`, `Sobree/`, `packages/shared/`), verify with `npm run build`, and confirm the acceptance criteria in the issue."
 
 ### C. Prompt for Reviewing a Teammate's Branch Before Merging
 > "Read `AGENTS.md`. Run `git fetch origin` and inspect the diff between `main` and **[branch-name]**.  
