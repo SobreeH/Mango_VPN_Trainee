@@ -81,6 +81,17 @@ describe('Portal Auth + TOTP Flow (fetch seam)', () => {
         ),
       )
       .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            status: 'ok',
+            service: 'mango-agent-windows',
+            version: '2.0.0',
+            tunnelActive: false,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
         new Response(JSON.stringify({ success: true }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },

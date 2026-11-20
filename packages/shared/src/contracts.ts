@@ -152,3 +152,64 @@ export interface LogoutRequest {
 export interface LogoutResponse {
   success: boolean;
 }
+
+export interface ConnectTicketResponse {
+  ticket: string;
+  expiresAt: string;
+  expiresInSeconds: number;
+}
+
+export type AgentTunnelState =
+  | 'disconnected'
+  | 'connecting'
+  | 'connected'
+  | 'disconnecting'
+  | 'error';
+
+export interface AgentHealthResponse {
+  status: 'ok';
+  service: 'mango-agent-windows';
+  version: string;
+  uptimeSeconds?: number;
+  tunnelActive: boolean;
+}
+
+export interface AgentStatusResponse {
+  state: AgentTunnelState;
+  version: string;
+  publicKey: string;
+  assignedIp: string | null;
+  serverEndpoint: string | null;
+  connectedSince: string | null;
+  bytesReceived: number;
+  bytesSent: number;
+  lastError: string | null;
+}
+
+export interface AgentConnectRequest {
+  ticket: string;
+}
+
+export interface AgentConnectResponse {
+  success: boolean;
+  message: string;
+  state: AgentTunnelState;
+  publicKey: string;
+  assignedIp: string | null;
+  serverEndpoint: string | null;
+  connectedSince: string | null;
+}
+
+export interface AgentDisconnectResponse {
+  success: boolean;
+  message: string;
+  state: AgentTunnelState;
+}
+
+export interface AgentErrorResponse {
+  success: false;
+  error: {
+    code: string;
+    message: string;
+  };
+}

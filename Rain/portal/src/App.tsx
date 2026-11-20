@@ -4,6 +4,7 @@ import { z } from 'zod';
 import QRCode from 'qrcode';
 import type { AuthTokensResponse, LoginResponse } from '@mango/shared';
 import { loginUser, logoutUser, verifyOtpCode } from './api/auth';
+import { AgentStatusCard } from './components/AgentStatusCard';
 
 const loginSchema = z.object({
   username: z.string().trim().min(1, 'Username is required'),
@@ -236,6 +237,8 @@ export function App() {
               <p className="text-lg font-semibold text-slate-100">{step.session.user.username}</p>
               <p className="text-xs text-slate-400">{step.session.user.email}</p>
             </div>
+
+            <AgentStatusCard />
 
             <button
               type="button"
