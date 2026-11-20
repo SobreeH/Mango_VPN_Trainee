@@ -17,8 +17,9 @@ import type {
   VpnSessionDto,
   VpnSessionListResponse,
 } from '@mango/shared';
+import { getApiBaseUrl } from './env';
 
-export const DEFAULT_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+export const DEFAULT_API_URL = getApiBaseUrl();
 
 async function requestJson<T>(
   url: string,

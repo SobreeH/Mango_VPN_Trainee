@@ -6,11 +6,9 @@ import type {
   AgentStatusResponse,
   ConnectTicketResponse,
 } from '@mango/shared';
+import { getAgentBaseUrl, getApiBaseUrl } from '../lib/env';
 
-export const AGENT_BASE_URL =
-  import.meta.env.VITE_AGENT_URL ?? 'http://127.0.0.1:47821';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
+export const AGENT_BASE_URL = getAgentBaseUrl();
 
 export class AgentHttpError extends Error {
   constructor(
@@ -40,7 +38,7 @@ async function parseAgentError(res: Response, fallback: string): Promise<AgentHt
 }
 
 export async function checkAgentHealth(): Promise<AgentHealthResponse> {
-  const res = await fetch(`${AGENT_BASE_URL}/health`, {
+  const res = await fetch(`${getAgentBaseUrl()}/health`, {
     method: 'GET',
   });
   if (!res.ok) {
@@ -50,7 +48,7 @@ export async function checkAgentHealth(): Promise<AgentHealthResponse> {
 }
 
 export async function fetchAgentStatus(pairingToken: string): Promise<AgentStatusResponse> {
-  const res = await fetch(`${AGENT_BASE_URL}/status`, {
+  const res = await fetch(`${getAgentBaseUrl()}/status`, {
     method: 'GET',
     headers: {
       'X-Mango-Agent-Token': pairingToken,
@@ -63,7 +61,7 @@ export async function fetchAgentStatus(pairingToken: string): Promise<AgentStatu
 }
 
 export async function requestConnectTicket(accessToken: string): Promise<ConnectTicketResponse> {
-  const res = await fetch(`${API_BASE_URL}/api/vpn/ticket`, {
+  const res = await fetch(`${getApiBaseUrl()}/api/vpn/ticket`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -86,7 +84,7 @@ export async function connectAgent(
   pairingToken: string,
   ticket: string,
 ): Promise<AgentConnectResponse> {
-  const res = await fetch(`${AGENT_BASE_URL}/connect`, {
+  const res = await fetch(`${getAgentBaseUrl()}/connect`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -101,7 +99,7 @@ export async function connectAgent(
 }
 
 export async function disconnectAgent(pairingToken: string): Promise<AgentDisconnectResponse> {
-  const res = await fetch(`${AGENT_BASE_URL}/disconnect`, {
+  const res = await fetch(`${getAgentBaseUrl()}/disconnect`, {
     method: 'POST',
     headers: {
       'X-Mango-Agent-Token': pairingToken,
