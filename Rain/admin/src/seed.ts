@@ -1,6 +1,30 @@
-import { pathToFileURL } from 'node:url';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { PrismaClient, RoleName } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+
+function loadEnvFileIfPresent(filePath: string): void {
+  if (!fs.existsSync(filePath)) return;
+  const lines = fs.readFileSync(filePath, 'utf8').split(/\r?\n/);
+  for (const rawLine of lines) {
+    const trimmed = rawLine.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const line = trimmed.startsWith('export ') ? trimmed.slice(7).trim() : trimmed;
+    const eqIndex = line.indexOf('=');
+    if (eqIndex <= 0) continue;
+    const key = line.slice(0, eqIndex).trim();
+    if (!key || process.env[key] !== undefined) continue;
+    let value = line.slice(eqIndex + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"') && value.length >= 2) ||
+      (value.startsWith("'") && value.endsWith("'") && value.length >= 2)
+    ) {
+      value = value.slice(1, -1);
+    }
+    process.env[key] = value;
+  }
+}
 
 const MIN_ADMIN_PASSWORD_LENGTH = 12;
 const BCRYPT_ROUNDS = 10;
@@ -82,6 +106,10 @@ export async function seedDatabase(
 }
 
 async function main() {
+  loadEnvFileIfPresent(path.resolve(process.cwd(), '.env'));
+  loadEnvFileIfPresent(
+    path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../.env'),
+  );
   const prisma = new PrismaClient();
   try {
     const result = await seedDatabase(prisma, process.env);

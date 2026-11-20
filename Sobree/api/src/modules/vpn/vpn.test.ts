@@ -500,4 +500,48 @@ describe('VPN Connect & Disconnect HTTP Seam (app.inject against PostgreSQL)', (
     });
     expect(audit).not.toBeNull();
   });
+
+  it('removes the prior ephemeral peer key when a device reconnects with a new Curve25519 key', async () => {
+    const first = await seedUserAndTicket({ username: 'ivan' });
+    const firstKey = generateWgPublicKey();
+    const res1 = await app.inject({
+      method: 'POST',
+      url: '/api/vpn/connect',
+      payload: {
+        ticket: first.rawTicket,
+        publicKey: firstKey,
+        deviceFingerprint: 'fp-ivan',
+        hostname: 'IVAN-PC',
+        agentVersion: '2.0.0',
+      },
+    });
+    expect(res1.statusCode).toBe(200);
+    const assignedIp = res1.json().assignedIp;
+
+    const secondTicketRaw = crypto.randomBytes(32).toString('base64url');
+    await prisma.connectTicket.create({
+      data: {
+        userId: first.user.id,
+        ticketHash: crypto.createHash('sha256').update(secondTicketRaw).digest('hex'),
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+
+    const secondKey = generateWgPublicKey();
+    const res2 = await app.inject({
+      method: 'POST',
+      url: '/api/vpn/connect',
+      payload: {
+        ticket: secondTicketRaw,
+        publicKey: secondKey,
+        deviceFingerprint: 'fp-ivan',
+        hostname: 'IVAN-PC',
+        agentVersion: '2.0.0',
+      },
+    });
+    expect(res2.statusCode).toBe(200);
+    expect(res2.json().assignedIp).toBe(assignedIp);
+    expect(removedPeers).toEqual([{ publicKey: firstKey }]);
+    expect(addedPeers[1]).toMatchObject({ publicKey: secondKey, assignedIp });
+  });
 });

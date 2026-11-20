@@ -162,6 +162,7 @@ export async function registerVpnRoutes(
         deviceId: string;
         sessionId: string;
         assignedIp: string;
+        previousPublicKey: string | null;
         allowedIps: string[];
         policies: DaemonPolicyRule[];
         connectedAt: Date;
@@ -232,6 +233,11 @@ export async function registerVpnRoutes(
             where: { deviceId: device.id },
             orderBy: { createdAt: 'desc' },
           });
+
+          const previousPublicKey =
+            existingDevicePeer && existingDevicePeer.publicKey !== publicKey
+              ? existingDevicePeer.publicKey
+              : null;
 
           let peer = existingDevicePeer;
           if (peer) {
@@ -316,6 +322,7 @@ export async function registerVpnRoutes(
             deviceId: device.id,
             sessionId: session.id,
             assignedIp: peer.assignedIp,
+            previousPublicKey,
             allowedIps: allowCidrs.length > 0 ? allowCidrs : ['10.13.13.0/24'],
             policies: daemonPolicies,
             connectedAt: session.connectedAt,
@@ -330,6 +337,14 @@ export async function registerVpnRoutes(
           });
         }
         throw err;
+      }
+
+      if (allocation.previousPublicKey) {
+        try {
+          await vpnDaemon.removePeer({ publicKey: allocation.previousPublicKey });
+        } catch {
+          // Best-effort cleanup of rotated ephemeral peer key before adding replacement key
+        }
       }
 
       try {
