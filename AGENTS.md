@@ -187,3 +187,20 @@ Copy and paste these prompts into your AI chat when starting a task:
 ### C. Prompt for Reviewing a Teammate's Branch Before Merging
 > "Read `AGENTS.md`. Run `git fetch origin` and inspect the diff between `main` and **[branch-name]**.  
 > Check for: (1) cross-boundary contract mismatches, (2) any hardcoded secrets or fake mock fallbacks, (3) missing auth/RBAC checks, and (4) whether `npm run build` and `go vet` pass."
+
+---
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs are tracked in GitHub Issues (`SobreeH/Mango_VPN_Trainee`) via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Canonical triage labels (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout (`GLOSSARY.md` and `docs/adr/` at the repo root). See `docs/agents/domain.md`.
+
