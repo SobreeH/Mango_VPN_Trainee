@@ -62,7 +62,10 @@ async function start() {
   console.log(`DATABASE_URL=${maskedUrl}`);
   console.log('Next steps:');
   console.log('  npm run db:migrate');
+  console.log('  # Bash (Linux/macOS):');
   console.log(`  DATABASE_URL=postgresql://${encodeURIComponent(config.user)}:<password>@127.0.0.1:${config.port}/mangovpn_v2_test npx prisma migrate deploy --schema=Sobree/api/prisma/schema.prisma`);
+  console.log('  # PowerShell (Windows):');
+  console.log(`  $env:DATABASE_URL="postgresql://${encodeURIComponent(config.user)}:<password>@127.0.0.1:${config.port}/mangovpn_v2_test"; npx prisma migrate deploy --schema=Sobree/api/prisma/schema.prisma`);
 
   let stopping = false;
   const stop = async () => {

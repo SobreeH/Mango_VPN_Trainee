@@ -9,7 +9,7 @@
     "packages/*"
   ],
   "scripts": {
-    "check:env": "powershell -ExecutionPolicy Bypass -File scripts/check-environment.ps1",
+    "check:env": "node scripts/check-environment.mjs",
     "dev:api": "npm --workspace=@mango/api run dev",
     "dev:portal": "npm --workspace=@mango/portal run dev",
     "build": "npm --workspace=@mango/shared run build && npm run --workspaces --if-present build",
