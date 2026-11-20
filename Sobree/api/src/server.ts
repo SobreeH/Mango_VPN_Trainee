@@ -1,7 +1,21 @@
-import 'dotenv/config';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import dotenv from 'dotenv';
 import { buildApp } from './app.js';
 import { loadConfig } from './config.js';
 import { createPrismaClient } from './lib/prisma.js';
+
+// Load workspace .env first if present, then fall back to monorepo root .env
+// without overriding variables already supplied by the shell/container.
+dotenv.config();
+const repoRootEnv = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../../../.env',
+);
+if (fs.existsSync(repoRootEnv)) {
+  dotenv.config({ path: repoRootEnv });
+}
 
 async function start(): Promise<void> {
   const config = loadConfig();

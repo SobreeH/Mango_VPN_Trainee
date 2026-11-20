@@ -39,6 +39,7 @@ services:
       WG_PRIVATE_KEY: ${WG_PRIVATE_KEY:-}
     ports:
       - "${WG_LISTEN_PORT:-51820}:51820/udp"
+      - "127.0.0.1:${DAEMON_PORT:-50051}:50051"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:50051/health >/dev/null || exit 1"]
       interval: 10s

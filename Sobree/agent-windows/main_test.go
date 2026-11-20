@@ -376,3 +376,16 @@ func TestConnectSurfacesApiFailureHonestly(t *testing.T) {
 		t.Fatalf("expected no tunnel activation on API failure")
 	}
 }
+
+func TestGetenvFirstPrefersPrimaryAndFallsBackToAlias(t *testing.T) {
+	t.Setenv("AGENT_LISTEN_ADDR", "")
+	t.Setenv("MANGO_AGENT_ADDR", "127.0.0.1:49999")
+	if got := getenvFirst("AGENT_LISTEN_ADDR", "MANGO_AGENT_ADDR"); got != "127.0.0.1:49999" {
+		t.Fatalf("expected fallback MANGO_AGENT_ADDR, got %q", got)
+	}
+
+	t.Setenv("AGENT_LISTEN_ADDR", "127.0.0.1:47821")
+	if got := getenvFirst("AGENT_LISTEN_ADDR", "MANGO_AGENT_ADDR"); got != "127.0.0.1:47821" {
+		t.Fatalf("expected primary AGENT_LISTEN_ADDR to win, got %q", got)
+	}
+}

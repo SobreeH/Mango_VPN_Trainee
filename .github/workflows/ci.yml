@@ -41,13 +41,18 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.26'
 
       - name: Install Monorepo Dependencies
         run: npm ci || npm install
 
       - name: Generate Prisma Client
         run: npm run db:generate
+        env:
+          DATABASE_URL: postgresql://mango:mangosecret@localhost:5432/mangovpn?schema=public
+
+      - name: Apply Prisma Migrations
+        run: npx prisma migrate deploy --schema=Sobree/api/prisma/schema.prisma
         env:
           DATABASE_URL: postgresql://mango:mangosecret@localhost:5432/mangovpn?schema=public
 
@@ -59,7 +64,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://mango:mangosecret@localhost:5432/mangovpn?schema=public
 
-      - name: Vet & Test Go Agent (Windows)
+      - name: Vet & Build Go Agent (Windows)
         working-directory: Sobree/agent-windows
         run: |
           if [ -f go.mod ]; then
@@ -75,3 +80,21 @@ jobs:
             go test ./...
             go build ./...
           fi
+
+  windows-agent-tests:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - name: Vet, Test & Build Go Agent (Windows)
+        working-directory: Sobree/agent-windows
+        run: |
+          go vet ./...
+          go test ./...
+          go build ./...

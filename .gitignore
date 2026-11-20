@@ -21,6 +21,7 @@ presharedkey
 
 # WireGuard configurations
 *.conf
+!Rain/portal/nginx.conf
 
 # Logs & Debug
 logs/

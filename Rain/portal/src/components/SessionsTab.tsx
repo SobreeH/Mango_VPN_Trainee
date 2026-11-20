@@ -40,11 +40,11 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps)
 
       {listQuery.isLoading ? (
         <p className="text-sm text-slate-400">Loading VPN sessions...</p>
-      ) : sessions.length === 0 ? (
+      ) : sessions.length === 0 && !listQuery.error ? (
         <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-6 text-center text-sm text-slate-400">
           No VPN sessions found.
         </div>
-      ) : (
+      ) : sessions.length > 0 ? (
         <div className="overflow-x-auto rounded-lg border border-slate-800">
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-900 text-slate-400">
@@ -89,7 +89,7 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps)
             </tbody>
           </table>
         </div>
-      )}
+      ) : null}
     </section>
   );
 }

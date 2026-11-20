@@ -17,17 +17,49 @@ const http = require('http');
 const crypto = require('crypto');
 const os = require('os');
 
-const PORT = Number(process.env.AGENT_PORT || 47821);
-const HOST = process.env.AGENT_HOST || '127.0.0.1';
-const API_URL = (process.env.API_URL || 'http://localhost:4000').replace(/\/+$/, '');
-const ALLOWED_ORIGINS = (process.env.AGENT_ALLOWED_ORIGINS || 'http://localhost:3000,http://127.0.0.1:3000')
+function getenvFirst(...keys) {
+  for (const key of keys) {
+    const val = process.env[key];
+    if (typeof val === 'string' && val.trim() !== '') {
+      return val.trim();
+    }
+  }
+  return '';
+}
+
+function resolveHostAndPort() {
+  const listenAddr = getenvFirst('AGENT_LISTEN_ADDR', 'MANGO_AGENT_ADDR');
+  if (listenAddr) {
+    const lastColon = listenAddr.lastIndexOf(':');
+    if (lastColon > 0 && lastColon < listenAddr.length - 1) {
+      const host = listenAddr.slice(0, lastColon).trim() || '127.0.0.1';
+      const port = Number(listenAddr.slice(lastColon + 1).trim());
+      if (Number.isInteger(port) && port > 0 && port <= 65535) {
+        return { host, port };
+      }
+    }
+  }
+  return {
+    host: getenvFirst('AGENT_HOST') || '127.0.0.1',
+    port: Number(getenvFirst('AGENT_PORT') || 47821),
+  };
+}
+
+const { host: HOST, port: PORT } = resolveHostAndPort();
+const API_URL = (getenvFirst('API_URL', 'MANGO_API_URL') || 'http://localhost:4000').replace(/\/+$/, '');
+const ALLOWED_ORIGINS = (
+  getenvFirst('AGENT_ALLOWED_ORIGINS', 'MANGO_AGENT_ALLOWED_ORIGINS') ||
+  'http://localhost:3000,http://127.0.0.1:3000'
+)
   .split(',')
   .map((o) => o.trim())
   .filter((o) => o && o !== '*');
-const PAIRING_TOKEN = process.env.AGENT_PAIRING_TOKEN || crypto.randomBytes(32).toString('base64url');
-const HOSTNAME = process.env.AGENT_HOSTNAME || os.hostname() || 'MOCK-WINDOWS-PC';
+const PAIRING_TOKEN =
+  getenvFirst('AGENT_PAIRING_TOKEN', 'MANGO_AGENT_PAIRING_TOKEN') ||
+  crypto.randomBytes(32).toString('base64url');
+const HOSTNAME = getenvFirst('AGENT_HOSTNAME') || os.hostname() || 'MOCK-WINDOWS-PC';
 const DEVICE_FINGERPRINT =
-  process.env.AGENT_DEVICE_FINGERPRINT ||
+  getenvFirst('AGENT_DEVICE_FINGERPRINT') ||
   'mock-' + crypto.createHash('sha256').update(HOSTNAME).digest('hex').slice(0, 24);
 const START_TIME = Date.now();
 const DEFAULT_VERSION = '2.0.0';

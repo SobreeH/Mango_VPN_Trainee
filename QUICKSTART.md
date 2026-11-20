@@ -30,7 +30,7 @@ This guide lists the **tools, runtimes, and configuration** needed to run MANGO 
 npm run check:env
 ```
 
-This runs `scripts/check-environment.ps1`, which reports whether Node.js, npm, Git, Docker, Docker Compose, and Go are installed and meet their minimum versions.
+This runs `scripts/check-environment.ps1`, which verifies tool availability on `PATH` and prints detected versions alongside the minimum requirements (Node.js, npm, Git, Docker, Docker Compose, and Go).
 
 ---
 
@@ -116,12 +116,12 @@ Do not put a default password in source or in `.env.example`.
 
 | Port | Protocol | Component | Notes |
 | :--- | :--- | :--- | :--- |
-| **3000** | TCP (HTTP) | Web Portal | Docker portal container. For local Vite dev, use `--port 3000` (see below). |
+| **3000** | TCP (HTTP) | Web Portal | Docker portal container and Vite dev server (`Rain/portal/vite.config.ts` pins port `3000`). |
 | **4000** | TCP (HTTP) | Control Plane API (Fastify) | `PORT` |
 | **5432** | TCP (PostgreSQL) | PostgreSQL 16 inside Docker | Container port. Host port is `POSTGRES_PORT` (default `15432`). |
 | **47821** | TCP (HTTP, loopback) | Windows Agent or `mock-agent.js` | Binds `127.0.0.1` only. |
 | **51820** | UDP (WireGuard) | VPN gateway | `WG_LISTEN_PORT` |
-| **50051** | TCP (HTTP) | VPN gateway daemon API | Bearer-authenticated HTTP, not a Unix socket. |
+| **50051** | TCP (HTTP) | VPN gateway daemon API | Bearer-authenticated HTTP. Bound to host loopback `127.0.0.1:50051` in `docker-compose.yml` for local host API dev. |
 
 To check whether a port is in use on Windows:
 ```powershell
@@ -157,11 +157,7 @@ npm run dev:api                      # Terminal 2: API on :4000
 npm run dev:portal                   # Terminal 3: portal dev server
 ```
 
-The API's default `CORS_ORIGIN` and the agent's default allowed origin are `http://localhost:3000`. Vite's own default is `5173`, so start the dev server on port 3000:
-
-```powershell
-npm --workspace=@mango/portal run dev -- --port 3000
-```
+The API's default `CORS_ORIGIN` and the agent's default allowed origin are `http://localhost:3000`, and `Rain/portal/vite.config.ts` pins Vite to port `3000` automatically so `npm run dev:portal` works directly without extra flags. `npm run dev:api` and `npm run db:seed` also automatically fall back to loading the monorepo root `.env`.
 
 Paste the PairingToken printed by the mock agent into the portal's pairing-token field. The portal sends it as the `X-Mango-Agent-Token` header.
 
@@ -185,44 +181,24 @@ The `vpn-gateway` service needs `NET_ADMIN` and `wg`/`nft` on Linux. Run the dae
 
 ### Full Docker stack
 
-Before building the `portal` image, ensure `Rain/portal/nginx.conf` exists (see the snippet below—`Rain/portal/Dockerfile` expects it on line 25):
-
-```nginx
-server {
-  listen 3000;
-  server_name _;
-  root /usr/share/nginx/html;
-  index index.html;
-
-  location = /env-config.js {
-    add_header Cache-Control "no-store, no-cache, must-revalidate";
-    try_files $uri =404;
-  }
-
-  location / {
-    try_files $uri $uri/ /index.html;
-  }
-}
-```
-
-Then start the full stack, verify container healthchecks, and seed the initial `ADMIN` user:
+[`Rain/portal/nginx.conf`](Rain/portal/nginx.conf) serves the SPA on port `3000` with `Cache-Control: no-store` on `/env-config.js`. Build and start the full stack, verify container healthchecks, and seed the initial `ADMIN` user:
 
 ```powershell
-npm run docker:up        # postgres, vpn-gateway, api, portal
-docker compose ps        # verify all 4 services are healthy/running
+docker compose up -d --build   # rebuild & start postgres, vpn-gateway, api, portal
+docker compose ps              # verify all 4 services are healthy
 npm run docker:logs
 
-# Seed the database (against host-mapped postgres :15432)
-$env:DATABASE_URL="postgresql://mango:<password>@localhost:15432/mangovpn?schema=public"
+# Seed the database (reads DATABASE_URL from root .env automatically)
 $env:SEED_ADMIN_USERNAME="admin"
 $env:SEED_ADMIN_PASSWORD="<at-least-12-characters>"
 npm run db:seed
+Remove-Item Env:SEED_ADMIN_PASSWORD
 
 npm run docker:down
 ```
 
 > [!NOTE]
-> `docker-compose.yml` publishes `vpn-gateway` UDP `51820`, while daemon HTTP `:50051` stays private on the internal `mango-net` Docker network (`VPN_DAEMON_URL=http://vpn-gateway:50051` for the `api` container). If you run `npm run dev:api` directly on the Windows host and want it to reach a containerized `vpn-gateway`, either run `api` in Docker (`docker compose up -d api`) or temporarily bind `127.0.0.1:50051:50051` in a local Compose override.
+> `docker-compose.yml` publishes `vpn-gateway` UDP `51820` externally and binds daemon HTTP `:50051` to host loopback `127.0.0.1:50051` (`VPN_DAEMON_URL=http://vpn-gateway:50051` inside `mango-net`, `http://127.0.0.1:50051` for host-run `npm run dev:api`).
 
 ---
 
@@ -281,7 +257,7 @@ cd Sobree/vpn-daemon; go vet ./...; go test ./...; cd ../..
 | :--- | :--- | :--- |
 | API refuses to start | Missing or short secret in `.env` (`Sobree/api/src/config.ts`) | Ensure `JWT_SECRET`, `REFRESH_SECRET`, `DAEMON_SHARED_SECRET` are `>= 32` chars and `TOTP_ENCRYPTION_KEY` is `64` hex chars. |
 | `RoleName` or `connect_tickets` does not exist | Local `mangovpn` DB still has v1 schema/migrations | Run `npx prisma migrate reset --force --schema=Sobree/api/prisma/schema.prisma` and `npm run db:seed`. |
-| `403 FORBIDDEN_ORIGIN` from agent | Portal running on Vite default `:5173` instead of `:3000` | Start portal with `-- --port 3000` or add the origin to `AGENT_ALLOWED_ORIGINS` and `CORS_ORIGIN`. |
+| `403 FORBIDDEN_ORIGIN` from agent | Portal running on an unexpected origin outside `AGENT_ALLOWED_ORIGINS` | Run `npm run dev:portal` (pinned to `:3000`) or add the origin to `AGENT_ALLOWED_ORIGINS` and `CORS_ORIGIN`. |
 | `401 Unauthorized` from agent | Missing/mismatched `X-Mango-Agent-Token` | Paste `PairingToken` from `npm run mock:agent`, or set `$env:AGENT_PAIRING_TOKEN` explicitly before `go run .` (Go agent does not print ephemeral tokens). |
 | `426` (`AGENT_VERSION_OUTDATED` / `INACTIVE`) | `windows-x64` agent version blocked or outdated in `agent_versions` | Activate or update version `2.0.0` for `windows-x64` in the Portal's **Agent Versions** tab. |
 | `502` on Connect / Policy Sync / Revoke | `api` cannot reach `vpn-gateway` or `DAEMON_SHARED_SECRET` mismatch | Check `docker compose ps vpn-gateway`, `docker compose logs vpn-gateway`, and `VPN_DAEMON_URL`. |
@@ -301,12 +277,10 @@ Invoke-RestMethod http://127.0.0.1:47821/status -Headers @{ "X-Mango-Agent-Token
 
 ## 10. Pre-Ship & Cloud Deployment Checklist
 
-1. **Resolve remaining repo blockers on a feature/fix branch** (never commit directly to `main`):
-   - Add `Rain/portal/nginx.conf` so `docker compose build portal` succeeds.
-   - Update `.github/workflows/ci.yml` from `go-version: '1.23'` to `'1.26'` (matching `Sobree/agent-windows/go.mod`) and run `go test ./...` for `Sobree/agent-windows`.
-   - Align the `MANGO_AGENT_*` / `MANGO_API_URL` comments in `.env.example` with the actual env vars read by `Sobree/agent-windows/main.go` (`AGENT_LISTEN_ADDR`, `AGENT_ALLOWED_ORIGINS`, `AGENT_PAIRING_TOKEN`, `API_URL`).
+1. **Pre-ship repo readiness**:
+   - Local dev/Docker/CI blockers (`Rain/portal/nginx.conf`, LF `docker-entrypoint.sh`, Go `1.26` + `prisma migrate deploy` + `windows-agent-tests` in `.github/workflows/ci.yml`, and `AGENT_*` / `MANGO_AGENT_*` env aliases) are resolved. Remaining hardening/rollout tickets are tracked in GitHub Issues `#19`, `#20`, and `#21`.
 2. **Deploy Linux gateway & control plane (AWS EC2 — Profile B in `.env.example`)**:
-   - Open **UDP `51820`** (WireGuard) and **HTTPS `443`** (reverse proxy/ALB -> Portal `:3000` and API `:4000`); keep `:50051` and `:5432` internal to `mango-net`.
+   - Open **UDP `51820`** (WireGuard) and **HTTPS `443`** (reverse proxy/ALB -> Portal `:3000` and API `:4000`); block `15432` in the EC2 Security Group (`:50051` is bound to `127.0.0.1` on the host and internal to `mango-net`).
    - Set `NODE_ENV=production`, strong secrets, `WG_SERVER_ENDPOINT=<AWS_PUBLIC_IP_OR_DNS>:51820`, `CORS_ORIGIN=https://vpn.example.com`, and `VITE_API_URL=https://api.vpn.example.com`, then run `docker compose up -d --build` and `npm run db:seed`.
 3. **Build & roll out the Windows Agent (`Sobree/agent-windows`)**:
    - Build binary (`$env:GOOS="windows"; $env:GOARCH="amd64"; go build -trimpath -ldflags="-s -w" -o mango-agent-windows.exe .`) and record SHA-256 (`Get-FileHash`).
