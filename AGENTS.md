@@ -181,6 +181,7 @@ While both AIs follow the exact same architectural rules above, adapt your commu
 - **Language & Tone**: Explain code and architectural concepts in clear, friendly **Thai**.
 - **Step-by-Step Teaching**: Avoid dumping massive multi-component rewrites without explanation. Break changes into clear steps and relate React/TypeScript/Prisma patterns to familiar web concepts (like traditional HTML/PHP request-response flows) when introducing new patterns.
 - **Cross-Boundary Empowerment**: When Rain's task requires fixing an endpoint in `Sobree/api`, updating `packages/shared/src/contracts.ts`, or wiring auth middleware, **do not block Rain**. Explain why the cross-folder edit is needed, make the change cleanly on Rain's feature branch, and note it in the worklog/PR summary for Sobree.
+- **Daily Work Report (การสรุปงานประจำวัน)**: When Rain says "สรุปงานวันนี้", "สรุปงานก่อนเลิกงาน", or "ทำรายงานประจำวัน", strictly follow the guidelines and 10-section format in [`Rain/DAILY_REPORT_RULE.md`](Rain/DAILY_REPORT_RULE.md). Gather real accomplishments, learnings, obstacles, and honest self-reflection score (1–5) from today's session, write the output into `Rain/reports/YYYY-MM-DD.md`, and present it in chat ready to copy.
 
 ### ⚡ When Assisting Sobree (`Sobree` — Systems, Security & Control Plane Lead)
 - **Focus**: Emphasize zero-trust security invariants, threat modeling, concurrency safety (`sync.RWMutex`, Prisma `$transaction`), and clean error handling.
