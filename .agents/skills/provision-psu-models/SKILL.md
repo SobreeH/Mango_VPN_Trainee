@@ -46,7 +46,7 @@ Select the model by task complexity first, preferring frontier `1×`–`3×` mod
 - **Completion criterion**: The prompt names the target files, constraints, and the exact verification command that defines done.
 
 ### 3. Dispatch the OpenCode Run
-Dispatch via [scripts/dispatch-opencode.ps1](scripts/dispatch-opencode.ps1) so every run opens a new visible terminal window (`wt.exe` → `pwsh` / `powershell`), streams `--thinking --print-logs --log-level info` live while teeing output to `%TEMP%\opencode-dispatch\...\output.log`, keeps the window open (`-KeepOpen:$true`) for inspection, and leaves `--standalone` off so the shared service keeps its 5-key rotation `avoid` map intact:
+Dispatch via [scripts/dispatch-opencode.ps1](scripts/dispatch-opencode.ps1) so every run opens a new visible terminal window (`wt.exe` → `pwsh` / `powershell`), streams `--thinking --print-logs --log-level info` live while teeing output to `%TEMP%\opencode-dispatch\...\output.log`, keeps the window open (`-KeepOpen:$true`) for inspection, and leaves `--standalone` off so the shared service keeps its 5-key rotation `avoid` map intact. It also forces UTF-8 console/log encoding and automatically falls back to inline streaming with a copy-pasteable `Get-Content -Path "<log>" -Wait -Tail 50` command when invoked from an isolated sandbox desktop (e.g. `exebox-*`).
 
 - **Single / Read-only / Sequential Run** (opens a new verbose terminal and waits for completion):
   ```powershell

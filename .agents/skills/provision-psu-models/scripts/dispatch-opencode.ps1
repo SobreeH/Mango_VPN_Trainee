@@ -31,6 +31,11 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+try { [Console]::OutputEncoding = $utf8NoBom } catch {}
+try { [Console]::InputEncoding = $utf8NoBom } catch {}
+$OutputEncoding = $utf8NoBom
+
 function ConvertTo-PowerShellSingleQuoted {
     param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Value)
     return "'" + ($Value -replace "'", "''") + "'"
@@ -51,6 +56,49 @@ function ConvertTo-WindowsArgString {
         }
     }
     return ($quoted -join ' ')
+}
+
+function Get-CurrentWindowsDesktopName {
+    try {
+        if (-not ('OpenCodeDesktopCheck' -as [type])) {
+            Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+
+public static class OpenCodeDesktopCheck {
+    [DllImport("kernel32.dll")]
+    public static extern uint GetCurrentThreadId();
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetThreadDesktop(uint dwThreadId);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern bool GetUserObjectInformationW(
+        IntPtr hObj,
+        int nIndex,
+        byte[] pvInfo,
+        int nLength,
+        out int lpnLengthNeeded
+    );
+
+    public static string GetDesktopName() {
+        IntPtr desktop = GetThreadDesktop(GetCurrentThreadId());
+        if (desktop == IntPtr.Zero) return "";
+        int needed = 0;
+        GetUserObjectInformationW(desktop, 2, null, 0, out needed);
+        if (needed <= 0) return "";
+        byte[] buffer = new byte[needed];
+        if (!GetUserObjectInformationW(desktop, 2, buffer, needed, out needed)) return "";
+        return Encoding.Unicode.GetString(buffer).TrimEnd('\0');
+    }
+}
+"@ -ErrorAction Stop
+        }
+        return [OpenCodeDesktopCheck]::GetDesktopName()
+    } catch {
+        return ''
+    }
 }
 
 if ([string]::IsNullOrWhiteSpace($Prompt) -and [string]::IsNullOrWhiteSpace($PromptFile)) {
@@ -80,14 +128,13 @@ if (-not [string]::IsNullOrWhiteSpace($PromptFile)) {
         throw "PromptFile does not exist: $PromptFile"
     }
     $resolvedPromptFile = (Resolve-Path -LiteralPath $PromptFile).Path
-    $promptText = [System.IO.File]::ReadAllText($resolvedPromptFile, (New-Object System.Text.UTF8Encoding($false)))
+    $promptText = [System.IO.File]::ReadAllText($resolvedPromptFile, $utf8NoBom)
 }
 
 if ([string]::IsNullOrWhiteSpace($promptText)) {
     throw 'Prompt text cannot be empty.'
 }
 
-$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $slug = ($Title -replace '[^a-zA-Z0-9_-]+', '-').Trim('-')
 if ([string]::IsNullOrWhiteSpace($slug)) {
@@ -106,6 +153,7 @@ $runnerScript = Join-Path $runDir 'runner.ps1'
 $logPath = Join-Path $runDir 'output.log'
 $pidPath = Join-Path $runDir 'runner.pid'
 $exitCodePath = Join-Path $runDir 'exit.code'
+$tailCommand = "Get-Content -Path `"$logPath`" -Wait -Tail 50"
 
 [System.IO.File]::WriteAllText($promptPath, $promptText, $utf8NoBom)
 
@@ -122,6 +170,10 @@ if (Test-Path Variable:PSNativeCommandUseErrorActionPreference) {
 }
 
 `$utf8NoBom = New-Object System.Text.UTF8Encoding(`$false)
+try { [Console]::OutputEncoding = `$utf8NoBom } catch {}
+try { [Console]::InputEncoding = `$utf8NoBom } catch {}
+`$OutputEncoding = `$utf8NoBom
+
 `$pidFile = $(ConvertTo-PowerShellSingleQuoted $pidPath)
 `$exitFile = $(ConvertTo-PowerShellSingleQuoted $exitCodePath)
 `$logFile = $(ConvertTo-PowerShellSingleQuoted $logPath)
@@ -184,16 +236,20 @@ if (-not [string]::IsNullOrWhiteSpace(`$attachFile)) {
 `$ocArgs.Add(`$promptContent)
 
 `$exitCode = 1
+`$logWriter = `$null
 try {
+    `$logWriter = New-Object System.IO.StreamWriter(`$logFile, `$false, `$utf8NoBom)
+    `$logWriter.AutoFlush = `$true
     & opencode @ocArgs 2>&1 |
         ForEach-Object {
-            if (`$_ -is [System.Management.Automation.ErrorRecord]) {
+            `$line = if (`$_ -is [System.Management.Automation.ErrorRecord]) {
                 `$_.ToString()
             } else {
-                `$_
+                [string]`$_
             }
-        } |
-        Tee-Object -FilePath `$logFile
+            `$logWriter.WriteLine(`$line)
+            Write-Output `$line
+        }
     if (`$null -ne `$LASTEXITCODE) {
         `$exitCode = [int]`$LASTEXITCODE
     } else {
@@ -202,9 +258,14 @@ try {
 } catch {
     `$errLine = "[dispatch-opencode] Runner exception: `$(`$_.Exception.Message)"
     Write-Host `$errLine -ForegroundColor Red
-    Add-Content -LiteralPath `$logFile -Value `$errLine -Encoding UTF8
+    if (`$null -ne `$logWriter) {
+        `$logWriter.WriteLine(`$errLine)
+    }
     `$exitCode = 1
 } finally {
+    if (`$null -ne `$logWriter) {
+        `$logWriter.Dispose()
+    }
     `$endTime = Get-Date
     `$elapsed = `$endTime - `$startTime
     [System.IO.File]::WriteAllText(`$exitFile, "`$exitCode", `$utf8NoBom)
@@ -230,11 +291,41 @@ $shellExe = if ($null -ne $pwshCmd) {
     (Get-Command 'powershell.exe' -ErrorAction Stop).Source
 }
 
-if ($NoWindow) {
-    Write-Output "Running OpenCode headless | Model: $Model | Title: $safeTitle | Log: $logPath"
+$desktopName = ''
+if (-not $NoWindow) {
+    $desktopName = Get-CurrentWindowsDesktopName
+}
+
+$isIsolatedDesktop = (-not $NoWindow) -and (-not [string]::IsNullOrWhiteSpace($desktopName)) -and ($desktopName -ine 'Default')
+
+if ($NoWindow -or $isIsolatedDesktop) {
+    if ($isIsolatedDesktop) {
+        Write-Output "Isolated Windows desktop detected ('$desktopName' != 'Default'); running inline instead of spawning an invisible window."
+        Write-Output "Watch live in your terminal: $tailCommand"
+    } else {
+        Write-Output "Running OpenCode headless | Model: $Model | Title: $safeTitle | Log: $logPath"
+    }
+
+    if ($NoWait) {
+        $bgArgs = ConvertTo-WindowsArgString -Arguments @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $runnerScript)
+        Start-Process -FilePath $shellExe -WorkingDirectory $resolvedWorkDir -WindowStyle Hidden -ArgumentList $bgArgs | Out-Null
+        $metadata = [ordered]@{
+            runDir       = $runDir
+            logFile      = $logPath
+            exitCodeFile = $exitCodePath
+            pidFile      = $pidPath
+            model        = $Model
+            title        = $safeTitle
+            worktree     = $worktreeLabel
+            tailCommand  = $tailCommand
+        }
+        Write-Output ($metadata | ConvertTo-Json -Compress)
+        exit 0
+    }
+
     & $shellExe -NoProfile -ExecutionPolicy Bypass -File $runnerScript
-    $headlessExit = if ($null -ne $LASTEXITCODE) { [int]$LASTEXITCODE } else { 1 }
-    exit $headlessExit
+    $inlineExit = if ($null -ne $LASTEXITCODE) { [int]$LASTEXITCODE } else { 1 }
+    exit $inlineExit
 }
 
 $shellArgs = if ($KeepOpen) {
@@ -264,6 +355,7 @@ if ($NoWait) {
         model        = $Model
         title        = $safeTitle
         worktree     = $worktreeLabel
+        tailCommand  = $tailCommand
     }
     Write-Output ($metadata | ConvertTo-Json -Compress)
     exit 0
