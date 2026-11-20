@@ -8,6 +8,7 @@ MANGO VPN removes manual `.conf` file handling for corporate VPN users. Users si
 
 ## 📚 Documentation
 
+- **[🎓 First-Time Beginner Tutorial & Testing Manual (`TUTORIAL.md`)](TUTORIAL.md)** *(หรือฉบับภาษาไทย [TUTORIAL.th.md](TUTORIAL.th.md))*: **Start here if it is your first time** — step-by-step setup for both Rain and Sobree, automatic `.env` generation, 3 run tracks, and click-by-click testing missions.
 - **[🤖 AI Development & Project Scoping Guide (`AGENTS.md`)](AGENTS.md)**: **Mandatory reading for all AI coding assistants**: scope rules, cross-boundary collaboration, protected paths, and anti-hallucination guardrails.
 - **[🚀 Quick Start & Environment Readiness Guide (`QUICKSTART.md`)](QUICKSTART.md)**: Tool prerequisites, `.env` setup, port map, first-time setup, interactive walkthrough, debugging, and shipping checklist.
 - **[📊 Project Progress & Ship Tracker (`PROGRESS.md`)](PROGRESS.md)**: Current v2 verification status, completed tickets (`#5`–`#13`), component readiness matrix, and remaining pre-ship action items.
