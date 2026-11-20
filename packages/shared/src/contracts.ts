@@ -101,3 +101,54 @@ export interface AgentVersionDto {
   isMandatory: boolean;
   releasedAt: string;
 }
+
+export interface AuthUserDto {
+  id: string;
+  username: string;
+  email: string;
+  role: RoleName;
+  totpEnabled: boolean;
+}
+
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+export type LoginResponse =
+  | {
+      status: 'MFA_SETUP_REQUIRED';
+      mfaToken: string;
+      otpauthUri: string;
+      secretBase32: string;
+      user: AuthUserDto;
+    }
+  | {
+      status: 'MFA_REQUIRED';
+      mfaToken: string;
+      user: AuthUserDto;
+    };
+
+export interface VerifyOtpRequest {
+  mfaToken: string;
+  code: string;
+}
+
+export interface AuthTokensResponse {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+  user: AuthUserDto;
+}
+
+export interface RefreshRequest {
+  refreshToken: string;
+}
+
+export interface LogoutRequest {
+  refreshToken: string;
+}
+
+export interface LogoutResponse {
+  success: boolean;
+}
