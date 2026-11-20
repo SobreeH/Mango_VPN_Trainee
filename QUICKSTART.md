@@ -2,6 +2,9 @@
 
 This guide lists the **tools, runtimes, and configuration** needed to run MANGO VPN v2 locally, and how to check that your machine is ready.
 
+> [!TIP]
+> **First time running or testing MANGO VPN?** Follow our beginner-friendly, step-by-step manual with automatic `.env` setup and click-by-click testing missions: **[🎓 English (`TUTORIAL.md`)](TUTORIAL.md)** | **[🇹🇭 ภาษาไทย (`TUTORIAL.th.md`)](TUTORIAL.th.md)**.
+
 > [!IMPORTANT]
 > **Using an AI Assistant?** Instruct your AI to read [`AGENTS.md`](AGENTS.md) before starting any task. It defines project scope, cross-boundary collaboration rules (`Rain/`, `Sobree/`, `packages/shared/`), and the anti-mock guardrails.
 
