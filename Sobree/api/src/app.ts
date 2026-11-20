@@ -5,6 +5,7 @@ import type { HealthResponse } from '@mango/shared';
 import { adminPlugin } from '@mango/rain-admin';
 import type { ApiConfig } from './config.js';
 import { registerAuthRoutes } from './modules/auth/auth.routes.js';
+import { registerVpnRoutes } from './modules/vpn/vpn.routes.js';
 
 export interface AppDependencies {
   config: ApiConfig;
@@ -41,6 +42,7 @@ export async function buildApp({ config, prisma }: AppDependencies): Promise<Fas
   });
 
   await registerAuthRoutes(app, { config, prisma });
+  await registerVpnRoutes(app, { config, prisma });
   await app.register(adminPlugin, { prefix: '/api' });
 
   app.addHook('onClose', async () => {
