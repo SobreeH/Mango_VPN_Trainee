@@ -492,6 +492,15 @@ func NewHandler(cfg AgentConfig) http.Handler {
 	})
 }
 
+func getenvFirst(keys ...string) string {
+	for _, key := range keys {
+		if val := strings.TrimSpace(os.Getenv(key)); val != "" {
+			return val
+		}
+	}
+	return ""
+}
+
 func generatePairingToken() string {
 	buf := make([]byte, 32)
 	if _, err := rand.Read(buf); err != nil {
@@ -501,33 +510,38 @@ func generatePairingToken() string {
 }
 
 func main() {
-	addr := os.Getenv("AGENT_LISTEN_ADDR")
+	addr := getenvFirst("AGENT_LISTEN_ADDR", "MANGO_AGENT_ADDR")
 	if addr == "" {
 		addr = defaultListenAddr
 	}
 
-	originsEnv := os.Getenv("AGENT_ALLOWED_ORIGINS")
+	originsEnv := getenvFirst("AGENT_ALLOWED_ORIGINS", "MANGO_AGENT_ALLOWED_ORIGINS")
 	if originsEnv == "" {
 		originsEnv = "http://localhost:3000,http://127.0.0.1:3000"
 	}
 	allowedOrigins := strings.Split(originsEnv, ",")
 
-	pairingToken := os.Getenv("AGENT_PAIRING_TOKEN")
+	pairingToken := getenvFirst("AGENT_PAIRING_TOKEN", "MANGO_AGENT_PAIRING_TOKEN")
 	if pairingToken == "" {
 		pairingToken = generatePairingToken()
 		log.Printf("Generated ephemeral AGENT_PAIRING_TOKEN for local session")
 	}
 
-	apiBaseURL := os.Getenv("API_URL")
+	apiBaseURL := getenvFirst("API_URL", "MANGO_API_URL")
 	if apiBaseURL == "" {
 		apiBaseURL = defaultApiBaseURL
 	}
 
+	hostname := getenvFirst("AGENT_HOSTNAME")
+	fingerprint := getenvFirst("AGENT_DEVICE_FINGERPRINT")
+
 	handler := NewHandler(AgentConfig{
-		AllowedOrigins: allowedOrigins,
-		PairingToken:   pairingToken,
-		Version:        defaultVersion,
-		ApiBaseURL:     apiBaseURL,
+		AllowedOrigins:    allowedOrigins,
+		PairingToken:      pairingToken,
+		Version:           defaultVersion,
+		ApiBaseURL:        apiBaseURL,
+		Hostname:          hostname,
+		DeviceFingerprint: fingerprint,
 	})
 
 	if err := runAgent(addr, handler); err != nil {
