@@ -2,14 +2,20 @@ import type { FastifyPluginAsync, preHandlerHookHandler } from 'fastify';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { AuditLogDto, AuditLogListResponse } from '@mango/shared';
 import { registerAgentVersionRoutes } from './agent-versions.js';
+import { registerUserRoutes } from './users.js';
+import { registerDeviceRoutes } from './devices.js';
+import { registerSessionRoutes } from './sessions.js';
+import type { AdminVpnDaemonClient } from './revocation.js';
 
 export * from './audit.js';
 export * from './agent-versions.js';
+export * from './revocation.js';
 
 export interface AdminPluginOptions {
   prisma: PrismaClient;
   authenticate: preHandlerHookHandler;
   requireAdmin: preHandlerHookHandler;
+  vpnDaemon?: AdminVpnDaemonClient;
 }
 
 interface AuditLogsQueryParams {
@@ -26,7 +32,7 @@ interface AuditLogsQueryParams {
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const adminPlugin: FastifyPluginAsync<AdminPluginOptions> = async (app, options) => {
-  const { prisma, authenticate, requireAdmin } = options;
+  const { prisma, authenticate, requireAdmin, vpnDaemon } = options;
 
   app.addHook('preHandler', authenticate);
   app.addHook('preHandler', requireAdmin);
@@ -116,4 +122,7 @@ export const adminPlugin: FastifyPluginAsync<AdminPluginOptions> = async (app, o
   });
 
   registerAgentVersionRoutes(app, prisma);
+  registerUserRoutes(app, prisma, vpnDaemon);
+  registerDeviceRoutes(app, prisma, vpnDaemon);
+  registerSessionRoutes(app, prisma, vpnDaemon);
 };

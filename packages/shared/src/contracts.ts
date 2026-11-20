@@ -50,9 +50,26 @@ export interface UserDto {
   createdAt: string;
 }
 
+export interface CreateUserRequest {
+  username: string;
+  email: string;
+  password: string;
+  role: RoleName;
+  isActive?: boolean;
+}
+
+export interface UpdateUserStatusRequest {
+  isActive: boolean;
+}
+
+export interface UserListResponse {
+  items: UserDto[];
+}
+
 export interface DeviceDto {
   id: string;
   userId: string;
+  username?: string;
   hostname: string;
   fingerprint: string;
   status: DeviceStatus;
@@ -60,14 +77,24 @@ export interface DeviceDto {
   createdAt: string;
 }
 
+export interface DeviceListResponse {
+  items: DeviceDto[];
+}
+
 export interface VpnSessionDto {
   id: string;
   userId: string;
+  username?: string;
   deviceId: string;
+  hostname?: string;
   assignedIp: string;
   status: SessionStatus;
   connectedAt: string;
   disconnectedAt: string | null;
+}
+
+export interface VpnSessionListResponse {
+  items: VpnSessionDto[];
 }
 
 export interface VpnPolicyDto {
