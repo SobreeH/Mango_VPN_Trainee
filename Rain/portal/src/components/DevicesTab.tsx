@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DeviceStatus, type DeviceDto } from '@mango/shared';
 import type { AuthRefreshContext } from '../api/auth';
 import { fetchDevices, revokeDevice } from '../lib/adminApi';
+import { ConfirmModal } from './ConfirmModal';
 
 interface DevicesTabProps {
   apiBaseUrl: string;
@@ -11,6 +13,11 @@ interface DevicesTabProps {
 
 export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
   const queryClient = useQueryClient();
+  const [deviceToRevoke, setDeviceToRevoke] = useState<{
+    id: string;
+    hostname: string;
+    fingerprint: string;
+  } | null>(null);
 
   const listQuery = useQuery({
     queryKey: ['admin-devices', apiBaseUrl],
@@ -79,7 +86,13 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
                     <button
                       type="button"
                       disabled={d.status === DeviceStatus.REVOKED || revokeMutation.isPending}
-                      onClick={() => revokeMutation.mutate(d.id)}
+                      onClick={() =>
+                        setDeviceToRevoke({
+                          id: d.id,
+                          hostname: d.hostname,
+                          fingerprint: d.fingerprint,
+                        })
+                      }
                       className="rounded border border-red-700/60 px-2 py-1 text-xs text-red-200 hover:bg-red-950/60 disabled:opacity-40"
                     >
                       Revoke
@@ -91,6 +104,38 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
           </table>
         </div>
       ) : null}
+
+      {/* Confirmation Modal for Device Revocation */}
+      <ConfirmModal
+        isOpen={deviceToRevoke !== null}
+        title="Revoke Device Access"
+        message={
+          <div className="space-y-2">
+            <p>
+              Are you sure you want to permanently revoke device{' '}
+              <strong className="text-slate-100">{deviceToRevoke?.hostname}</strong>?
+            </p>
+            <p className="font-mono text-xs text-slate-400">
+              Fingerprint: {deviceToRevoke?.fingerprint}
+            </p>
+            <p className="text-xs text-red-400 font-medium pt-1">
+              ⚠️ This will immediately sever any active WireGuard VPN tunnels and block all future
+              connection attempts from this device.
+            </p>
+          </div>
+        }
+        confirmLabel="Revoke Device"
+        confirmVariant="danger"
+        isLoading={revokeMutation.isPending}
+        onConfirm={() => {
+          if (deviceToRevoke) {
+            revokeMutation.mutate(deviceToRevoke.id, {
+              onSettled: () => setDeviceToRevoke(null),
+            });
+          }
+        }}
+        onCancel={() => setDeviceToRevoke(null)}
+      />
     </section>
   );
 }

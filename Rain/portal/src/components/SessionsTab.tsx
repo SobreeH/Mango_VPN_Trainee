@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { SessionStatus, type VpnSessionDto } from '@mango/shared';
 import type { AuthRefreshContext } from '../api/auth';
 import { disconnectSession, fetchSessions } from '../lib/adminApi';
+import { ConfirmModal } from './ConfirmModal';
 
 interface SessionsTabProps {
   apiBaseUrl: string;
@@ -11,6 +13,11 @@ interface SessionsTabProps {
 
 export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps) {
   const queryClient = useQueryClient();
+  const [sessionToDisconnect, setSessionToDisconnect] = useState<{
+    id: string;
+    username: string;
+    assignedIp: string;
+  } | null>(null);
 
   const listQuery = useQuery({
     queryKey: ['admin-sessions', apiBaseUrl],
@@ -78,7 +85,13 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps)
                     <button
                       type="button"
                       disabled={s.status !== SessionStatus.ACTIVE || disconnectMutation.isPending}
-                      onClick={() => disconnectMutation.mutate(s.id)}
+                      onClick={() =>
+                        setSessionToDisconnect({
+                          id: s.id,
+                          username: s.username ?? s.userId,
+                          assignedIp: s.assignedIp,
+                        })
+                      }
                       className="rounded border border-red-700/60 px-2 py-1 text-xs text-red-200 hover:bg-red-950/60 disabled:opacity-40"
                     >
                       Disconnect
@@ -90,6 +103,38 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps)
           </table>
         </div>
       ) : null}
+
+      {/* Confirmation Modal for Disconnect Session */}
+      <ConfirmModal
+        isOpen={sessionToDisconnect !== null}
+        title="Disconnect Active VPN Session"
+        message={
+          <div className="space-y-2">
+            <p>
+              Are you sure you want to force disconnect the session for user{' '}
+              <strong className="text-slate-100">{sessionToDisconnect?.username}</strong>?
+            </p>
+            <p className="font-mono text-xs text-emerald-400">
+              Assigned IP: {sessionToDisconnect?.assignedIp}
+            </p>
+            <p className="text-xs text-amber-400 font-medium pt-1">
+              ⚠️ The WireGuard peer will be immediately removed from the gateway daemon, terminating
+              active network access.
+            </p>
+          </div>
+        }
+        confirmLabel="Disconnect Session"
+        confirmVariant="danger"
+        isLoading={disconnectMutation.isPending}
+        onConfirm={() => {
+          if (sessionToDisconnect) {
+            disconnectMutation.mutate(sessionToDisconnect.id, {
+              onSettled: () => setSessionToDisconnect(null),
+            });
+          }
+        }}
+        onCancel={() => setSessionToDisconnect(null)}
+      />
     </section>
   );
 }

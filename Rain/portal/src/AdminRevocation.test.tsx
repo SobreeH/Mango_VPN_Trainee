@@ -127,9 +127,11 @@ describe('Portal Admin Users, Devices & Sessions Tabs (fetch seam)', () => {
 
     expect(await screen.findByText('client.two')).toBeInTheDocument();
 
-    // Toggle status (Disable)
-    const disableBtns = screen.getAllByRole('button', { name: /Disable/i });
+    // Toggle status (Disable) via confirmation modal
+    const disableBtns = screen.getAllByRole('button', { name: /^Disable$/i });
     fireEvent.click(disableBtns[0]!);
+    // Modal is shown - confirm
+    fireEvent.click(screen.getByRole('button', { name: /^Disable User$/i }));
     await waitFor(() => {
       expect(screen.getByText('Disabled')).toBeInTheDocument();
     });
@@ -178,7 +180,9 @@ describe('Portal Admin Users, Devices & Sessions Tabs (fetch seam)', () => {
     fireEvent.click(screen.getByRole('tab', { name: /Devices/i }));
     expect(await screen.findByText('staff-laptop')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Revoke/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Revoke$/i }));
+    // Modal is shown - confirm revocation
+    fireEvent.click(screen.getByRole('button', { name: /^Revoke Device$/i }));
     await waitFor(() => {
       expect(screen.getByText('REVOKED')).toBeInTheDocument();
     });
@@ -227,7 +231,9 @@ describe('Portal Admin Users, Devices & Sessions Tabs (fetch seam)', () => {
     fireEvent.click(screen.getByRole('tab', { name: /Sessions/i }));
     expect(await screen.findByText('10.13.13.10')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Disconnect/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Disconnect$/i }));
+    // Modal is shown - confirm disconnection
+    fireEvent.click(screen.getByRole('button', { name: /^Disconnect Session$/i }));
     expect(await screen.findByRole('alert')).toHaveTextContent('VPN daemon unreachable');
     expect(screen.queryByText(/No VPN sessions found/i)).not.toBeInTheDocument();
   });
@@ -255,5 +261,90 @@ describe('Portal Admin Users, Devices & Sessions Tabs (fetch seam)', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/Users service offline/i);
     expect(screen.queryByText(/No users found/i)).not.toBeInTheDocument();
+  });
+
+  it('supports modal cancellation and instant search/role filtering in UsersTab', async () => {
+    const users = [
+      {
+        id: 'u-1',
+        username: 'alice.staff',
+        email: 'alice@mango.local',
+        role: RoleName.STAFF,
+        isActive: true,
+        totpEnabled: false,
+        createdAt: '2026-11-20T02:00:00.000Z',
+      },
+      {
+        id: 'u-2',
+        username: 'bob.client',
+        email: 'bob@mango.local',
+        role: RoleName.CLIENT,
+        isActive: true,
+        totpEnabled: false,
+        createdAt: '2026-11-20T02:05:00.000Z',
+      },
+    ];
+
+    let patchCalled = false;
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/api/audit-logs')) {
+        return new Response(
+          JSON.stringify({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 1 }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (url.endsWith('/api/users') && (!init?.method || init.method === 'GET')) {
+        return new Response(JSON.stringify({ items: users }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.includes('/status') && init?.method === 'PATCH') {
+        patchCalled = true;
+        return new Response(JSON.stringify({ ...users[0], isActive: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify({ message: 'Not found' }), { status: 404 });
+    });
+
+    renderWithQuery(<App initialSession={adminSession} />);
+    fireEvent.click(screen.getByRole('tab', { name: /Users/i }));
+    expect(await screen.findByText('alice.staff')).toBeInTheDocument();
+    expect(screen.getByText('bob.client')).toBeInTheDocument();
+
+    // Test search filter
+    const searchInput = screen.getByLabelText(/Search users/i);
+    fireEvent.change(searchInput, { target: { value: 'alice' } });
+    expect(screen.getByText('alice.staff')).toBeInTheDocument();
+    expect(screen.queryByText('bob.client')).not.toBeInTheDocument();
+
+    // Reset search
+    fireEvent.change(searchInput, { target: { value: '' } });
+    expect(screen.getByText('bob.client')).toBeInTheDocument();
+
+    // Test role filter
+    const roleSelect = screen.getByLabelText(/Role:/i);
+    fireEvent.change(roleSelect, { target: { value: RoleName.CLIENT } });
+    expect(screen.queryByText('alice.staff')).not.toBeInTheDocument();
+    expect(screen.getByText('bob.client')).toBeInTheDocument();
+
+    // Reset role filter
+    fireEvent.change(roleSelect, { target: { value: 'ALL' } });
+    expect(screen.getByText('alice.staff')).toBeInTheDocument();
+
+    // Test cancellation modal
+    const disableBtns = screen.getAllByRole('button', { name: /^Disable$/i });
+    fireEvent.click(disableBtns[0]!);
+    expect(screen.getByText(/Are you sure you want to disable account/i)).toBeInTheDocument();
+
+    // Click Cancel
+    fireEvent.click(screen.getByRole('button', { name: /^Cancel$/i }));
+    await waitFor(() => {
+      expect(screen.queryByText(/Are you sure you want to disable account/i)).not.toBeInTheDocument();
+    });
+    expect(patchCalled).toBe(false);
   });
 });
