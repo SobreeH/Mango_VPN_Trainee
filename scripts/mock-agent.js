@@ -30,6 +30,7 @@ const DEVICE_FINGERPRINT =
   process.env.AGENT_DEVICE_FINGERPRINT ||
   'mock-' + crypto.createHash('sha256').update(HOSTNAME).digest('hex').slice(0, 24);
 const START_TIME = Date.now();
+const DEFAULT_VERSION = '2.0.0';
 
 function generateX25519PublicKeyB64() {
   const { publicKey } = crypto.generateKeyPairSync('x25519');
@@ -39,7 +40,7 @@ function generateX25519PublicKeyB64() {
 }
 
 const agentState = {
-  version: '2.0.0-mock',
+  version: DEFAULT_VERSION,
   state: 'disconnected', // 'disconnected' | 'connecting' | 'connected' | 'disconnecting' | 'error'
   sessionId: null,
   assignedIp: null,

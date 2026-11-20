@@ -1,22 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { SessionStatus, type VpnSessionDto } from '@mango/shared';
+import type { AuthRefreshContext } from '../api/auth';
 import { disconnectSession, fetchSessions } from '../lib/adminApi';
 
 interface SessionsTabProps {
   apiBaseUrl: string;
   accessToken: string;
+  auth?: AuthRefreshContext;
 }
 
-export function SessionsTab({ apiBaseUrl, accessToken }: SessionsTabProps) {
+export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps) {
   const queryClient = useQueryClient();
 
   const listQuery = useQuery({
     queryKey: ['admin-sessions', apiBaseUrl],
-    queryFn: () => fetchSessions(apiBaseUrl, accessToken),
+    queryFn: () => fetchSessions(apiBaseUrl, accessToken, auth),
   });
 
   const disconnectMutation = useMutation({
-    mutationFn: (id: string) => disconnectSession(apiBaseUrl, accessToken, id),
+    mutationFn: (id: string) => disconnectSession(apiBaseUrl, accessToken, id, auth),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['admin-sessions', apiBaseUrl] });
     },

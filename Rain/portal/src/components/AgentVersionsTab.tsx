@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AgentVersionDto, UpdateAgentVersionRequest } from '@mango/shared';
+import type { AuthRefreshContext } from '../api/auth';
 import {
   createAgentVersion,
   fetchAgentVersions,
@@ -10,9 +11,10 @@ import {
 interface AgentVersionsTabProps {
   apiBaseUrl: string;
   accessToken: string;
+  auth?: AuthRefreshContext;
 }
 
-export function AgentVersionsTab({ apiBaseUrl, accessToken }: AgentVersionsTabProps) {
+export function AgentVersionsTab({ apiBaseUrl, accessToken, auth }: AgentVersionsTabProps) {
   const queryClient = useQueryClient();
   const [version, setVersion] = useState('');
   const [platform, setPlatform] = useState('windows-x64');
@@ -22,19 +24,24 @@ export function AgentVersionsTab({ apiBaseUrl, accessToken }: AgentVersionsTabPr
 
   const listQuery = useQuery({
     queryKey: ['agent-versions', apiBaseUrl],
-    queryFn: () => fetchAgentVersions(apiBaseUrl, accessToken),
+    queryFn: () => fetchAgentVersions(apiBaseUrl, accessToken, auth),
   });
 
   const createMutation = useMutation({
     mutationFn: () =>
-      createAgentVersion(apiBaseUrl, accessToken, {
-        version,
-        platform,
-        downloadUrl,
-        sha256Checksum,
-        isActive: true,
-        isRequired,
-      }),
+      createAgentVersion(
+        apiBaseUrl,
+        accessToken,
+        {
+          version,
+          platform,
+          downloadUrl,
+          sha256Checksum,
+          isActive: true,
+          isRequired,
+        },
+        auth,
+      ),
     onSuccess: () => {
       setVersion('');
       setDownloadUrl('');
@@ -46,7 +53,7 @@ export function AgentVersionsTab({ apiBaseUrl, accessToken }: AgentVersionsTabPr
 
   const updateMutation = useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: UpdateAgentVersionRequest }) =>
-      updateAgentVersion(apiBaseUrl, accessToken, id, patch),
+      updateAgentVersion(apiBaseUrl, accessToken, id, patch, auth),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['agent-versions', apiBaseUrl] });
     },

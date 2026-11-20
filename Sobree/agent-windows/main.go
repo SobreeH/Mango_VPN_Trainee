@@ -530,8 +530,7 @@ func main() {
 		ApiBaseURL:     apiBaseURL,
 	})
 
-	log.Printf("MANGO Windows Agent listening on %s", addr)
-	if err := http.ListenAndServe(addr, handler); err != nil {
+	if err := runAgent(addr, handler); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
 }

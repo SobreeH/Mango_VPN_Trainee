@@ -6,14 +6,16 @@ import {
   RoleName,
   type VpnPolicyDto,
 } from '@mango/shared';
+import type { AuthRefreshContext } from '../api/auth';
 import { createPolicy, deletePolicy, fetchPolicies } from '../lib/adminApi';
 
 interface PoliciesTabProps {
   apiBaseUrl: string;
   accessToken: string;
+  auth?: AuthRefreshContext;
 }
 
-export function PoliciesTab({ apiBaseUrl, accessToken }: PoliciesTabProps) {
+export function PoliciesTab({ apiBaseUrl, accessToken, auth }: PoliciesTabProps) {
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
   const [role, setRole] = useState<RoleName>(RoleName.STAFF);
@@ -25,20 +27,25 @@ export function PoliciesTab({ apiBaseUrl, accessToken }: PoliciesTabProps) {
 
   const listQuery = useQuery({
     queryKey: ['policies', apiBaseUrl],
-    queryFn: () => fetchPolicies(apiBaseUrl, accessToken),
+    queryFn: () => fetchPolicies(apiBaseUrl, accessToken, auth),
   });
 
   const createMutation = useMutation({
     mutationFn: () =>
-      createPolicy(apiBaseUrl, accessToken, {
-        name,
-        role,
-        targetCidr,
-        protocol,
-        portRange: portRange.trim() ? portRange.trim() : null,
-        action,
-        priority: Number.parseInt(priority, 10) || 100,
-      }),
+      createPolicy(
+        apiBaseUrl,
+        accessToken,
+        {
+          name,
+          role,
+          targetCidr,
+          protocol,
+          portRange: portRange.trim() ? portRange.trim() : null,
+          action,
+          priority: Number.parseInt(priority, 10) || 100,
+        },
+        auth,
+      ),
     onSuccess: () => {
       setName('');
       setTargetCidr('');
@@ -49,7 +56,7 @@ export function PoliciesTab({ apiBaseUrl, accessToken }: PoliciesTabProps) {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => deletePolicy(apiBaseUrl, accessToken, id),
+    mutationFn: (id: string) => deletePolicy(apiBaseUrl, accessToken, id, auth),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['policies', apiBaseUrl] });
     },

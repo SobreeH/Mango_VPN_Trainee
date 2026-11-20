@@ -3,7 +3,7 @@ import { Shield, KeyRound, LogOut, AlertCircle } from 'lucide-react';
 import { z } from 'zod';
 import QRCode from 'qrcode';
 import { RoleName, type AuthTokensResponse, type AuthUserDto, type LoginResponse } from '@mango/shared';
-import { loginUser, logoutUser, verifyOtpCode } from './api/auth';
+import { loginUser, logoutUser, verifyOtpCode, type AuthRefreshContext } from './api/auth';
 import { AgentStatusCard } from './components/AgentStatusCard';
 import { DEFAULT_API_URL } from './lib/adminApi';
 import { AuditLogsTab } from './components/AuditLogsTab';
@@ -129,6 +129,14 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
     }
   }
 
+  function clearLocalSession(nextError: string | null = null) {
+    setUsername('');
+    setPassword('');
+    setOtpCode('');
+    setErrorMessage(nextError);
+    setStep({ kind: 'login' });
+  }
+
   async function handleLogout() {
     if (step.kind !== 'authenticated') return;
     setErrorMessage(null);
@@ -137,12 +145,19 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
     } catch {
       // Clear local session even if server revocation request fails
     } finally {
-      setUsername('');
-      setPassword('');
-      setOtpCode('');
-      setStep({ kind: 'login' });
+      clearLocalSession(null);
     }
   }
+
+  const authContext: AuthRefreshContext | undefined =
+    step.kind === 'authenticated'
+      ? {
+          refreshToken: step.session.refreshToken,
+          apiBaseUrl,
+          onSessionUpdate: (newSession) => setStep({ kind: 'authenticated', session: newSession }),
+          onAuthExpired: (message) => clearLocalSession(message),
+        }
+      : undefined;
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-100 p-6">
@@ -273,7 +288,11 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
               <p className="text-xs text-slate-400">{step.session.user.email}</p>
             </div>
 
-            <AgentStatusCard accessToken={step.session.accessToken} />
+            <AgentStatusCard
+              accessToken={step.session.accessToken}
+              userRole={step.session.user.role}
+              auth={authContext}
+            />
 
             {step.session.user.role === RoleName.ADMIN && (
               <div className="space-y-4 border-t border-slate-800 pt-4">
@@ -307,22 +326,46 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
 
                 <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
                   {activeTab === 'audit-logs' && (
-                    <AuditLogsTab apiBaseUrl={apiBaseUrl} accessToken={step.session.accessToken} />
+                    <AuditLogsTab
+                      apiBaseUrl={apiBaseUrl}
+                      accessToken={step.session.accessToken}
+                      auth={authContext}
+                    />
                   )}
                   {activeTab === 'agent-versions' && (
-                    <AgentVersionsTab apiBaseUrl={apiBaseUrl} accessToken={step.session.accessToken} />
+                    <AgentVersionsTab
+                      apiBaseUrl={apiBaseUrl}
+                      accessToken={step.session.accessToken}
+                      auth={authContext}
+                    />
                   )}
                   {activeTab === 'users' && (
-                    <UsersTab apiBaseUrl={apiBaseUrl} accessToken={step.session.accessToken} />
+                    <UsersTab
+                      apiBaseUrl={apiBaseUrl}
+                      accessToken={step.session.accessToken}
+                      auth={authContext}
+                    />
                   )}
                   {activeTab === 'devices' && (
-                    <DevicesTab apiBaseUrl={apiBaseUrl} accessToken={step.session.accessToken} />
+                    <DevicesTab
+                      apiBaseUrl={apiBaseUrl}
+                      accessToken={step.session.accessToken}
+                      auth={authContext}
+                    />
                   )}
                   {activeTab === 'sessions' && (
-                    <SessionsTab apiBaseUrl={apiBaseUrl} accessToken={step.session.accessToken} />
+                    <SessionsTab
+                      apiBaseUrl={apiBaseUrl}
+                      accessToken={step.session.accessToken}
+                      auth={authContext}
+                    />
                   )}
                   {activeTab === 'policies' && (
-                    <PoliciesTab apiBaseUrl={apiBaseUrl} accessToken={step.session.accessToken} />
+                    <PoliciesTab
+                      apiBaseUrl={apiBaseUrl}
+                      accessToken={step.session.accessToken}
+                      auth={authContext}
+                    />
                   )}
                 </div>
               </div>

@@ -4,13 +4,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RoleName } from '@mango/shared';
 import { App } from './App';
 
-function renderApp() {
+function renderApp(props: Parameters<typeof App>[0] = {}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
     <QueryClientProvider client={queryClient}>
-      <App />
+      <App {...props} />
     </QueryClientProvider>,
   );
 }
@@ -192,5 +192,169 @@ describe('Portal Auth + TOTP Flow (fetch seam)', () => {
       expect(screen.getByText(/two-factor verification/i)).toBeInTheDocument();
     });
     expect(screen.queryByAltText(/totp authenticator qr code/i)).not.toBeInTheDocument();
+  });
+
+  it('silently refreshes expired accessToken on 401 and retries the request once', async () => {
+    let auditCallCount = 0;
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/health')) {
+        return new Response(
+          JSON.stringify({
+            status: 'ok',
+            service: 'mango-agent-windows',
+            version: '2.0.0',
+            tunnelActive: false,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+
+      if (url.includes('/api/audit-logs')) {
+        auditCallCount += 1;
+        const headers = init?.headers as Record<string, string> | undefined;
+        const authHeader = headers?.Authorization ?? headers?.authorization;
+        if (auditCallCount === 1) {
+          expect(authHeader).toBe('Bearer expired-access-token');
+          return new Response(
+            JSON.stringify({
+              statusCode: 401,
+              error: 'Unauthorized',
+              message: 'Access token expired',
+            }),
+            { status: 401, headers: { 'Content-Type': 'application/json' } },
+          );
+        }
+        expect(authHeader).toBe('Bearer fresh-access-token');
+        return new Response(
+          JSON.stringify({
+            items: [
+              {
+                id: 'log-refresh-1',
+                actorUserId: 'u-1',
+                actorUsername: 'alice',
+                action: 'auth.login',
+                targetType: 'AUTH',
+                targetId: 'u-1',
+                ipAddress: '127.0.0.1',
+                metadata: null,
+                createdAt: '2026-11-20T03:00:00Z',
+              },
+            ],
+            page: 1,
+            pageSize: 20,
+            total: 1,
+            totalPages: 1,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+
+      if (url.endsWith('/api/auth/refresh')) {
+        expect(init?.method).toBe('POST');
+        expect(JSON.parse(String(init?.body))).toEqual({
+          refreshToken: 'valid-refresh-token',
+        });
+        return new Response(
+          JSON.stringify({
+            accessToken: 'fresh-access-token',
+            refreshToken: 'fresh-refresh-token',
+            expiresIn: 900,
+            user: {
+              id: 'u-1',
+              username: 'alice',
+              email: 'alice@mango.internal',
+              role: RoleName.ADMIN,
+              totpEnabled: true,
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+
+      return new Response(JSON.stringify({ message: 'Not found' }), { status: 404 });
+    });
+
+    renderApp({
+      initialSession: {
+        accessToken: 'expired-access-token',
+        refreshToken: 'valid-refresh-token',
+        user: {
+          id: 'u-1',
+          username: 'alice',
+          email: 'alice@mango.internal',
+          role: RoleName.ADMIN,
+          totpEnabled: true,
+        },
+      },
+      apiBaseUrl: 'http://localhost:4000',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('auth.login')).toBeInTheDocument();
+    });
+    expect(auditCallCount).toBe(2);
+    expect(screen.getByRole('button', { name: /log out/i })).toBeInTheDocument();
+  });
+
+  it('logs out cleanly with an error message when token refresh fails on 401', async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/health')) {
+        return new Response(
+          JSON.stringify({
+            status: 'ok',
+            service: 'mango-agent-windows',
+            version: '2.0.0',
+            tunnelActive: false,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+
+      if (url.includes('/api/audit-logs')) {
+        return new Response(
+          JSON.stringify({
+            statusCode: 401,
+            error: 'Unauthorized',
+            message: 'Access token expired',
+          }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+
+      if (url.endsWith('/api/auth/refresh')) {
+        return new Response(
+          JSON.stringify({
+            statusCode: 401,
+            error: 'Unauthorized',
+            message: 'Refresh token revoked',
+          }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+
+      return new Response(JSON.stringify({ message: 'Not found' }), { status: 404 });
+    });
+
+    renderApp({
+      initialSession: {
+        accessToken: 'expired-access-token',
+        refreshToken: 'revoked-refresh-token',
+        user: {
+          id: 'u-1',
+          username: 'alice',
+          email: 'alice@mango.internal',
+          role: RoleName.ADMIN,
+          totpEnabled: true,
+        },
+      },
+      apiBaseUrl: 'http://localhost:4000',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent(/refresh token revoked/i);
   });
 });

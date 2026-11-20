@@ -1,22 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DeviceStatus, type DeviceDto } from '@mango/shared';
+import type { AuthRefreshContext } from '../api/auth';
 import { fetchDevices, revokeDevice } from '../lib/adminApi';
 
 interface DevicesTabProps {
   apiBaseUrl: string;
   accessToken: string;
+  auth?: AuthRefreshContext;
 }
 
-export function DevicesTab({ apiBaseUrl, accessToken }: DevicesTabProps) {
+export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
   const queryClient = useQueryClient();
 
   const listQuery = useQuery({
     queryKey: ['admin-devices', apiBaseUrl],
-    queryFn: () => fetchDevices(apiBaseUrl, accessToken),
+    queryFn: () => fetchDevices(apiBaseUrl, accessToken, auth),
   });
 
   const revokeMutation = useMutation({
-    mutationFn: (id: string) => revokeDevice(apiBaseUrl, accessToken, id),
+    mutationFn: (id: string) => revokeDevice(apiBaseUrl, accessToken, id, auth),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['admin-devices', apiBaseUrl] });
       void queryClient.invalidateQueries({ queryKey: ['admin-sessions', apiBaseUrl] });

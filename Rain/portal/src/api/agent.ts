@@ -7,6 +7,7 @@ import type {
   ConnectTicketResponse,
 } from '@mango/shared';
 import { getAgentBaseUrl, getApiBaseUrl } from '../lib/env';
+import { fetchWithRefresh, type AuthRefreshContext } from './auth';
 
 export const AGENT_BASE_URL = getAgentBaseUrl();
 
@@ -60,13 +61,16 @@ export async function fetchAgentStatus(pairingToken: string): Promise<AgentStatu
   return (await res.json()) as AgentStatusResponse;
 }
 
-export async function requestConnectTicket(accessToken: string): Promise<ConnectTicketResponse> {
-  const res = await fetch(`${getApiBaseUrl()}/api/vpn/ticket`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+export async function requestConnectTicket(
+  accessToken: string,
+  auth?: AuthRefreshContext,
+): Promise<ConnectTicketResponse> {
+  const res = await fetchWithRefresh(
+    `${auth?.apiBaseUrl ?? getApiBaseUrl()}/api/vpn/ticket`,
+    accessToken,
+    { method: 'POST' },
+    auth,
+  );
   if (!res.ok) {
     let message = `Failed to obtain connect ticket (${res.status})`;
     try {
