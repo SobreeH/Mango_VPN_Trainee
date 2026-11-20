@@ -9,7 +9,8 @@ MANGO VPN removes manual `.conf` file handling for corporate VPN users. Users si
 ## 📚 Documentation
 
 - **[🤖 AI Development & Project Scoping Guide (`AGENTS.md`)](AGENTS.md)**: **Mandatory reading for all AI coding assistants**: scope rules, cross-boundary collaboration, protected paths, and anti-hallucination guardrails.
-- **[🚀 Quick Start & Environment Readiness Guide (`QUICKSTART.md`)](QUICKSTART.md)**: Tool prerequisites, `.env` setup, port map, and first-time setup.
+- **[🚀 Quick Start & Environment Readiness Guide (`QUICKSTART.md`)](QUICKSTART.md)**: Tool prerequisites, `.env` setup, port map, first-time setup, interactive walkthrough, debugging, and shipping checklist.
+- **[📊 Project Progress & Ship Tracker (`PROGRESS.md`)](PROGRESS.md)**: Current v2 verification status, completed tickets (`#5`–`#13`), component readiness matrix, and remaining pre-ship action items.
 
 ---
 
@@ -213,3 +214,177 @@ The guardrail scanner is not an npm script. Run it with `node scripts/check-guar
 ## 8. Continuous Integration
 
 `.github/workflows/ci.yml` runs on pushes and pull requests to `main` and `feature/**`. It runs the guardrail scanner, `npm ci`, `npm run db:generate`, `npm run build`, `npm test`, and `go vet`, `go build`, and `go test` for the Go modules. `.github/CODEOWNERS` routes changes under `Sobree/`, `packages/shared/`, `docker-compose.yml`, `.github/`, `AGENTS.md`, and `scripts/check-guardrails.mjs` to `@SobreeH` for review.
+
+---
+
+## 9. End-to-End Walkthrough: Test, Run & Verify Locally
+
+### Step 1 — Environment & Secrets (`.env`)
+
+1. Verify local prerequisites (`Node.js >= 18`, `npm >= 9`, `Git >= 2.30`, `Docker >= 24`, `Docker Compose >= v2.20`, `Go >= 1.22` / `1.26.0` for `agent-windows`, and **WireGuard for Windows** for real tunnels):
+   ```powershell
+   npm run check:env
+   ```
+2. Copy `.env.example` to `.env` at the repository root and replace every placeholder secret:
+   ```powershell
+   copy .env.example .env
+   openssl rand -base64 32   # distinct values for JWT_SECRET, REFRESH_SECRET, DAEMON_SHARED_SECRET
+   openssl rand -hex 32      # 64 hex chars for TOTP_ENCRYPTION_KEY
+   ```
+   Also configure `POSTGRES_PASSWORD`, `DATABASE_URL` (`postgresql://mango:<password>@localhost:15432/mangovpn?schema=public`), and WireGuard server keys (`WG_PRIVATE_KEY`, `WG_SERVER_PUBLIC_KEY`).
+
+### Step 2 — Database Migration & Admin Seed
+
+1. Start PostgreSQL 16 (`mango-postgres` on host port `15432`):
+   ```powershell
+   docker compose up -d postgres
+   ```
+2. Generate the Prisma client and apply migrations (`npm run db:migrate`, or reset if upgrading from an older v1 schema):
+   ```powershell
+   npm run db:generate
+   npm run db:migrate
+   # If upgrading from a stale v1 DB:
+   # npx prisma migrate reset --force --schema=Sobree/api/prisma/schema.prisma
+   ```
+3. Seed roles (`ADMIN`, `STAFF`, `CLIENT`) and the initial admin user:
+   ```powershell
+   $env:SEED_ADMIN_USERNAME="admin"
+   $env:SEED_ADMIN_PASSWORD="<at-least-12-characters>"
+   $env:SEED_ADMIN_EMAIL="admin@mangovpn.local"   # optional
+   npm run db:seed
+   ```
+
+### Step 3 — Run Automated Verification Gates
+
+```powershell
+# 1. Security & anti-mock guardrails (must report 0 violations)
+node scripts/check-guardrails.mjs
+
+# 2. Full TypeScript monorepo build (@mango/shared -> admin -> portal -> api)
+npm run build
+
+# 3. Vitest suite (68 tests: 3 in @mango/rain-admin, 26 in @mango/portal, 39 in @mango/api)
+$env:DATABASE_URL="postgresql://mango:<password>@localhost:15432/mangovpn?schema=public"
+npm test
+
+# 4. Go vet & unit tests for both Go modules
+cd Sobree/agent-windows; go vet ./...; go test ./...; cd ../..
+cd Sobree/vpn-daemon; go vet ./...; go test ./...; cd ../..
+```
+
+### Step 4 — Interactive Walkthrough (Browser -> API -> Agent -> Gateway)
+
+- **Mode A — Portal & Admin Dev with `scripts/mock-agent.js` (Rain)**:
+  1. Terminal 1: `npm run mock:agent` (binds `127.0.0.1:47821`, prints `PairingToken`).
+  2. Terminal 2: `npm run dev:api` (Fastify API on `:4000`).
+  3. Terminal 3: `npm --workspace=@mango/portal run dev -- --port 3000` *(must run on `:3000` to match default `CORS_ORIGIN` and `AGENT_ALLOWED_ORIGINS=http://localhost:3000`)*.
+- **Mode B — Full Systems Dev with Go Windows Agent & Linux Gateway Container (Sobree)**:
+  1. Start database, gateway, and API containers (or run API with a local Compose override exposing `127.0.0.1:50051:50051`):
+     ```powershell
+     docker compose up -d postgres vpn-gateway api
+     ```
+  2. In an **Administrator** PowerShell (required for `wireguard.exe /installtunnelservice` on `mango0`), start `Sobree/agent-windows`:
+     ```powershell
+     $env:AGENT_LISTEN_ADDR="127.0.0.1:47821"
+     $env:AGENT_ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:3000"
+     $env:AGENT_PAIRING_TOKEN="<your-chosen-local-pairing-token>"
+     $env:API_URL="http://localhost:4000"
+     cd Sobree/agent-windows; go run .
+     ```
+     *(Explicitly set `AGENT_PAIRING_TOKEN` because `main.go` generates an ephemeral token without printing its value when omitted.)*
+- **In the browser (`http://localhost:3000`)**:
+  1. **Password Login & TOTP Enrollment**: Sign in with the seeded `ADMIN` user -> scan the QR code (`MFA_SETUP_REQUIRED` -> `otpauthUri`) into an authenticator app -> submit the 6-digit code (`POST /api/auth/verify-otp`).
+  2. **Pair Local Agent**: Paste the `PairingToken` into the Portal's agent token field (`X-Mango-Agent-Token`).
+  3. **Connect VPN**: Click **Connect VPN** -> Portal requests a 60s single-use ticket (`POST /api/vpn/ticket`) -> agent generates an in-memory Curve25519 keypair and calls `POST /api/vpn/connect` -> API allocates `10.13.13.x` and registers the peer + role policies in `vpn-gateway` *(requires `vpn-gateway` reachable at `VPN_DAEMON_URL`, otherwise API returns `502`)* -> agent activates `mango0`.
+  4. **Admin CRUD & Real-Time Revocation**: Manage **Users**, **Devices**, **Sessions**, **Policies**, **Audit Logs**, and **Agent Versions**. Revoking a device, disconnecting a session, or deactivating a user tears down the WireGuard peer on `vpn-gateway` first before committing the DB update.
+
+---
+
+## 10. Debugging & Troubleshooting Guide
+
+| Issue / Symptom | Root Cause | Resolution |
+| :--- | :--- | :--- |
+| **API fails immediately on startup** | `Sobree/api/src/config.ts` validates required env vars at boot | Ensure `DATABASE_URL` is set, `JWT_SECRET`, `REFRESH_SECRET`, and `DAEMON_SHARED_SECRET` are `>= 32` chars, and `TOTP_ENCRYPTION_KEY` is `64` hex chars. |
+| **Prisma errors (`type "public.RoleName" does not exist` or `table "public.connect_tickets" does not exist`)** | Target database still has legacy v1 tables/migrations | Run `npx prisma migrate reset --force --schema=Sobree/api/prisma/schema.prisma` and `npm run db:seed`. |
+| **`403 FORBIDDEN_ORIGIN` from Windows Agent / mock-agent** | Portal is running on Vite's default `:5173` instead of `:3000` | Start Vite with `-- --port 3000`, or add the origin to `AGENT_ALLOWED_ORIGINS` and `CORS_ORIGIN`. |
+| **`401 Unauthorized` from `/status`, `/connect`, `/disconnect`** | Missing or mismatched `X-Mango-Agent-Token` header | Copy the `PairingToken` printed by `npm run mock:agent`, or set `$env:AGENT_PAIRING_TOKEN` explicitly before starting `Sobree/agent-windows`. |
+| **`426` (`AGENT_VERSION_OUTDATED` / `AGENT_VERSION_INACTIVE`)** | `agent_versions` table blocks or requires a newer version for `windows-x64` | Check or activate version `2.0.0` for platform `windows-x64` in the Portal's **Agent Versions** tab. |
+| **`502 Bad Gateway` on Connect, Policy Sync, or Revocation** | `Sobree/api` cannot reach `vpn-gateway` at `VPN_DAEMON_URL` or `DAEMON_SHARED_SECRET` mismatches | Note that `docker-compose.yml` only maps `:50051` inside `mango-net` (`http://vpn-gateway:50051`). Run `api` inside Docker or verify `docker compose ps vpn-gateway` and `docker compose logs vpn-gateway`. |
+
+**Useful live inspection commands**:
+```powershell
+# Inspect WireGuard peers and nftables forward chain inside vpn-gateway
+docker exec mango-vpn-gateway wg show
+docker exec mango-vpn-gateway nft list table inet mango_vpn
+
+# Inspect local Windows Agent / mock-agent loopback API and generated tunnel config
+Invoke-RestMethod http://127.0.0.1:47821/health
+Invoke-RestMethod http://127.0.0.1:47821/status -Headers @{ "X-Mango-Agent-Token" = "<your-token>" }
+Get-Content "$env:TEMP\mango-vpn\mango0.conf"
+```
+
+---
+
+## 11. Shipping & Production Deployment Guide (Docker Compose & AWS + Windows Clients)
+
+### 11.1 Pre-Ship Repository Checklist
+
+Complete these items on a feature/fix branch before cutting a release (never commit directly to `main` per `AGENTS.md`):
+
+1. **Add `Rain/portal/nginx.conf`** (required by `Rain/portal/Dockerfile` line 25 so `docker compose build portal` succeeds):
+   ```nginx
+   server {
+     listen 3000;
+     server_name _;
+     root /usr/share/nginx/html;
+     index index.html;
+
+     location = /env-config.js {
+       add_header Cache-Control "no-store, no-cache, must-revalidate";
+       try_files $uri =404;
+     }
+
+     location / {
+       try_files $uri $uri/ /index.html;
+     }
+   }
+   ```
+2. **Align Go version in `.github/workflows/ci.yml`**: Update line 44 from `go-version: '1.23'` to `'1.26'` (matching `Sobree/agent-windows/go.mod`) and add `go test ./...` for `Sobree/agent-windows`.
+3. **Align `.env.example` Windows Agent comments**: `.env.example` lines 60–63 list `MANGO_AGENT_*` / `MANGO_API_URL`, whereas `Sobree/agent-windows/main.go` reads `AGENT_LISTEN_ADDR`, `AGENT_ALLOWED_ORIGINS`, `AGENT_PAIRING_TOKEN`, and `API_URL`.
+
+### 11.2 Local Full-Stack Docker Compose Verification
+
+```powershell
+npm run docker:up
+docker compose ps
+$env:DATABASE_URL="postgresql://mango:<password>@localhost:15432/mangovpn?schema=public"
+$env:SEED_ADMIN_USERNAME="admin"
+$env:SEED_ADMIN_PASSWORD="<at-least-12-characters>"
+npm run db:seed
+```
+- `mango-api` runs `prisma migrate deploy` automatically before starting `Sobree/api/dist/server.js`.
+- `mango-portal` runs `Rain/portal/docker-entrypoint.sh` at container startup to inject `VITE_API_URL` and `VITE_AGENT_URL` into `/usr/share/nginx/html/env-config.js` (`window.__MANGO_ENV__`).
+
+### 11.3 Remote Linux Gateway & Control Plane Deployment (AWS EC2 — Profile B)
+
+1. **Firewall / Security Group**: Allow **UDP `51820`** (WireGuard) and **HTTPS `443`** (reverse proxy / ALB terminating TLS and forwarding to Portal `:3000` and API `:4000`). Keep `vpn-gateway` (`:50051`) and `postgres` (`:5432`) private inside `mango-net`.
+2. **Production `.env`**: Set `NODE_ENV=production`, strong random secrets, generated `WG_PRIVATE_KEY` + `WG_SERVER_PUBLIC_KEY`, `WG_SERVER_ENDPOINT=<AWS_PUBLIC_IP_OR_DNS>:51820`, `CORS_ORIGIN=https://vpn.example.com`, and `VITE_API_URL=https://api.vpn.example.com`.
+3. **Deploy & seed**: Run `docker compose up -d --build` and run `npm run db:seed` for the initial `ADMIN` account.
+
+### 11.4 Building, Registering & Rolling Out the Windows Service Agent (`Sobree/agent-windows`)
+
+1. **Build the Windows executable and compute its SHA-256 checksum**:
+   ```powershell
+   cd Sobree/agent-windows
+   $env:GOOS="windows"; $env:GOARCH="amd64"
+   go build -trimpath -ldflags="-s -w" -o mango-agent-windows.exe .
+   Get-FileHash .\mango-agent-windows.exe -Algorithm SHA256
+   ```
+2. **Register in Admin Portal**: Add the release under **Agent Versions** (`version`: `2.0.0`, `platform`: `windows-x64`, `sha256Checksum`, `downloadUrl`, `isActive: true`).
+3. **Install on client Windows VMs**: Ensure **WireGuard for Windows** is installed, install/start the service with `AGENT_LISTEN_ADDR=127.0.0.1:47821`, `AGENT_ALLOWED_ORIGINS=https://vpn.example.com`, `AGENT_PAIRING_TOKEN=<per-machine-token>`, and `API_URL=https://api.vpn.example.com`.
+
+### 11.5 Final Production Smoke & Zero-Trust Audit
+
+- Verify login + TOTP enrollment + single-use Connect Ticket redemption (`POST /api/vpn/ticket` -> `POST /api/vpn/connect`).
+- Verify `wg show` displays the peer and `nft list table inet mango_vpn` enforces the role's `ALLOW`/`DENY` rules with default drop.
+- Verify real-time teardown by triggering Device Revoke, Session Disconnect, and User Deactivate from the Admin Console and confirming immediate peer removal on `wg0` and `mango0`.
