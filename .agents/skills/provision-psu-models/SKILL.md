@@ -5,7 +5,7 @@ description: Provision OpenCode CLI worker runs on psu-dot-blue models matched b
 
 # Provisioning `psu-dot-blue` Models via OpenCode
 
-Provision background or parallel worker runs through the `opencode` CLI against the university `psu-dot-blue` provider (`https://ai.psu.blue/v1`).
+Provision verbose worker runs through the `opencode` CLI against the university `psu-dot-blue` provider (`https://ai.psu.blue/v1`), opening a visible new terminal window on Windows by default so progress, thinking blocks, and logs stream live.
 
 ## Key Rotation & Quota Invariants (5 Keys, Reset 00:01 GMT+7)
 
@@ -46,19 +46,29 @@ Select the model by task complexity first, preferring frontier `1×`–`3×` mod
 - **Completion criterion**: The prompt names the target files, constraints, and the exact verification command that defines done.
 
 ### 3. Dispatch the OpenCode Run
-Run via `opencode run` against the shared background service (never `--standalone` unless debugging the server itself):
+Dispatch via [scripts/dispatch-opencode.ps1](scripts/dispatch-opencode.ps1) so every run opens a new visible terminal window (`wt.exe` → `pwsh` / `powershell`), streams `--thinking --print-logs --log-level info` live while teeing output to `%TEMP%\opencode-dispatch\...\output.log`, keeps the window open (`-KeepOpen:$true`) for inspection, and leaves `--standalone` off so the shared service keeps its 5-key rotation `avoid` map intact:
 
-- **Single / Read-only / Sequential Run**:
+- **Single / Read-only / Sequential Run** (opens a new verbose terminal and waits for completion):
   ```powershell
-  opencode run -m psu-dot-blue/<model> --auto --archived --title "<short-task-title>" "<pointer-based prompt>"
+  .\.agents\skills\provision-psu-models\scripts\dispatch-opencode.ps1 `
+    -Model "psu-dot-blue/<model>" `
+    -Title "<short-task-title>" `
+    -Prompt "<pointer-based prompt>"
   ```
-- **Parallel Modifying Run (Isolated Git Worktree)**:
+- **Parallel Modifying Runs (Isolated Git Worktrees)** (`-Worktree` + `-NoWait` launches multiple visible terminals concurrently; inspect each returned `exitCodeFile` and `logFile` afterward):
   ```powershell
-  opencode run -m psu-dot-blue/<model> --worktree <task-slug> --auto --archived --title "<short-task-title>" "<pointer-based prompt>"
+  .\.agents\skills\provision-psu-models\scripts\dispatch-opencode.ps1 `
+    -Model "psu-dot-blue/<model>" `
+    -Worktree "<task-slug>" `
+    -Title "<short-task-title>" `
+    -Prompt "<pointer-based prompt>" `
+    -NoWait
   ```
-- **Multi-turn Continuation** (when a worker needs a follow-up instruction in the same context):
-  Pass `--session <session-id>` (or `--format json` on initial run to capture structured output/session metadata).
-- **Completion criterion**: The `opencode run` process exits with code `0` and produces its final report or diff.
+- **Multi-turn Continuation** (follow-up in the same worker session):
+  Pass `-Session "<session-id>"` (or read long prompts from a file with `-PromptFile <path>` and attach extra context with `-AttachFile <path>`).
+- **Headless / CI Fallback** (when no interactive desktop session is available):
+  Pass `-NoWindow` to run `--thinking --print-logs --log-level info` in the current shell while still logging to `%TEMP%\opencode-dispatch\...\output.log`.
+- **Completion criterion**: The worker writes `0` to `exit.code` (or exits `0` in `-NoWindow` mode) and produces its final report or diff.
 
 ### 4. Verify & Integrate
 - Inspect `git status -s` and `git diff` (in the main tree or the worker's worktree).
