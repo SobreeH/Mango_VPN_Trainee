@@ -240,7 +240,7 @@ if (-not [string]::IsNullOrWhiteSpace(`$attachFile)) {
 try {
     `$logWriter = New-Object System.IO.StreamWriter(`$logFile, `$false, `$utf8NoBom)
     `$logWriter.AutoFlush = `$true
-    & opencode @ocArgs 2>&1 |
+    $null | & opencode @ocArgs 2>&1 |
         ForEach-Object {
             `$line = if (`$_ -is [System.Management.Automation.ErrorRecord]) {
                 `$_.ToString()
