@@ -34,6 +34,7 @@ MANGO VPN is a **Zero-Trust Role-Based WireGuard Remote Access & Policy Manageme
 | [`Sobree/agent-windows/`](Sobree/agent-windows/) | Sobree ⚡ | Go (`golang.org/x/sys/windows/svc`) | Local Windows Service listening on `127.0.0.1:47821` with Chromium Private Network Access (PNA), in-memory Curve25519 keygen, WireGuard tunnel activation |
 | [`Sobree/vpn-daemon/`](Sobree/vpn-daemon/) | Sobree ⚡ | Go (Linux daemon) | Linux WireGuard (`wg set`) & `nftables` role-policy enforcement daemon, bearer-authenticated HTTP API on `:50051` |
 | [`scripts/mock-agent.js`](scripts/mock-agent.js) | Shared (Dev Tool) | Node.js | Local loopback simulator (`127.0.0.1:47821`) mirroring `Sobree/agent-windows` for frontend testing without Windows Service / kernel WireGuard |
+| [`scripts/mock-daemon.js`](scripts/mock-daemon.js) | Shared (Dev Tool) | Node.js | Dev-only loopback simulator (`127.0.0.1:50051`) mirroring `Sobree/vpn-daemon` without WireGuard / nftables enforcement |
 
 ### What Is In-Scope vs. Out-of-Scope
 - **IN-SCOPE**:
@@ -84,7 +85,7 @@ The following paths are **security-critical** and require explicit human confirm
 
 ## 4. Strict AI Anti-Hallucination & Truthfulness Guardrails
 
-All AI assistants must obey these 5 non-negotiable engineering rules:
+All AI assistants must obey these 6 non-negotiable engineering rules:
 
 ### Rule 1: No Fake Success or Silent Mock Fallbacks in Production Code
 - **NEVER** catch a failed API or Agent HTTP request and display a fake "Success!" toast or append fabricated records (such as `id: u-${Date.now()}`) to UI state.
@@ -107,6 +108,9 @@ All AI assistants must obey these 5 non-negotiable engineering rules:
 
 ### Rule 5: Keep `mock-agent.js` Synchronized with `Sobree/agent-windows`
 - Whenever the loopback contract on `127.0.0.1:47821` (`/health`, `/status`, `/connect`, `/disconnect`, PNA/CORS headers, or token validation) is changed in [`Sobree/agent-windows/main.go`](Sobree/agent-windows/main.go), the AI **must** update [`scripts/mock-agent.js`](scripts/mock-agent.js) in the same branch so frontend testing stays accurate.
+
+### Rule 6: Keep `mock-daemon.js` Synchronized with `Sobree/vpn-daemon`
+- Whenever the daemon HTTP contract (routes, authentication, validation, or success/error JSON) in [`Sobree/vpn-daemon/main.go`](Sobree/vpn-daemon/main.go) changes, the AI **must** update [`scripts/mock-daemon.js`](scripts/mock-daemon.js) in the same branch. The mock is dev-only and loopback-only; it must never be referenced by `docker-compose.yml` or Dockerfiles, or be claimed to provide WireGuard/nftables enforcement.
 
 ---
 

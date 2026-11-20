@@ -23,7 +23,7 @@
 | **VS Code** *(ทางเลือก)* | **ทั้งสองคน** | ล่าสุด | ล่าสุด | โปรแกรมเขียนโค้ด (Editor) | [code.visualstudio.com](https://code.visualstudio.com/) |
 
 > [!NOTE]
-> **สำหรับ Rain (Web Portal และ Admin)**: คุณต้องการเพียงแค่ **Node.js และ Git** ก็สามารถรัน Web Portal, API และระบบ Admin CRUD ได้แล้ว โดยให้ใช้สคริปต์จำลอง Agent บน Loopback ผ่าน `scripts/mock-agent.js` แทน Windows Agent จริง ทำให้คุณไม่จำเป็นต้องลง Go, Docker หรือ WireGuard สำหรับการพัฒนาหน้าบ้าน (UI) อย่างไรก็ตาม ฐานข้อมูล PostgreSQL ยังจำเป็นต้องมีอยู่ ดังนั้นคุณสามารถรันผ่าน Docker หรือชี้ค่า `DATABASE_URL` ไปยัง PostgreSQL ที่คุณติดตั้งไว้เองก็ได้
+> **สำหรับ Rain (Web Portal และ Admin, ไม่ใช้ Docker)**: คุณต้องการเพียงแค่ **Node.js และ Git** โดย**ไม่ต้องใช้ Docker, Go หรือ WireGuard** ก็รัน Web Portal, API และระบบ Admin CRUD ได้ ขั้นตอนนี้ใช้เครื่องมือในเครื่องสามตัว: `npm run db:start` รัน PostgreSQL 16 แบบฝังตัว (ข้อมูลอยู่ที่ `.local/postgres`), `npm run mock:daemon` จำลอง Gateway Daemon พอร์ต `:50051` (`[DEV MOCK DAEMON – no wg/nftables enforcement]` ใช้สำหรับการพัฒนาเท่านั้น) และ `npm run mock:agent` จำลอง Windows Agent พอร์ต `:47821` (`scripts/mock-agent.js`) หากต้องการรันระบบเต็มรูปแบบด้วย Docker ก็ยังใช้ Docker Desktop ได้
 
 ---
 
@@ -34,6 +34,12 @@ npm run check:env
 ```
 
 คำสั่งนี้จะรันสคริปต์ `scripts/check-environment.ps1` ซึ่งจะรายงานว่า Node.js, npm, Git, Docker, Docker Compose และ Go ได้รับการติดตั้งในเครื่องแล้วหรือไม่ และมีเวอร์ชันตรงตามเกณฑ์ขั้นต่ำหรือไม่
+
+สำหรับการตั้งค่าของ Rain ที่ไม่ใช้ Docker ให้รันการตรวจสอบตามบทบาทแทน สคริปต์จะกำหนดให้ Docker, Docker Compose, Docker Desktop และ Go เป็น `OPTIONAL`:
+
+```powershell
+npm run check:env -- -Role Rain
+```
 
 ---
 
@@ -80,7 +86,7 @@ copy .env.example .env
 
 | ตัวแปร (Variable) | ส่วนที่ใช้งาน | คำอธิบายและข้อกำหนด |
 | :--- | :--- | :--- |
-| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT` | Docker Compose `postgres` | พอร์ตบนเครื่อง Host ค่าเริ่มต้นคือ `15432` |
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT` | Docker Compose `postgres` **และ** `npm run db:start` (PostgreSQL 16 แบบฝังตัว ข้อมูลอยู่ที่ `.local/postgres`) | พอร์ตบนเครื่อง Host/Loopback ค่าเริ่มต้นคือ `15432` `npm run db:start` จะสร้างทั้ง `POSTGRES_DB` และ `mangovpn_v2_test` ให้อัตโนมัติ |
 | `DATABASE_URL` | API และ Prisma CLI บนเครื่อง Host | ต้องชี้ไปยังฐานข้อมูลและพอร์ตเดียวกันกับข้างต้น |
 | `JWT_SECRET`, `REFRESH_SECRET` | API | บังคับต้องมี ความยาวอย่างน้อย 32 ตัวอักษร (ระบบ API จะปฏิเสธการเริ่มทำงานทันทีหากไม่มีหรือสั้นเกินไป) |
 | `TOTP_ENCRYPTION_KEY` | API | บังคับต้องมี และต้องเป็นเลขฐานสิบหก (Hex) ความยาวตรง 64 ตัวอักษรพอดี |
@@ -121,10 +127,10 @@ openssl rand -hex 32      # สำหรับ TOTP_ENCRYPTION_KEY (จะได
 | :--- | :--- | :--- | :--- |
 | **3000** | TCP (HTTP) | Web Portal | คอนเทนเนอร์ของ Portal หรือเมื่อรัน Vite dev ในเครื่อง ให้ระบุ `--port 3000` |
 | **4000** | TCP (HTTP) | Control Plane API (Fastify) | ควบคุมโดยตัวแปร `PORT` |
-| **5432** | TCP (PostgreSQL) | PostgreSQL 16 ใน Docker | พอร์ตในคอนเทนเนอร์ ส่วนพอร์ตบนเครื่อง Host คือ `POSTGRES_PORT` (ค่าเริ่มต้น `15432`) |
+| **15432** / **5432** | TCP (PostgreSQL) | PostgreSQL 16 บน `127.0.0.1:15432` | เริ่มด้วย `npm run db:start` (แบบฝังตัว ไม่ใช้ Docker) หรือคอนเทนเนอร์ Docker `postgres` (พอร์ตในคอนเทนเนอร์ `5432` พอร์ตบนเครื่อง Host คือ `POSTGRES_PORT` ค่าเริ่มต้น `15432`) |
 | **47821** | TCP (HTTP, loopback) | Windows Agent หรือ `mock-agent.js` | ผูกติดกับที่อยู่ `127.0.0.1` เท่านั้น |
 | **51820** | UDP (WireGuard) | VPN gateway | ควบคุมโดยตัวแปร `WG_LISTEN_PORT` |
-| **50051** | TCP (HTTP) | VPN gateway daemon API | HTTP ยืนยันตัวตนด้วย Bearer Token ไม่ใช่ Unix Socket |
+| **50051** | TCP (HTTP) | VPN gateway daemon API | HTTP ยืนยันตัวตนด้วย Bearer Token ทำงานที่ `127.0.0.1:50051` เริ่มโดย `npm run mock:daemon` (ตัวจำลองสำหรับการพัฒนาเท่านั้น ไม่บังคับใช้ `wg`/`nftables`) หรือ Docker `vpn-gateway` |
 
 วิธีตรวจสอบว่าพอร์ตนั้นๆ กำลังถูกใช้งานอยู่หรือไม่บน Windows:
 ```powershell
@@ -148,27 +154,37 @@ npm run build
 copy .env.example .env
 ```
 
-### ขั้นตอนการทำงานสำหรับ Rain (Portal และ Admin)
+### ขั้นตอนการทำงานสำหรับ Rain (Portal และ Admin, ไม่ใช้ Docker)
+
+Rain **ไม่ต้องใช้ Docker** รันคำสั่งเหล่านี้จาก Root ของโปรเจกต์ แยกตาม Terminal:
 
 ```powershell
-docker compose up -d postgres        # รัน Database (พอร์ตบน Host คือ 15432)
+# Terminal 1: PostgreSQL 16 แบบฝังตัวบน 127.0.0.1:15432 (สร้าง POSTGRES_DB และ mangovpn_v2_test ให้ ข้อมูลอยู่ที่ .local/postgres)
+npm run db:start                     # กด Ctrl+C เพื่อหยุดอย่างถูกต้อง และรัน npm run db:reset-local เฉพาะหลังหยุดแล้วเท่านั้น
+
+# Terminal ตั้งค่า (ขณะที่ Terminal 1 ยังทำงานอยู่)
 npm run db:generate
 npm run db:migrate
 npm run db:seed                      # ต้องกำหนดตัวแปร SEED_ADMIN_* ใน Environment ก่อน
-npm run mock:agent                   # Terminal 1: จะแสดง PairingToken เมื่อเริ่มทำงาน
-npm run dev:api                      # Terminal 2: เริ่ม API บนพอร์ต :4000
-npm run dev:portal                   # Terminal 3: เริ่มเซิร์ฟเวอร์ Dev ของ Portal
+
+# Terminal 2: ตัวจำลอง Gateway Daemon บน 127.0.0.1:50051 (ไม่บังคับใช้ wg/nftables)
+npm run mock:daemon
+
+# Terminal 3: Mock Windows Agent (จะแสดง PairingToken เมื่อเริ่มทำงาน)
+npm run mock:agent
+
+# Terminal 4: API บนพอร์ต :4000
+npm run dev:api
+
+# Terminal 5: เซิร์ฟเวอร์ Dev ของ Portal บนพอร์ต :3000
+npm run dev:portal
 ```
 
-ค่าเริ่มต้น `CORS_ORIGIN` ของ API และ Allowed Origin ของ Agent จะตั้งไว้ที่ `http://localhost:3000` แต่ค่าตั้งต้นของ Vite จะเป็นพอร์ต `5173` ดังนั้นให้เริ่มเซิร์ฟเวอร์ Dev ด้วยพอร์ต 3000:
-
-```powershell
-npm --workspace=@mango/portal run dev -- --port 3000
-```
+ค่าเริ่มต้น `CORS_ORIGIN` ของ API และ Allowed Origin ของ Agent ตั้งไว้ที่ `http://localhost:3000` และ `Rain/portal/vite.config.ts` ล็อกพอร์ตของ Vite ไว้ที่ `3000` ให้โดยอัตโนมัติ ดังนั้น `npm run dev:portal` ใช้งานได้ทันทีโดยไม่ต้องใส่ Flag เพิ่ม
 
 นำค่า PairingToken ที่แสดงบน Terminal ของ Mock Agent ไปวางในช่อง "Paste X-Mango-Agent-Token" บนหน้าเว็บ เพื่อให้หน้าเว็บส่ง Header `X-Mango-Agent-Token` ไปยัง Agent ได้อย่างถูกต้อง
 
-### ขั้นตอนการทำงานสำหรับ Sobree (API, Agent และ Gateway)
+### ขั้นตอนการทำงานสำหรับ Sobree (API, Agent และ Gateway, ต้องใช้ Docker Desktop)
 
 ```powershell
 docker compose up -d postgres
@@ -194,18 +210,22 @@ npm run docker:logs      # ดู Log
 npm run docker:down      # สั่งปิดระบบ
 ```
 
-> [!WARNING]
-> ปัจจุบัน `Rain/portal/Dockerfile` มีการสั่ง Copy ไฟล์ `Rain/portal/nginx.conf` แต่ยังไม่มีไฟล์นี้ในคลังโค้ด ส่งผลให้ Image ของ Portal จะยังไม่สามารถ Build ได้จนกว่าจะเพิ่มไฟล์ดังกล่าว โปรดติดตามประเด็นนี้ก่อนจะใช้งานเซอร์วิส `portal` บน Docker
-
 ---
 
 ## 7. การตรวจสอบความเรียบร้อยของระบบ (Verify the Setup)
 
 ```powershell
 npm run build
-npm test
 node scripts/check-guardrails.mjs
+
+# ทดสอบแบบไม่ใช้ Docker: ต้องรัน npm run db:start ค้างไว้ก่อน แล้ว Migrate ฐานข้อมูลทดสอบ
+$env:DATABASE_URL="postgresql://mango:<password>@127.0.0.1:15432/mangovpn_v2_test?schema=public"
+npx prisma migrate deploy --schema=Sobree/api/prisma/schema.prisma
+npm test
+Remove-Item Env:DATABASE_URL
 ```
+
+แทนค่า `<password>` ด้วย `POSTGRES_PASSWORD` จาก `.env` และให้เว้น `DATABASE_URL` ไว้ว่างในเทอร์มินัลที่รัน `npm run dev:api` เพื่อให้ API ใช้ฐานข้อมูล `mangovpn` จาก `.env`
 
 หากมีการแก้ไขโค้ดภาษา Go ให้รัน Vet และ Test ในแต่ละโมดูล:
 ```powershell

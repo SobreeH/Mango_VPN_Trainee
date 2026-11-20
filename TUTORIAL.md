@@ -27,17 +27,17 @@ flowchart LR
 |---|---|---|
 | Web Portal | `http://localhost:3000` | Login, TOTP enrollment, VPN controls, and Admin Governance UI. |
 | Control Plane API | `http://localhost:4000` | Password/TOTP auth, short-lived connect tickets, IP allocation, and gateway coordination. |
-| PostgreSQL 16 | `localhost:15432` (container port `5432`) | Stores users, sessions, policies, devices, and audit history. |
+| PostgreSQL 16 | `localhost:15432` (container port `5432`) | Stores users, sessions, policies, devices, and audit history. Track A runs it embedded with `npm run db:start` (data in `.local/postgres`); Tracks B/C run the Docker container `mango-postgres`. |
 | Local Windows Agent | `http://127.0.0.1:47821` | `scripts/mock-agent.js` for UI demos or the Go `agent-windows` for real Windows WireGuard. |
-| Linux VPN Gateway Daemon | `http://127.0.0.1:50051` (HTTP); `51820/udp` (WireGuard) | Docker service `mango-vpn-gateway` programs `wg0` and role-based `nftables` rules. |
+| Linux VPN Gateway Daemon | `http://127.0.0.1:50051` (HTTP); `51820/udp` (WireGuard) | Programs `wg0` and role-based `nftables` rules. Track A simulates it with `npm run mock:daemon` (`scripts/mock-daemon.js`, dev-only, no `wg`/`nftables` enforcement). Tracks B/C run the Docker service `mango-vpn-gateway`. |
 
 ### Which Track Should I Use?
 
 | Track | Choose this if… | What it proves | What you need |
 |---|---|---|---|
-| **Track A (Rain — UI & Admin Dev)** | You are learning the portal and Admin CRUD, or do not want to configure a Windows tunnel yet. | Login/MFA, API, Admin CRUD, gateway peer/policy requests, and simulated agent UI state. The mock does **not** activate a real WireGuard tunnel. | Node.js, Git, Docker Desktop for PostgreSQL and gateway, and an authenticator app. |
-| **Track B (Sobree — Full Go Agent & Real WireGuard Tunnel)** | You want the real Go agent to install the `mango0` WireGuard tunnel on Windows. | Real ticket flow, agent key generation, Windows tunnel activation, and Docker Linux gateway peer/policy programming. | Track A tools plus Go 1.26+, WireGuard for Windows, and an Administrator PowerShell window. |
-| **Track C (One-Command Full Docker Stack Demo)** | You want the API, portal, database, and gateway containers started together. | The four-container stack and a native-on-Windows agent connected to it. | Track A tools plus Docker Desktop. Start `mock-agent.js` or the Go agent on Windows; a browser in Docker cannot reach its own host's loopback agent. |
+| **Track A (Rain — UI & Admin Dev, Docker-free)** | You are learning the portal and Admin CRUD, or do not want to configure a Windows tunnel yet. | Login/MFA, API, Admin CRUD, gateway peer/policy requests, and simulated agent UI state. Neither `mock:daemon` nor `mock:agent` activates a real WireGuard tunnel or `nftables` enforcement. | Node.js, Git, and an authenticator app. **No Docker Desktop required.** Uses `npm run db:start`, `npm run mock:daemon`, and `npm run mock:agent`. |
+| **Track B (Sobree — Full Go Agent & Real WireGuard Tunnel)** | You want the real Go agent to install the `mango0` WireGuard tunnel on Windows. | Real ticket flow, agent key generation, Windows tunnel activation, and Docker Linux gateway peer/policy programming. | Node.js, Git, **Docker Desktop** (required for PostgreSQL and the gateway), Go 1.26+, WireGuard for Windows, and an Administrator PowerShell window. |
+| **Track C (One-Command Full Docker Stack Demo)** | You want the API, portal, database, and gateway containers started together. | The four-container stack and a native-on-Windows agent connected to it. | Node.js, Git, **Docker Desktop** (required), and an authenticator app. Start `mock-agent.js` or the Go agent on Windows; a browser in Docker cannot reach its own host's loopback agent. |
 
 ## Phase 1: Check Your Computer Is Ready (5 Minutes)
 
@@ -48,11 +48,11 @@ flowchart LR
 | Node.js `>=18` (recommended: `20 LTS`) | Required | Required | Runs the API, portal, build, and tests. |
 | npm `>=9` | Required | Required | Installs the monorepo workspaces. npm comes with Node.js. |
 | Git `>=2.30` | Required | Required | Gets and manages the project files. |
-| Docker Desktop with Docker Compose v2 | Required for this tutorial's PostgreSQL and gateway | Required | Runs PostgreSQL and the Linux gateway on Windows. |
+| Docker Desktop with Docker Compose v2 | Not needed (uses `npm run db:start` & `npm run mock:daemon`) | Required | Runs PostgreSQL and the Linux gateway on Windows for Track B/C. |
 | Go `>=1.26` | Not needed for mock agent | Required for Windows Go Agent | The Windows agent module requires Go 1.26. The Linux daemon module itself lists Go 1.22. |
 | WireGuard for Windows | Not needed for mock agent | Required for real tunnel | Provides `wireguard.exe`, which installs/removes tunnel `mango0`. |
 
-Rain can use the Node mock instead of the Go agent, but this tutorial still uses Docker for the database and gateway so API policy/revocation calls have a real daemon endpoint to reach.
+Track A (Rain) needs **zero Docker**. `npm run db:start` runs embedded PostgreSQL 16, and `npm run mock:daemon` simulates the gateway daemon API on `127.0.0.1:50051`, so policy and revocation calls have an endpoint to reach. This simulator is dev-only and does not program WireGuard or `nftables`. Tracks B and C still use Docker Desktop for the real gateway.
 
 ### 1.2 Run the project readiness check
 
@@ -63,6 +63,12 @@ cd E:\Trainee\Mango_VPN_Trainee
 npm run check:env
 ```
 
+Rain (Track A, Docker-free) should run the role-specific check instead. It marks Docker CLI, Docker Compose, Docker Desktop, and Go as `OPTIONAL`:
+
+```powershell
+npm run check:env -- -Role Rain
+```
+
 **What you should see:** A table with tool status and versions, followed by a Rain readiness message if Node.js and npm are available. The script detects whether commands are on `PATH`; it does not install tools, verify every minimum version, or check that WireGuard for Windows is installed. For Track B, separately run:
 
 ```powershell
@@ -71,7 +77,9 @@ go version
 
 **What you should see:** A Go version of `go1.26` or newer for the Windows agent. If PowerShell says a command is not recognized, install that tool and open a new PowerShell window so the updated `PATH` is loaded.
 
-### 1.3 Check Docker Desktop is actually running
+### 1.3 Check Docker Desktop is actually running (Track B and Track C only)
+
+Track A (Rain) can skip this section and go directly to Phase 2. The `docker info` check is only needed for Track B and Track C.
 
 ```powershell
 docker info
@@ -153,7 +161,7 @@ if (Test-Path -LiteralPath .env) {
 
 | Variable(s) | Purpose |
 |---|---|
-| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT` | Configure the PostgreSQL container and its host port. The supplied template uses user `mango`, database `mangovpn`, and host port `15432`. |
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT` | Configure PostgreSQL for **both** the Docker `postgres` container (Tracks B/C) and the embedded PostgreSQL 16 started by `npm run db:start` (Track A, data in `.local/postgres`). The supplied template uses user `mango`, database `mangovpn`, and host port `15432`. |
 | `DATABASE_URL` | Tells Prisma and a host-run API how to connect to that database. Keep its username, password, port, and database aligned with the PostgreSQL values. |
 | `JWT_SECRET`, `REFRESH_SECRET` | Sign/secure API access and refresh sessions. Each must be at least 32 characters; the script makes independent random secrets. |
 | `TOTP_ENCRYPTION_KEY` | Encrypts TOTP secret data; must be exactly 64 hexadecimal characters (32 bytes). |
@@ -167,22 +175,48 @@ if (Test-Path -LiteralPath .env) {
 
 Choose **one** track. In this tutorial, every terminal command should run from the repository root unless a step explicitly says to change folders.
 
-### 🌧️ Track A: Rain's Workflow (Web Portal + Admin CRUD + Mock Agent Simulator)
+### 🌧️ Track A: Rain's Workflow (Web Portal + Admin CRUD + Mock Agent Simulator, Docker-Free)
 
-Track A is ideal for learning the UI and CRUD screens. We start **both** PostgreSQL and `vpn-gateway` with `docker compose up -d postgres vpn-gateway`, not just the database. `POST /api/vpn/connect`, creating Policies, and revoking Devices/Sessions call `vpn-gateway` at `127.0.0.1:50051`. Starting both avoids `502 Bad Gateway` responses from an unavailable daemon. The mock agent simulates the Windows agent's loopback contract and connected display; it does **not** install a WireGuard tunnel or prove real network traffic.
+Track A needs **zero Docker**. It uses three local tools instead:
 
-#### Step A1: Start the database and gateway; prepare the database
+- **Embedded PostgreSQL 16** via `npm run db:start`, listening on `127.0.0.1:15432` and storing its data in `.local/postgres`.
+- **Mock VPN Gateway Daemon** via `npm run mock:daemon`, a dev-only simulator of the gateway API on `http://127.0.0.1:50051`. It prints `[DEV MOCK DAEMON – no wg/nftables enforcement]`.
+- **Mock Local Agent** via `npm run mock:agent`, on `http://127.0.0.1:47821`.
+
+`POST /api/vpn/connect`, creating Policies, and revoking Devices/Sessions call the gateway at `127.0.0.1:50051`. Running `npm run mock:daemon` avoids `502 Bad Gateway` responses without Docker. It is **dev-only**: it does not program WireGuard or `nftables`, so it proves the API and UI flow, not real network enforcement. The mock agent likewise simulates the Windows agent's loopback contract and connected display; it does **not** install a WireGuard tunnel or prove real network traffic.
+
+#### Step A1: Start embedded PostgreSQL and prepare the database
+
+Open **Terminal 1** and start the embedded database. Leave it running:
 
 ```powershell
-docker compose up -d postgres vpn-gateway
-docker compose ps
+cd E:\Trainee\Mango_VPN_Trainee
+npm run db:start
+```
+
+Press **Ctrl+C** in this terminal to stop PostgreSQL cleanly. Only after it has stopped, `npm run db:reset-local` wipes `.local/postgres`, which deletes all local database data.
+
+Then open a **separate** PowerShell window (the setup terminal) and run:
+
+```powershell
+cd E:\Trainee\Mango_VPN_Trainee
 npm run db:generate
 npm run db:migrate
 ```
 
-`db:generate` creates the Prisma client from the current schema. `db:migrate` applies the checked-in development migrations to PostgreSQL.
+`db:generate` creates the Prisma client from the current schema. `db:migrate` applies the checked-in development migrations to the `mangovpn` database.
 
-**What you should see:** `mango-postgres` and `mango-vpn-gateway` are running; after their health checks finish they should show `healthy`. Prisma generation and migration complete without errors. If a container is still starting, wait a few seconds and run `docker compose ps` again.
+**What you should see:** Terminal 1 prints `PostgreSQL running at 127.0.0.1:15432` and creates both `mangovpn` (from `POSTGRES_DB`) and `mangovpn_v2_test`. Prisma generation and migration complete without errors in the setup terminal.
+
+> **Test database (needed before `npm test`):** `npm test` uses `mangovpn_v2_test`. Migrate it once in the setup terminal, replacing `<password>` with `POSTGRES_PASSWORD` from `.env`:
+>
+> ```powershell
+> $env:DATABASE_URL="postgresql://mango:<password>@127.0.0.1:15432/mangovpn_v2_test?schema=public"
+> npx prisma migrate deploy --schema=Sobree/api/prisma/schema.prisma
+> Remove-Item Env:DATABASE_URL
+> ```
+>
+> Keep `DATABASE_URL` **unset** in the terminals that run `npm run dev:api`, so the API uses the `mangovpn` database from `.env`. If you exported it in this window, `Remove-Item Env:DATABASE_URL` clears it, or open a fresh PowerShell window.
 
 #### Step A2: Seed your first ADMIN account
 
@@ -199,11 +233,24 @@ For example, a valid local test password could be `StaffTestPass#2026`; do not u
 
 **What you should see:** A message similar to `Seeded roles [ADMIN, STAFF, CLIENT] and ADMIN user "admin".` PowerShell should return to the prompt after the password environment variable is removed.
 
-#### Step A3: Open three PowerShell terminals
+#### Step A3: Open five PowerShell terminals
 
-Keep all three terminals open while using the portal. Open each one in `E:\Trainee\Mango_VPN_Trainee`.
+Keep all five terminals open while using the portal. Open each one in `E:\Trainee\Mango_VPN_Trainee`.
 
-**Terminal 1 — mock local agent**
+**Terminal 1 — Embedded PostgreSQL 16 (already running from Step A1)**
+
+Leave the `npm run db:start` window open. Do not close it while the API or tests are using the database.
+
+**Terminal 2 — Mock VPN Gateway Daemon (dev-only)**
+
+```powershell
+cd E:\Trainee\Mango_VPN_Trainee
+npm run mock:daemon
+```
+
+**What you should see:** `[DEV MOCK DAEMON – no wg/nftables enforcement]`, followed by `This simulator does not program WireGuard or nftables.` and `Listening on http://127.0.0.1:50051`. The simulator reads `DAEMON_SHARED_SECRET` from `.env` and refuses to start if it is missing or shorter than 32 characters. It keeps peers and policies in memory only.
+
+**Terminal 3 — mock local agent**
 
 ```powershell
 cd E:\Trainee\Mango_VPN_Trainee
@@ -212,7 +259,7 @@ npm run mock:agent
 
 **What you should see:** A startup box headed `MANGO VPN - Local Windows Agent Simulator (v2)`, with address `http://127.0.0.1:47821`. Find `PairingToken:` and copy the complete token value. Leave this terminal running. The mock chooses a fresh token each time it starts unless you configure one yourself.
 
-**Terminal 2 — Control Plane API**
+**Terminal 4 — Control Plane API**
 
 ```powershell
 cd E:\Trainee\Mango_VPN_Trainee
@@ -221,7 +268,7 @@ npm run dev:api
 
 **What you should see:** Fastify's startup log reports that it is listening on `:4000` (usually `http://127.0.0.1:4000`). Leave it running. A missing/invalid secret or unavailable database prevents a successful start; check `.env` and the container status if so.
 
-**Terminal 3 — Web Portal**
+**Terminal 5 — Web Portal**
 
 ```powershell
 cd E:\Trainee\Mango_VPN_Trainee
@@ -472,9 +519,9 @@ Click **Audit Logs**. Look for security events from the actions above, such as `
 
 ## Phase 5: Live Gateway Inspection & Automated CLI Tests
 
-### 5.1 Inspect the gateway while a real/mock peer is registered
+### 5.1 Inspect the Docker gateway while a peer is registered (Track B and Track C only)
 
-With a session connected, run these commands in PowerShell:
+Track A's `npm run mock:daemon` runs on your host and has no `wg0` interface or `mango_vpn` nftables table, so skip this section for Track A. With a session connected in Track B or C, run these commands in PowerShell:
 
 ```powershell
 docker exec mango-vpn-gateway wg show
@@ -519,7 +566,7 @@ if ($env:DATABASE_URL) { 'DATABASE_URL is set in this PowerShell session.' } els
 npm test
 ```
 
-Vitest suites run across API, Admin, and Portal workspaces. PostgreSQL must be running and the database must have the current v2 schema. If a test expects an exported `DATABASE_URL`, set it for this PowerShell window using the same URL from `.env`, then rerun `npm test`.
+Vitest suites run across API, Admin, and Portal workspaces. PostgreSQL must be running and the database must have the current v2 schema. For Track A, PostgreSQL is the embedded instance from `npm run db:start` (keep it running), and `mangovpn_v2_test` must be migrated as shown in Step A1. If a test expects an exported `DATABASE_URL`, set it for this PowerShell window using the same URL from `.env`, then rerun `npm test`.
 
 **What you should see:** Test suites report passed tests. If tests fail because PostgreSQL is unreachable or the schema is old, use the troubleshooting section below before treating the failure as a code defect.
 
@@ -545,24 +592,24 @@ Pop-Location
 
 | Symptom | What it usually means | What to do |
 |---|---|---|
-| `502 Bad Gateway` during Connect, Policy creation/sync, or revocation | The API cannot reach the gateway daemon, or the daemon secret differs. | Run `docker compose ps vpn-gateway`; wait for `healthy`. Check that this tutorial started `vpn-gateway`, and that `DAEMON_SHARED_SECRET` in root `.env` matches the Compose/API configuration. Host-run API uses `http://127.0.0.1:50051`; the API container uses `http://vpn-gateway:50051`. |
+| `502 Bad Gateway` during Connect, Policy creation/sync, or revocation | The API cannot reach the gateway daemon, or the daemon secret differs. | **Track A:** confirm `npm run mock:daemon` is running and listening on `http://127.0.0.1:50051`, and that `DAEMON_SHARED_SECRET` in `.env` is at least 32 characters (the simulator refuses to start otherwise). **Track B/C:** run `docker compose ps vpn-gateway` and wait for `healthy`, and check that `DAEMON_SHARED_SECRET` in root `.env` matches the Compose/API configuration. The host-run API uses `http://127.0.0.1:50051`; the API container uses `http://vpn-gateway:50051`. |
 | Agent reports `401 Unauthorized` / `INVALID_PAIRING_TOKEN` | The token is missing, mistyped, or changed when the agent restarted. | Copy the newest mock `PairingToken:` or use the exact `AGENT_PAIRING_TOKEN` set before starting Go. Pair again. |
 | `403 FORBIDDEN_ORIGIN` | The portal's browser origin is not on the local agent allowlist. | Open the portal at `http://localhost:3000` or use the configured `http://127.0.0.1:3000` origin. For Go, set `AGENT_ALLOWED_ORIGINS` to include the exact origin, then restart the agent. Do not use a wildcard origin. |
 | `426 AGENT_VERSION_OUTDATED` or `AGENT_VERSION_INACTIVE` | A required version is newer than the agent, or this exact version has been deactivated. | In **Agent Versions**, make the required version optional with **Mark Optional**, or activate the correct release. Do not deactivate the version you are testing. |
 | `Device has been revoked` | The agent is trying to reconnect with a permanently revoked device fingerprint. | Use a new, unused fingerprint for a new device identity. With mock agent, set `$env:AGENT_DEVICE_FINGERPRINT="mock-device-02"` (or another unused value) before `npm run mock:agent`; restart it and pair with its new token. |
 | `RoleName` does not exist or `connect_tickets` table is missing | The database still has a v1 schema or old migrations. Resetting removes local database data. | If you can safely discard the local database, run `npx prisma migrate reset --force --schema=Sobree/api/prisma/schema.prisma`, then `npm run db:seed` with your admin environment variables. This reset is destructive to the local database. |
-| `docker info` says `error during connect` | Docker Desktop's engine is stopped or still starting. | Open **Docker Desktop** and wait until its bottom-left bar says **Engine running**. Retry `docker info`. |
+| `docker info` says `error during connect` (Track B/C only) | Docker Desktop's engine is stopped or still starting. | Open **Docker Desktop** and wait until its bottom-left bar says **Engine running**. Retry `docker info`. |
 | API fails at startup with a required-variable error | `.env` is missing or a required secret is invalid. | Check that `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, and `DAEMON_SHARED_SECRET` are set; the three secrets must each be at least 32 characters. `TOTP_ENCRYPTION_KEY` must be exactly 64 hexadecimal characters. |
 | Agent shows `Agent Unreachable` | No agent process is listening on the loopback port. | Start `npm run mock:agent` or the Go agent and check that it logs `127.0.0.1:47821`. Stop any other process using that port. |
 | `mango0` does not start on Track B | The real agent may not be elevated, WireGuard for Windows may be missing, or the gateway public key/endpoint may be wrong. | Run Go in Administrator PowerShell, install WireGuard for Windows, and verify `WG_PRIVATE_KEY`, `WG_SERVER_PUBLIC_KEY`, and `WG_SERVER_ENDPOINT` are aligned. Read the Go agent's exact error in its terminal. |
 
 ### Clean shutdown
 
-1. In each terminal running `npm run mock:agent`, `npm run dev:api`, `npm run dev:portal`, or `go run .`, press **Ctrl+C** once. If the Go tunnel was active, click **Disconnect VPN** first when possible so the API and gateway remove the peer cleanly.
+1. In each terminal running `npm run mock:agent`, `npm run mock:daemon`, `npm run dev:api`, `npm run dev:portal`, `go run .`, or `npm run db:start`, press **Ctrl+C** once. If the Go tunnel was active, click **Disconnect VPN** first when possible so the API and gateway remove the peer cleanly. Ctrl+C in `db:start` stops embedded PostgreSQL. Run `npm run db:reset-local` only after it has stopped, because it deletes `.local/postgres` and all local database data.
 
    **What you should see:** Each foreground process stops and PowerShell returns to its prompt. For Track B, WireGuard's tunnel service should be removed when the agent disconnects successfully.
 
-2. Stop the Docker services from the repository root:
+2. Track B and Track C only: stop the Docker services from the repository root. Track A has no Docker services to stop.
 
    ```powershell
    docker compose down
