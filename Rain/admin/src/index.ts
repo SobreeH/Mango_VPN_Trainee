@@ -1,15 +1,18 @@
 import type { FastifyPluginAsync, preHandlerHookHandler } from 'fastify';
 import type { Prisma, PrismaClient } from '@prisma/client';
-import type { AuditLogDto, AuditLogListResponse } from '@mango/shared';
+import type { AuditLogDto, AuditLogListResponse, DaemonSyncPoliciesRequest } from '@mango/shared';
 import { registerAgentVersionRoutes } from './agent-versions.js';
+import { registerPolicyRoutes } from './policies.js';
 
 export * from './audit.js';
 export * from './agent-versions.js';
+export * from './policies.js';
 
 export interface AdminPluginOptions {
   prisma: PrismaClient;
   authenticate: preHandlerHookHandler;
   requireAdmin: preHandlerHookHandler;
+  syncPolicies?: (req: DaemonSyncPoliciesRequest) => Promise<void>;
 }
 
 interface AuditLogsQueryParams {
@@ -26,7 +29,7 @@ interface AuditLogsQueryParams {
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const adminPlugin: FastifyPluginAsync<AdminPluginOptions> = async (app, options) => {
-  const { prisma, authenticate, requireAdmin } = options;
+  const { prisma, authenticate, requireAdmin, syncPolicies } = options;
 
   app.addHook('preHandler', authenticate);
   app.addHook('preHandler', requireAdmin);
@@ -116,4 +119,5 @@ export const adminPlugin: FastifyPluginAsync<AdminPluginOptions> = async (app, o
   });
 
   registerAgentVersionRoutes(app, prisma);
+  registerPolicyRoutes(app, prisma, syncPolicies);
 };

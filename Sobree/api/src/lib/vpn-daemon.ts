@@ -1,9 +1,14 @@
-import type { DaemonAddPeerRequest, DaemonRemovePeerRequest } from '@mango/shared';
+import type {
+  DaemonAddPeerRequest,
+  DaemonRemovePeerRequest,
+  DaemonSyncPoliciesRequest,
+} from '@mango/shared';
 import type { ApiConfig } from '../config.js';
 
 export interface VpnDaemonClient {
   addPeer(req: DaemonAddPeerRequest): Promise<void>;
   removePeer(req: DaemonRemovePeerRequest): Promise<void>;
+  syncPolicies(req: DaemonSyncPoliciesRequest): Promise<void>;
 }
 
 export class HttpVpnDaemonClient implements VpnDaemonClient {
@@ -21,6 +26,10 @@ export class HttpVpnDaemonClient implements VpnDaemonClient {
 
   async removePeer(req: DaemonRemovePeerRequest): Promise<void> {
     await this.post('/peers/remove', req);
+  }
+
+  async syncPolicies(req: DaemonSyncPoliciesRequest): Promise<void> {
+    await this.post('/policies/sync', req);
   }
 
   private async post(path: string, body: unknown): Promise<void> {

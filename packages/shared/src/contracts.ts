@@ -82,6 +82,21 @@ export interface VpnPolicyDto {
   enabled: boolean;
 }
 
+export interface CreateVpnPolicyRequest {
+  role: RoleName;
+  name: string;
+  targetCidr: string;
+  protocol: PolicyProtocol;
+  portRange?: string | null;
+  action: PolicyAction;
+  priority?: number;
+  enabled?: boolean;
+}
+
+export interface VpnPolicyListResponse {
+  items: VpnPolicyDto[];
+}
+
 export interface AuditLogDto {
   id: string;
   actorUserId: string | null;
@@ -230,10 +245,30 @@ export interface VpnDisconnectResponse {
   disconnectedAt: string | null;
 }
 
+export interface DaemonPolicyRule {
+  targetCidr: string;
+  protocol: PolicyProtocol;
+  portRange: string | null;
+  action: PolicyAction;
+  priority: number;
+}
+
 export interface DaemonAddPeerRequest {
   publicKey: string;
   assignedIp: string;
   role?: RoleName;
+  policies?: DaemonPolicyRule[];
+}
+
+export interface DaemonPeerPolicySync {
+  publicKey: string;
+  assignedIp: string;
+  role: RoleName;
+  policies: DaemonPolicyRule[];
+}
+
+export interface DaemonSyncPoliciesRequest {
+  peers: DaemonPeerPolicySync[];
 }
 
 export interface DaemonRemovePeerRequest {

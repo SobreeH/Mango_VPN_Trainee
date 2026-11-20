@@ -9,7 +9,10 @@ export interface WriteAuditLogInput {
   metadata?: Record<string, unknown> | null;
 }
 
-export async function writeAuditLog(prisma: PrismaClient, input: WriteAuditLogInput) {
+export async function writeAuditLog(
+  prisma: PrismaClient | Prisma.TransactionClient,
+  input: WriteAuditLogInput,
+) {
   return prisma.auditLog.create({
     data: {
       actorUserId: input.actorUserId ?? null,

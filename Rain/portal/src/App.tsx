@@ -8,6 +8,7 @@ import { AgentStatusCard } from './components/AgentStatusCard';
 import { DEFAULT_API_URL } from './lib/adminApi';
 import { AuditLogsTab } from './components/AuditLogsTab';
 import { AgentVersionsTab } from './components/AgentVersionsTab';
+import { PoliciesTab } from './components/PoliciesTab';
 
 export interface PortalSession {
   accessToken: string;
@@ -20,7 +21,7 @@ export interface AppProps {
   apiBaseUrl?: string;
 }
 
-type AdminTab = 'audit-logs' | 'agent-versions';
+type AdminTab = 'audit-logs' | 'agent-versions' | 'policies';
 
 const loginSchema = z.object({
   username: z.string().trim().min(1, 'Username is required'),
@@ -300,13 +301,28 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                   >
                     Agent Versions
                   </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === 'policies'}
+                    onClick={() => setActiveTab('policies')}
+                    className={`rounded-lg px-4 py-2 text-sm font-medium ${
+                      activeTab === 'policies'
+                        ? 'bg-amber-500 text-slate-950'
+                        : 'text-slate-300 hover:bg-slate-900'
+                    }`}
+                  >
+                    Policies
+                  </button>
                 </div>
 
                 <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
                   {activeTab === 'audit-logs' ? (
                     <AuditLogsTab apiBaseUrl={apiBaseUrl} accessToken={step.session.accessToken} />
-                  ) : (
+                  ) : activeTab === 'agent-versions' ? (
                     <AgentVersionsTab apiBaseUrl={apiBaseUrl} accessToken={step.session.accessToken} />
+                  ) : (
+                    <PoliciesTab apiBaseUrl={apiBaseUrl} accessToken={step.session.accessToken} />
                   )}
                 </div>
               </div>

@@ -4,7 +4,10 @@ import type {
   AuditLogListResponse,
   AuditLogQuery,
   CreateAgentVersionRequest,
+  CreateVpnPolicyRequest,
   UpdateAgentVersionRequest,
+  VpnPolicyDto,
+  VpnPolicyListResponse,
 } from '@mango/shared';
 
 export const DEFAULT_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
@@ -89,4 +92,34 @@ export function updateAgentVersion(
     method: 'PATCH',
     body: JSON.stringify(payload),
   });
+}
+
+export function fetchPolicies(
+  apiBaseUrl: string,
+  accessToken: string,
+): Promise<VpnPolicyListResponse> {
+  return requestJson<VpnPolicyListResponse>(`${apiBaseUrl}/api/policies`, accessToken);
+}
+
+export function createPolicy(
+  apiBaseUrl: string,
+  accessToken: string,
+  payload: CreateVpnPolicyRequest,
+): Promise<VpnPolicyDto> {
+  return requestJson<VpnPolicyDto>(`${apiBaseUrl}/api/policies`, accessToken, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deletePolicy(
+  apiBaseUrl: string,
+  accessToken: string,
+  id: string,
+): Promise<{ success: boolean; id: string }> {
+  return requestJson<{ success: boolean; id: string }>(
+    `${apiBaseUrl}/api/policies/${id}`,
+    accessToken,
+    { method: 'DELETE' },
+  );
 }
