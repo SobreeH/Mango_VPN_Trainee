@@ -269,7 +269,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
               <p className="text-xs text-slate-400">{step.session.user.email}</p>
             </div>
 
-            <AgentStatusCard />
+            <AgentStatusCard accessToken={step.session.accessToken} />
 
             {step.session.user.role === RoleName.ADMIN && (
               <div className="space-y-4 border-t border-slate-800 pt-4">

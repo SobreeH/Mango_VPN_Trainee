@@ -148,4 +148,178 @@ describe('AgentStatusCard (fetch seam)', () => {
       }),
     );
   });
+
+  it('connects VPN via ticket + agent /connect, displays assigned IP and permitted networks, and disconnects', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            status: 'ok',
+            service: 'mango-agent-windows',
+            version: '2.0.0',
+            tunnelActive: false,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            state: 'disconnected',
+            version: '2.0.0',
+            publicKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+            assignedIp: null,
+            serverEndpoint: null,
+            allowedIps: [],
+            connectedSince: null,
+            bytesReceived: 0,
+            bytesSent: 0,
+            lastError: null,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ticket: 'one-time-connect-ticket',
+            expiresAt: '2026-11-20T03:00:00Z',
+            expiresInSeconds: 60,
+          }),
+          { status: 201, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            message: 'WireGuard tunnel connected',
+            state: 'connected',
+            publicKey: 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=',
+            sessionId: 'sess-123',
+            assignedIp: '10.13.13.4',
+            serverEndpoint: 'vpn.mango.internal:51820',
+            allowedIps: ['10.20.0.0/16'],
+            connectedSince: '2026-11-20T02:59:00Z',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            message: 'WireGuard tunnel disconnected',
+            state: 'disconnected',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+
+    render(<AgentStatusCard accessToken="jwt-access-token" />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/agent pairing token/i)).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText(/agent pairing token/i), {
+      target: { value: 'valid-pairing-token' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /pair agent/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /connect vpn/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /connect vpn/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('10.13.13.4')).toBeInTheDocument();
+    });
+    expect(screen.getByText('10.20.0.0/16')).toBeInTheDocument();
+    expect(screen.getByText(/^connected$/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /disconnect vpn/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/^disconnected$/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText('10.13.13.4')).not.toBeInTheDocument();
+  });
+
+  it('surfaces connect errors honestly without faking connected state', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            status: 'ok',
+            service: 'mango-agent-windows',
+            version: '2.0.0',
+            tunnelActive: false,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            state: 'disconnected',
+            version: '2.0.0',
+            publicKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+            assignedIp: null,
+            serverEndpoint: null,
+            allowedIps: [],
+            connectedSince: null,
+            bytesReceived: 0,
+            bytesSent: 0,
+            lastError: null,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ticket: 'expired-ticket',
+            expiresAt: '2026-11-20T03:00:00Z',
+            expiresInSeconds: 60,
+          }),
+          { status: 201, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: false,
+            error: {
+              code: 'API_CONNECT_REJECTED',
+              message: 'Connect ticket has expired',
+            },
+          }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+
+    render(<AgentStatusCard accessToken="jwt-access-token" />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/agent pairing token/i)).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText(/agent pairing token/i), {
+      target: { value: 'valid-pairing-token' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /pair agent/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /connect vpn/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /connect vpn/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(/connect ticket has expired/i);
+    });
+    expect(screen.queryByText(/^connected$/i)).not.toBeInTheDocument();
+  });
 });
