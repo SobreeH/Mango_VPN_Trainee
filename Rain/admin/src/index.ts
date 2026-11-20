@@ -1,4 +1,5 @@
-export * from './admin.service.js';
-export * from './admin.controller.js';
-export * from './admin.routes.js';
+import type { FastifyPluginAsync } from 'fastify';
 
+export const adminPlugin: FastifyPluginAsync = async () => {
+  // Admin routes will be implemented in subsequent tickets
+};

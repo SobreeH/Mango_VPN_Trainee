@@ -1,7 +1,7 @@
 {
   "name": "@mango/shared",
-  "version": "0.1.0",
-  "description": "Shared TypeScript API contracts, DTOs, and interfaces for MANGO VPN",
+  "version": "0.2.0",
+  "description": "Shared TypeScript API contracts, DTOs, and enums for MANGO VPN v2",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

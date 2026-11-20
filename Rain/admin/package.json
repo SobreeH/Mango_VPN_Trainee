@@ -1,7 +1,7 @@
 {
   "name": "@mango/rain-admin",
-  "version": "0.1.0",
-  "description": "Rain's Admin Module (CRUD Endpoints & Database Seed Script)",
+  "version": "0.2.0",
+  "description": "MANGO VPN v2 Admin CRUD Module",
   "private": true,
   "type": "module",
   "main": "dist/index.js",
@@ -20,14 +20,11 @@
   "dependencies": {
     "@mango/shared": "*",
     "@prisma/client": "^5.14.0",
-    "bcryptjs": "^2.4.3",
     "fastify": "^4.26.2"
   },
   "devDependencies": {
-    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.12.7",
     "tsx": "^4.10.1",
     "typescript": "^5.4.5"
   }
 }
-

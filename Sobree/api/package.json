@@ -1,7 +1,7 @@
 {
   "name": "@mango/api",
-  "version": "0.1.0",
-  "description": "MANGO VPN - Central Control Plane Management API (Sobree)",
+  "version": "0.2.0",
+  "description": "MANGO VPN v2 Control Plane API",
   "private": true,
   "type": "module",
   "main": "dist/server.js",
@@ -9,8 +9,10 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
+    "test": "vitest run",
     "prisma:generate": "prisma generate --schema=prisma/schema.prisma",
     "prisma:migrate": "prisma migrate dev --schema=prisma/schema.prisma",
+    "prisma:deploy": "prisma migrate deploy --schema=prisma/schema.prisma",
     "prisma:seed": "npm --workspace=@mango/rain-admin run seed"
   },
   "dependencies": {
@@ -29,6 +31,7 @@
     "@types/node": "^20.12.7",
     "prisma": "^5.14.0",
     "tsx": "^4.10.1",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "vitest": "^2.1.8"
   }
 }
