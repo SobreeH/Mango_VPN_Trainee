@@ -8,6 +8,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -300,6 +303,7 @@ func TestConnectRedeemsTicketWithApiAndActivatesTunnel(t *testing.T) {
 		ApiBaseURL:        apiSrv.URL,
 		DeviceFingerprint: "fp-win11-42",
 		Hostname:          "WIN11-42",
+		Platform:          "windows-x64",
 		WgRunner:          wgRunner,
 	})
 
@@ -316,7 +320,8 @@ func TestConnectRedeemsTicketWithApiAndActivatesTunnel(t *testing.T) {
 	if connectPayload["ticket"] != "ticket-42" ||
 		connectPayload["deviceFingerprint"] != "fp-win11-42" ||
 		connectPayload["hostname"] != "WIN11-42" ||
-		connectPayload["agentVersion"] != "2.0.0-test" {
+		connectPayload["agentVersion"] != "2.0.0-test" ||
+		connectPayload["platform"] != "windows-x64" {
 		t.Fatalf("unexpected /api/vpn/connect payload: %+v", connectPayload)
 	}
 
@@ -374,6 +379,216 @@ func TestConnectSurfacesApiFailureHonestly(t *testing.T) {
 	}
 	if len(wgRunner.activated) != 0 {
 		t.Fatalf("expected no tunnel activation on API failure")
+	}
+}
+
+type fakeExecCall struct {
+	name string
+	args []string
+}
+
+func newFakeExec(calls *[]fakeExecCall, out []byte, err error) commandExecFunc {
+	return func(_ context.Context, name string, args ...string) ([]byte, error) {
+		*calls = append(*calls, fakeExecCall{name: name, args: args})
+		return out, err
+	}
+}
+
+func testTunnelConfig() TunnelConfig {
+	return TunnelConfig{
+		InterfaceName:   tunnelIfaceName,
+		PrivateKeyB64:   "UHJpdmF0ZUtleUZvclRlc3RPbmx5MDAwMDAwMDAwMDAwMDA=",
+		AssignedIP:      "10.13.13.9",
+		ServerPublicKey: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+		ServerEndpoint:  "vpn.mango.internal:51820",
+		AllowedIPs:      []string{"10.20.0.0/16"},
+		DNS:             []string{"1.1.1.1"},
+	}
+}
+
+func assertTunnelConfigContent(t *testing.T, confPath string, cfg TunnelConfig) {
+	t.Helper()
+	data, err := os.ReadFile(confPath)
+	if err != nil {
+		t.Fatalf("expected config file at %s: %v", confPath, err)
+	}
+	content := string(data)
+	for _, want := range []string{
+		"[Interface]",
+		"PrivateKey = " + cfg.PrivateKeyB64,
+		"Address = 10.13.13.9/32",
+		"DNS = 1.1.1.1",
+		"[Peer]",
+		"PublicKey = " + cfg.ServerPublicKey,
+		"Endpoint = " + cfg.ServerEndpoint,
+		"AllowedIPs = 10.20.0.0/16",
+	} {
+		if !strings.Contains(content, want) {
+			t.Fatalf("expected %q in tunnel config, got:\n%s", want, content)
+		}
+	}
+}
+
+func TestWindowsWireGuardRunnerActivateWritesConfigAndInstallsTunnel(t *testing.T) {
+	baseDir := t.TempDir()
+	cfg := testTunnelConfig()
+	var calls []fakeExecCall
+	runner := windowsWireGuardRunner{BaseDir: baseDir, Exec: newFakeExec(&calls, nil, nil)}
+
+	if err := runner.Activate(context.Background(), cfg); err != nil {
+		t.Fatalf("unexpected Activate error: %v", err)
+	}
+
+	confPath := filepath.Join(baseDir, "mango-vpn", "mango0.conf")
+	assertTunnelConfigContent(t, confPath, cfg)
+
+	if len(calls) != 1 || calls[0].name != "wireguard.exe" ||
+		!slices.Equal(calls[0].args, []string{"/installtunnelservice", confPath}) {
+		t.Fatalf("unexpected exec calls: %+v", calls)
+	}
+}
+
+func TestWindowsWireGuardRunnerActivateRemovesConfigOnFailure(t *testing.T) {
+	baseDir := t.TempDir()
+	var calls []fakeExecCall
+	runner := windowsWireGuardRunner{
+		BaseDir: baseDir,
+		Exec:    newFakeExec(&calls, []byte("access denied"), os.ErrPermission),
+	}
+
+	err := runner.Activate(context.Background(), testTunnelConfig())
+	if err == nil || !strings.Contains(err.Error(), "wireguard.exe install failed") || !strings.Contains(err.Error(), "access denied") {
+		t.Fatalf("expected wireguard.exe install error with output, got %v", err)
+	}
+
+	if _, statErr := os.Stat(filepath.Join(baseDir, "mango-vpn", "mango0.conf")); !os.IsNotExist(statErr) {
+		t.Fatalf("expected mango0.conf to be removed after failed install, stat err=%v", statErr)
+	}
+}
+
+func TestWindowsWireGuardRunnerDeactivateUninstallsAndRemovesConfig(t *testing.T) {
+	baseDir := t.TempDir()
+	if _, err := writeTunnelConfigFile(baseDir, testTunnelConfig()); err != nil {
+		t.Fatalf("failed to prepare config: %v", err)
+	}
+	var calls []fakeExecCall
+	runner := windowsWireGuardRunner{BaseDir: baseDir, Exec: newFakeExec(&calls, nil, nil)}
+
+	if err := runner.Deactivate(context.Background(), "mango0"); err != nil {
+		t.Fatalf("unexpected Deactivate error: %v", err)
+	}
+
+	if len(calls) != 1 || calls[0].name != "wireguard.exe" ||
+		!slices.Equal(calls[0].args, []string{"/uninstalltunnelservice", "mango0"}) {
+		t.Fatalf("unexpected exec calls: %+v", calls)
+	}
+	if _, statErr := os.Stat(filepath.Join(baseDir, "mango-vpn", "mango0.conf")); !os.IsNotExist(statErr) {
+		t.Fatalf("expected mango0.conf to be removed after Deactivate, stat err=%v", statErr)
+	}
+}
+
+func TestLinuxWireGuardRunnerActivateWritesConfigAndBringsUpTunnel(t *testing.T) {
+	baseDir := t.TempDir()
+	cfg := testTunnelConfig()
+	var calls []fakeExecCall
+	runner := linuxWireGuardRunner{BaseDir: baseDir, Exec: newFakeExec(&calls, nil, nil)}
+
+	if err := runner.Activate(context.Background(), cfg); err != nil {
+		t.Fatalf("unexpected Activate error: %v", err)
+	}
+
+	confPath := filepath.Join(baseDir, "mango-vpn", "mango0.conf")
+	assertTunnelConfigContent(t, confPath, cfg)
+
+	if len(calls) != 1 || calls[0].name != "wg-quick" ||
+		!slices.Equal(calls[0].args, []string{"up", confPath}) {
+		t.Fatalf("unexpected exec calls: %+v", calls)
+	}
+}
+
+func TestLinuxWireGuardRunnerActivateRemovesConfigOnFailure(t *testing.T) {
+	baseDir := t.TempDir()
+	var calls []fakeExecCall
+	runner := linuxWireGuardRunner{
+		BaseDir: baseDir,
+		Exec:    newFakeExec(&calls, []byte("RTNETLINK answers: Operation not permitted"), os.ErrPermission),
+	}
+
+	err := runner.Activate(context.Background(), testTunnelConfig())
+	if err == nil || !strings.Contains(err.Error(), "wg-quick up failed") || !strings.Contains(err.Error(), "Operation not permitted") {
+		t.Fatalf("expected wg-quick up error with output, got %v", err)
+	}
+
+	if _, statErr := os.Stat(filepath.Join(baseDir, "mango-vpn", "mango0.conf")); !os.IsNotExist(statErr) {
+		t.Fatalf("expected mango0.conf to be removed after failed wg-quick up, stat err=%v", statErr)
+	}
+}
+
+func TestLinuxWireGuardRunnerDeactivateUsesConfigPathAndRemovesConfig(t *testing.T) {
+	baseDir := t.TempDir()
+	confPath, err := writeTunnelConfigFile(baseDir, testTunnelConfig())
+	if err != nil {
+		t.Fatalf("failed to prepare config: %v", err)
+	}
+	var calls []fakeExecCall
+	runner := linuxWireGuardRunner{BaseDir: baseDir, Exec: newFakeExec(&calls, nil, nil)}
+
+	if err := runner.Deactivate(context.Background(), "mango0"); err != nil {
+		t.Fatalf("unexpected Deactivate error: %v", err)
+	}
+
+	if len(calls) != 1 || calls[0].name != "wg-quick" ||
+		!slices.Equal(calls[0].args, []string{"down", confPath}) {
+		t.Fatalf("unexpected exec calls: %+v", calls)
+	}
+	if _, statErr := os.Stat(confPath); !os.IsNotExist(statErr) {
+		t.Fatalf("expected mango0.conf to be removed after Deactivate, stat err=%v", statErr)
+	}
+}
+
+func TestLinuxWireGuardRunnerDeactivateFallsBackToInterfaceNameWhenConfigMissing(t *testing.T) {
+	baseDir := t.TempDir()
+	var calls []fakeExecCall
+	runner := linuxWireGuardRunner{BaseDir: baseDir, Exec: newFakeExec(&calls, nil, nil)}
+
+	if err := runner.Deactivate(context.Background(), "mango0"); err != nil {
+		t.Fatalf("unexpected Deactivate error: %v", err)
+	}
+
+	if len(calls) != 1 || calls[0].name != "wg-quick" ||
+		!slices.Equal(calls[0].args, []string{"down", "mango0"}) {
+		t.Fatalf("expected wg-quick down mango0 fallback, got %+v", calls)
+	}
+}
+
+func TestTunnelConfigPathUsesTempDirWhenBaseDirBlank(t *testing.T) {
+	want := filepath.Join(os.TempDir(), "mango-vpn", "mango0.conf")
+	if got := tunnelConfigPath("   ", "mango0"); got != want {
+		t.Fatalf("expected %q, got %q", want, got)
+	}
+}
+
+func TestDefaultWireGuardRunnerForOS(t *testing.T) {
+	if _, ok := defaultWireGuardRunnerForOS("linux").(linuxWireGuardRunner); !ok {
+		t.Fatalf("expected linuxWireGuardRunner for linux")
+	}
+	if _, ok := defaultWireGuardRunnerForOS("windows").(windowsWireGuardRunner); !ok {
+		t.Fatalf("expected windowsWireGuardRunner for windows")
+	}
+}
+
+func TestDefaultPlatform(t *testing.T) {
+	for _, tc := range []struct {
+		goos, goarch, want string
+	}{
+		{"linux", "amd64", "linux-x64"},
+		{"windows", "amd64", "windows-x64"},
+		{"linux", "arm64", "linux-arm64"},
+		{"windows", "386", "windows-386"},
+	} {
+		if got := defaultPlatform(tc.goos, tc.goarch); got != tc.want {
+			t.Fatalf("defaultPlatform(%q, %q): expected %q, got %q", tc.goos, tc.goarch, tc.want, got)
+		}
 	}
 }
 

@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -46,14 +47,24 @@ type WireGuardRunner interface {
 	Deactivate(ctx context.Context, interfaceName string) error
 }
 
-type windowsWireGuardRunner struct{}
+type commandExecFunc func(ctx context.Context, name string, args ...string) ([]byte, error)
 
-func (windowsWireGuardRunner) Activate(ctx context.Context, cfg TunnelConfig) error {
-	confDir := filepath.Join(os.TempDir(), "mango-vpn")
-	if err := os.MkdirAll(confDir, 0o700); err != nil {
-		return err
+func defaultCommandExec(ctx context.Context, name string, args ...string) ([]byte, error) {
+	return exec.CommandContext(ctx, name, args...).CombinedOutput()
+}
+
+func tunnelConfigPath(baseDir, interfaceName string) string {
+	if strings.TrimSpace(baseDir) == "" {
+		baseDir = os.TempDir()
 	}
-	confPath := filepath.Join(confDir, cfg.InterfaceName+".conf")
+	return filepath.Join(baseDir, "mango-vpn", interfaceName+".conf")
+}
+
+func writeTunnelConfigFile(baseDir string, cfg TunnelConfig) (string, error) {
+	confPath := tunnelConfigPath(baseDir, cfg.InterfaceName)
+	if err := os.MkdirAll(filepath.Dir(confPath), 0o700); err != nil {
+		return "", err
+	}
 	allowed := strings.Join(cfg.AllowedIPs, ", ")
 	if allowed == "" {
 		allowed = "10.13.13.0/24"
@@ -67,21 +78,101 @@ func (windowsWireGuardRunner) Activate(ctx context.Context, cfg TunnelConfig) er
 		cfg.ServerPublicKey, cfg.ServerEndpoint, allowed)
 
 	if err := os.WriteFile(confPath, []byte(content), 0o600); err != nil {
+		return "", err
+	}
+	return confPath, nil
+}
+
+type windowsWireGuardRunner struct {
+	BaseDir string
+	Exec    commandExecFunc
+}
+
+func (r windowsWireGuardRunner) execFn() commandExecFunc {
+	if r.Exec != nil {
+		return r.Exec
+	}
+	return defaultCommandExec
+}
+
+func (r windowsWireGuardRunner) Activate(ctx context.Context, cfg TunnelConfig) error {
+	confPath, err := writeTunnelConfigFile(r.BaseDir, cfg)
+	if err != nil {
 		return err
 	}
-	out, err := exec.CommandContext(ctx, "wireguard.exe", "/installtunnelservice", confPath).CombinedOutput()
+	out, err := r.execFn()(ctx, "wireguard.exe", "/installtunnelservice", confPath)
 	if err != nil {
+		_ = os.Remove(confPath)
 		return fmt.Errorf("wireguard.exe install failed: %v (%s)", err, strings.TrimSpace(string(out)))
 	}
 	return nil
 }
 
-func (windowsWireGuardRunner) Deactivate(ctx context.Context, interfaceName string) error {
-	out, err := exec.CommandContext(ctx, "wireguard.exe", "/uninstalltunnelservice", interfaceName).CombinedOutput()
+func (r windowsWireGuardRunner) Deactivate(ctx context.Context, interfaceName string) error {
+	confPath := tunnelConfigPath(r.BaseDir, interfaceName)
+	out, err := r.execFn()(ctx, "wireguard.exe", "/uninstalltunnelservice", interfaceName)
+	_ = os.Remove(confPath)
 	if err != nil {
 		return fmt.Errorf("wireguard.exe uninstall failed: %v (%s)", err, strings.TrimSpace(string(out)))
 	}
 	return nil
+}
+
+type linuxWireGuardRunner struct {
+	BaseDir string
+	Exec    commandExecFunc
+}
+
+func (r linuxWireGuardRunner) execFn() commandExecFunc {
+	if r.Exec != nil {
+		return r.Exec
+	}
+	return defaultCommandExec
+}
+
+func (r linuxWireGuardRunner) Activate(ctx context.Context, cfg TunnelConfig) error {
+	confPath, err := writeTunnelConfigFile(r.BaseDir, cfg)
+	if err != nil {
+		return err
+	}
+	out, err := r.execFn()(ctx, "wg-quick", "up", confPath)
+	if err != nil {
+		_ = os.Remove(confPath)
+		return fmt.Errorf("wg-quick up failed: %v (%s)", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+func (r linuxWireGuardRunner) Deactivate(ctx context.Context, interfaceName string) error {
+	confPath := tunnelConfigPath(r.BaseDir, interfaceName)
+	target := interfaceName
+	if _, statErr := os.Stat(confPath); statErr == nil {
+		target = confPath
+	}
+	out, err := r.execFn()(ctx, "wg-quick", "down", target)
+	_ = os.Remove(confPath)
+	if err != nil {
+		return fmt.Errorf("wg-quick down failed: %v (%s)", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+func defaultWireGuardRunnerForOS(goos string) WireGuardRunner {
+	if goos == "linux" {
+		return linuxWireGuardRunner{}
+	}
+	return windowsWireGuardRunner{}
+}
+
+func defaultPlatform(goos, goarch string) string {
+	arch := goarch
+	switch goarch {
+	case "amd64":
+		arch = "x64"
+	case "arm64":
+		arch = "arm64"
+	}
+	return goos + "-" + arch
 }
 
 // AgentConfig configures the loopback Windows Agent HTTP handler.
@@ -92,6 +183,7 @@ type AgentConfig struct {
 	ApiBaseURL        string
 	DeviceFingerprint string
 	Hostname          string
+	Platform          string
 	HTTPClient        *http.Client
 	WgRunner          WireGuardRunner
 }
@@ -179,11 +271,17 @@ func NewHandler(cfg AgentConfig) http.Handler {
 	if apiBaseURL == "" {
 		apiBaseURL = defaultApiBaseURL
 	}
+	platform := strings.TrimSpace(cfg.Platform)
+	if platform == "" {
+		platform = defaultPlatform(runtime.GOOS, runtime.GOARCH)
+	}
 	hostname := strings.TrimSpace(cfg.Hostname)
 	if hostname == "" {
 		h, err := os.Hostname()
 		if err == nil && h != "" {
 			hostname = h
+		} else if runtime.GOOS == "linux" {
+			hostname = "LINUX-CLIENT"
 		} else {
 			hostname = "WINDOWS-CLIENT"
 		}
@@ -191,7 +289,11 @@ func NewHandler(cfg AgentConfig) http.Handler {
 	fingerprint := strings.TrimSpace(cfg.DeviceFingerprint)
 	if fingerprint == "" {
 		sum := sha256.Sum256([]byte(hostname + ":" + version))
-		fingerprint = "win-" + hex.EncodeToString(sum[:12])
+		prefix := "win-"
+		if strings.HasPrefix(platform, "linux") {
+			prefix = "lnx-"
+		}
+		fingerprint = prefix + hex.EncodeToString(sum[:12])
 	}
 	httpClient := cfg.HTTPClient
 	if httpClient == nil {
@@ -199,7 +301,7 @@ func NewHandler(cfg AgentConfig) http.Handler {
 	}
 	wgRunner := cfg.WgRunner
 	if wgRunner == nil {
-		wgRunner = windowsWireGuardRunner{}
+		wgRunner = defaultWireGuardRunnerForOS(runtime.GOOS)
 	}
 
 	priv, pubB64, err := generateCurve25519Keypair()
@@ -318,6 +420,7 @@ func NewHandler(cfg AgentConfig) http.Handler {
 			"deviceFingerprint": fingerprint,
 			"hostname":          hostname,
 			"agentVersion":      version,
+			"platform":          platform,
 		})
 		apiReq, err := http.NewRequestWithContext(r.Context(), http.MethodPost, apiBaseURL+"/api/vpn/connect", bytes.NewReader(apiPayload))
 		if err != nil {
@@ -534,6 +637,7 @@ func main() {
 
 	hostname := getenvFirst("AGENT_HOSTNAME")
 	fingerprint := getenvFirst("AGENT_DEVICE_FINGERPRINT")
+	platform := getenvFirst("AGENT_PLATFORM", "MANGO_AGENT_PLATFORM")
 
 	handler := NewHandler(AgentConfig{
 		AllowedOrigins:    allowedOrigins,
@@ -542,6 +646,7 @@ func main() {
 		ApiBaseURL:        apiBaseURL,
 		Hostname:          hostname,
 		DeviceFingerprint: fingerprint,
+		Platform:          platform,
 	})
 
 	if err := runAgent(addr, handler); err != nil {
