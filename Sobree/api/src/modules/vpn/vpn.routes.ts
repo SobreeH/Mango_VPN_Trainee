@@ -2,19 +2,24 @@ import crypto from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import {
   DeviceStatus,
-  PolicyAction,
+  PolicyAction as PrismaPolicyAction,
+  PolicyProtocol as PrismaPolicyProtocol,
   RoleName as PrismaRoleName,
   SessionStatus,
   type PrismaClient,
 } from '@prisma/client';
 import {
+  PolicyAction,
+  PolicyProtocol,
   RoleName,
   type ConnectTicketResponse,
+  type DaemonPolicyRule,
   type VpnConnectRequest,
   type VpnConnectResponse,
   type VpnDisconnectRequest,
   type VpnDisconnectResponse,
 } from '@mango/shared';
+import { AgentVersionError, assertAgentVersionAllowed } from '@mango/rain-admin';
 import type { ApiConfig } from '../../config.js';
 import type { VpnDaemonClient } from '../../lib/vpn-daemon.js';
 import { createAuthenticateHook } from '../../middleware/auth.js';
@@ -136,6 +141,19 @@ export async function registerVpnRoutes(
         });
       }
 
+      try {
+        await assertAgentVersionAllowed(prisma, agentVersion, 'windows-x64');
+      } catch (err) {
+        if (err instanceof AgentVersionError) {
+          return reply.status(err.statusCode).send({
+            statusCode: err.statusCode,
+            error: err.code,
+            message: err.message,
+          });
+        }
+        throw err;
+      }
+
       const ticketHash = crypto.createHash('sha256').update(ticket).digest('hex');
 
       let allocation: {
@@ -145,6 +163,7 @@ export async function registerVpnRoutes(
         sessionId: string;
         assignedIp: string;
         allowedIps: string[];
+        policies: DaemonPolicyRule[];
         connectedAt: Date;
       };
 
@@ -273,8 +292,23 @@ export async function registerVpnRoutes(
             orderBy: { priority: 'asc' },
           });
           const allowCidrs = policies
-            .filter((p) => p.action === PolicyAction.ALLOW)
+            .filter((p) => p.action === PrismaPolicyAction.ALLOW)
             .map((p) => p.targetCidr);
+
+          const daemonPolicies: DaemonPolicyRule[] = policies.map((p) => ({
+            targetCidr: p.targetCidr,
+            protocol:
+              p.protocol === PrismaPolicyProtocol.TCP
+                ? PolicyProtocol.TCP
+                : p.protocol === PrismaPolicyProtocol.UDP
+                  ? PolicyProtocol.UDP
+                  : p.protocol === PrismaPolicyProtocol.ICMP
+                    ? PolicyProtocol.ICMP
+                    : PolicyProtocol.ANY,
+            portRange: p.portRange,
+            action: p.action === PrismaPolicyAction.ALLOW ? PolicyAction.ALLOW : PolicyAction.DENY,
+            priority: p.priority,
+          }));
 
           return {
             userId: ticketRecord.userId,
@@ -283,6 +317,7 @@ export async function registerVpnRoutes(
             sessionId: session.id,
             assignedIp: peer.assignedIp,
             allowedIps: allowCidrs.length > 0 ? allowCidrs : ['10.13.13.0/24'],
+            policies: daemonPolicies,
             connectedAt: session.connectedAt,
           };
         });
@@ -302,6 +337,7 @@ export async function registerVpnRoutes(
           publicKey,
           assignedIp: allocation.assignedIp,
           role: allocation.role,
+          policies: allocation.policies,
         });
       } catch (err) {
         const reason = err instanceof Error ? err.message : 'VPN daemon failed to add peer';

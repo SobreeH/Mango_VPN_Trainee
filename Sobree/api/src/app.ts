@@ -60,6 +60,7 @@ export async function buildApp({
     authenticate,
     requireAdmin: requireRole(RoleName.ADMIN),
     vpnDaemon: daemonClient,
+    syncPolicies: (req) => daemonClient.syncPolicies(req),
   });
 
   app.addHook('onClose', async () => {

@@ -12,7 +12,10 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"sort"
+	"strconv"
 	"strings"
+	"sync"
 )
 
 // CommandRunner abstracts OS-level command execution (wg, nft) for testing.
@@ -74,6 +77,153 @@ func normalizePeerIP(rawIP string) (string, error) {
 	return addr.String() + "/32", nil
 }
 
+// PolicyRule represents a role-based firewall rule enforced via nftables.
+type PolicyRule struct {
+	TargetCidr string  `json:"targetCidr"`
+	Protocol   string  `json:"protocol"`
+	PortRange  *string `json:"portRange"`
+	Action     string  `json:"action"`
+	Priority   int     `json:"priority"`
+}
+
+type peerPolicyEntry struct {
+	PublicKey  string
+	AssignedIP string
+	Role       string
+	Policies   []PolicyRule
+}
+
+func validatePortRange(raw *string, protocol string) (*string, error) {
+	if raw == nil || strings.TrimSpace(*raw) == "" {
+		return nil, nil
+	}
+	trimmed := strings.TrimSpace(*raw)
+	if protocol != "TCP" && protocol != "UDP" {
+		return nil, fmt.Errorf("portRange is only supported for TCP or UDP protocols")
+	}
+	parts := strings.Split(trimmed, "-")
+	if len(parts) > 2 {
+		return nil, fmt.Errorf("portRange must be a single port or start-end range")
+	}
+	parsePort := func(s string) (int, error) {
+		p, err := strconv.Atoi(strings.TrimSpace(s))
+		if err != nil || p < 1 || p > 65535 {
+			return 0, fmt.Errorf("port %q must be between 1 and 65535", s)
+		}
+		return p, nil
+	}
+	start, err := parsePort(parts[0])
+	if err != nil {
+		return nil, err
+	}
+	if len(parts) == 2 {
+		end, err := parsePort(parts[1])
+		if err != nil {
+			return nil, err
+		}
+		if start > end {
+			return nil, fmt.Errorf("portRange start must be <= end")
+		}
+		normalized := fmt.Sprintf("%d-%d", start, end)
+		return &normalized, nil
+	}
+	normalized := strconv.Itoa(start)
+	return &normalized, nil
+}
+
+func validatePolicyRules(rules []PolicyRule) ([]PolicyRule, error) {
+	out := make([]PolicyRule, 0, len(rules))
+	for _, r := range rules {
+		prefix, err := netip.ParsePrefix(strings.TrimSpace(r.TargetCidr))
+		if err != nil || !prefix.Addr().Is4() {
+			return nil, fmt.Errorf("invalid targetCidr %q: must be a valid IPv4 CIDR", r.TargetCidr)
+		}
+		proto := strings.ToUpper(strings.TrimSpace(r.Protocol))
+		switch proto {
+		case "ANY", "TCP", "UDP", "ICMP":
+		default:
+			return nil, fmt.Errorf("invalid protocol %q: must be ANY, TCP, UDP, or ICMP", r.Protocol)
+		}
+		action := strings.ToUpper(strings.TrimSpace(r.Action))
+		if action != "ALLOW" && action != "DENY" {
+			return nil, fmt.Errorf("invalid action %q: must be ALLOW or DENY", r.Action)
+		}
+		portRange, err := validatePortRange(r.PortRange, proto)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, PolicyRule{
+			TargetCidr: prefix.String(),
+			Protocol:   proto,
+			PortRange:  portRange,
+			Action:     action,
+			Priority:   r.Priority,
+		})
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		return out[i].Priority < out[j].Priority
+	})
+	return out, nil
+}
+
+func applyNftables(ctx context.Context, runner CommandRunner, iface string, peers []peerPolicyEntry) error {
+	cmds := [][]string{
+		{"add", "table", "inet", "mango_vpn"},
+		{"add", "chain", "inet", "mango_vpn", "forward", "{", "type", "filter", "hook", "forward", "priority", "0", ";", "policy", "drop", ";", "}"},
+		{"flush", "chain", "inet", "mango_vpn", "forward"},
+		{"add", "rule", "inet", "mango_vpn", "forward", "ct", "state", "established,related", "accept"},
+	}
+
+	sortedPeers := append([]peerPolicyEntry(nil), peers...)
+	sort.SliceStable(sortedPeers, func(i, j int) bool {
+		return sortedPeers[i].AssignedIP < sortedPeers[j].AssignedIP
+	})
+
+	for _, peer := range sortedPeers {
+		peerIP := strings.TrimSuffix(peer.AssignedIP, "/32")
+		for _, rule := range peer.Policies {
+			verdict := "drop"
+			if rule.Action == "ALLOW" {
+				verdict = "accept"
+			}
+			args := []string{
+				"add", "rule", "inet", "mango_vpn", "forward",
+				"iifname", iface, "ip", "saddr", peerIP, "ip", "daddr", rule.TargetCidr,
+			}
+			switch rule.Protocol {
+			case "TCP":
+				if rule.PortRange != nil {
+					args = append(args, "tcp", "dport", *rule.PortRange)
+				} else {
+					args = append(args, "ip", "protocol", "tcp")
+				}
+			case "UDP":
+				if rule.PortRange != nil {
+					args = append(args, "udp", "dport", *rule.PortRange)
+				} else {
+					args = append(args, "ip", "protocol", "udp")
+				}
+			case "ICMP":
+				args = append(args, "ip", "protocol", "icmp")
+			}
+			args = append(args, verdict)
+			cmds = append(cmds, args)
+		}
+		// Explicit per-peer default drop after all role rules.
+		cmds = append(cmds, []string{
+			"add", "rule", "inet", "mango_vpn", "forward",
+			"iifname", iface, "ip", "saddr", peerIP, "drop",
+		})
+	}
+
+	for _, args := range cmds {
+		if out, err := runner.Run(ctx, "nft", args...); err != nil {
+			return fmt.Errorf("nft %s failed: %v (%s)", strings.Join(args, " "), err, strings.TrimSpace(string(out)))
+		}
+	}
+	return nil
+}
+
 func NewMux(cfg DaemonConfig) *http.ServeMux {
 	iface := strings.TrimSpace(cfg.Interface)
 	if iface == "" {
@@ -82,6 +232,18 @@ func NewMux(cfg DaemonConfig) *http.ServeMux {
 	runner := cfg.Runner
 	if runner == nil {
 		runner = execCommandRunner{}
+	}
+
+	var mu sync.RWMutex
+	peerPolicies := make(map[string]peerPolicyEntry)
+	nftActive := false
+
+	snapshotPeersLocked := func() []peerPolicyEntry {
+		list := make([]peerPolicyEntry, 0, len(peerPolicies))
+		for _, entry := range peerPolicies {
+			list = append(list, entry)
+		}
+		return list
 	}
 
 	requireAuth := func(next http.HandlerFunc) http.HandlerFunc {
@@ -116,6 +278,20 @@ func NewMux(cfg DaemonConfig) *http.ServeMux {
 			writeError(w, http.StatusInternalServerError, "WG_COMMAND_FAILED", fmt.Sprintf("wg remove failed: %v (%s)", err, strings.TrimSpace(string(out))))
 			return
 		}
+
+		mu.Lock()
+		delete(peerPolicies, pubKey)
+		shouldSyncNft := nftActive
+		peersSnapshot := snapshotPeersLocked()
+		mu.Unlock()
+
+		if shouldSyncNft {
+			if err := applyNftables(r.Context(), runner, iface, peersSnapshot); err != nil {
+				writeError(w, http.StatusInternalServerError, "NFT_COMMAND_FAILED", err.Error())
+				return
+			}
+		}
+
 		writeJSON(w, http.StatusOK, map[string]any{
 			"success":   true,
 			"publicKey": pubKey,
@@ -132,9 +308,10 @@ func NewMux(cfg DaemonConfig) *http.ServeMux {
 
 	mux.HandleFunc("POST /peers", requireAuth(func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			PublicKey  string `json:"publicKey"`
-			AssignedIP string `json:"assignedIp"`
-			Role       string `json:"role,omitempty"`
+			PublicKey  string       `json:"publicKey"`
+			AssignedIP string       `json:"assignedIp"`
+			Role       string       `json:"role,omitempty"`
+			Policies   []PolicyRule `json:"policies,omitempty"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "INVALID_JSON", "Request body must be valid JSON")
@@ -151,10 +328,37 @@ func NewMux(cfg DaemonConfig) *http.ServeMux {
 			return
 		}
 
+		var validatedPolicies []PolicyRule
+		if req.Policies != nil {
+			validatedPolicies, err = validatePolicyRules(req.Policies)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, "INVALID_POLICY", err.Error())
+				return
+			}
+		}
+
 		out, err := runner.Run(r.Context(), "wg", "set", iface, "peer", pubKey, "allowed-ips", allowedIP)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "WG_COMMAND_FAILED", fmt.Sprintf("wg set failed: %v (%s)", err, strings.TrimSpace(string(out))))
 			return
+		}
+
+		if req.Policies != nil {
+			mu.Lock()
+			peerPolicies[pubKey] = peerPolicyEntry{
+				PublicKey:  pubKey,
+				AssignedIP: allowedIP,
+				Role:       strings.TrimSpace(req.Role),
+				Policies:   validatedPolicies,
+			}
+			nftActive = true
+			peersSnapshot := snapshotPeersLocked()
+			mu.Unlock()
+
+			if err := applyNftables(r.Context(), runner, iface, peersSnapshot); err != nil {
+				writeError(w, http.StatusInternalServerError, "NFT_COMMAND_FAILED", err.Error())
+				return
+			}
 		}
 
 		writeJSON(w, http.StatusOK, map[string]any{
@@ -163,6 +367,65 @@ func NewMux(cfg DaemonConfig) *http.ServeMux {
 			"assignedIp": allowedIP,
 		})
 	}))
+
+	syncPoliciesHandler := requireAuth(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Peers []struct {
+				PublicKey  string       `json:"publicKey"`
+				AssignedIP string       `json:"assignedIp"`
+				Role       string       `json:"role"`
+				Policies   []PolicyRule `json:"policies"`
+			} `json:"peers"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "INVALID_JSON", "Request body must be valid JSON")
+			return
+		}
+
+		nextMap := make(map[string]peerPolicyEntry, len(req.Peers))
+		for _, p := range req.Peers {
+			pubKey, err := validateWireGuardKey(p.PublicKey)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, "INVALID_PUBLIC_KEY", err.Error())
+				return
+			}
+			allowedIP, err := normalizePeerIP(p.AssignedIP)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, "INVALID_IP", err.Error())
+				return
+			}
+			validatedRules, err := validatePolicyRules(p.Policies)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, "INVALID_POLICY", err.Error())
+				return
+			}
+			nextMap[pubKey] = peerPolicyEntry{
+				PublicKey:  pubKey,
+				AssignedIP: allowedIP,
+				Role:       strings.TrimSpace(p.Role),
+				Policies:   validatedRules,
+			}
+		}
+
+		mu.Lock()
+		peerPolicies = nextMap
+		nftActive = true
+		peersSnapshot := snapshotPeersLocked()
+		mu.Unlock()
+
+		if err := applyNftables(r.Context(), runner, iface, peersSnapshot); err != nil {
+			writeError(w, http.StatusInternalServerError, "NFT_COMMAND_FAILED", err.Error())
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"success": true,
+			"peers":   len(peersSnapshot),
+		})
+	})
+
+	mux.HandleFunc("POST /policies/sync", syncPoliciesHandler)
+	mux.HandleFunc("PUT /peers/policies", syncPoliciesHandler)
 
 	mux.HandleFunc("POST /peers/remove", requireAuth(func(w http.ResponseWriter, r *http.Request) {
 		var req struct {

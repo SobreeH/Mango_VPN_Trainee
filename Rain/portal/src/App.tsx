@@ -11,6 +11,7 @@ import { AgentVersionsTab } from './components/AgentVersionsTab';
 import { UsersTab } from './components/UsersTab';
 import { DevicesTab } from './components/DevicesTab';
 import { SessionsTab } from './components/SessionsTab';
+import { PoliciesTab } from './components/PoliciesTab';
 
 export interface PortalSession {
   accessToken: string;
@@ -23,7 +24,7 @@ export interface AppProps {
   apiBaseUrl?: string;
 }
 
-type AdminTab = 'audit-logs' | 'agent-versions' | 'users' | 'devices' | 'sessions';
+type AdminTab = 'audit-logs' | 'agent-versions' | 'users' | 'devices' | 'sessions' | 'policies';
 
 const loginSchema = z.object({
   username: z.string().trim().min(1, 'Username is required'),
@@ -284,6 +285,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                       ['users', 'Users'],
                       ['devices', 'Devices'],
                       ['sessions', 'Sessions'],
+                      ['policies', 'Policies'],
                     ] as const
                   ).map(([tabKey, label]) => (
                     <button
@@ -318,6 +320,9 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                   )}
                   {activeTab === 'sessions' && (
                     <SessionsTab apiBaseUrl={apiBaseUrl} accessToken={step.session.accessToken} />
+                  )}
+                  {activeTab === 'policies' && (
+                    <PoliciesTab apiBaseUrl={apiBaseUrl} accessToken={step.session.accessToken} />
                   )}
                 </div>
               </div>

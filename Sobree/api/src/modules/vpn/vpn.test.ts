@@ -185,6 +185,7 @@ describe('VPN Connect & Disconnect HTTP Seam (app.inject against PostgreSQL)', (
       if (removePeerError) throw removePeerError;
       removedPeers.push(req);
     },
+    async syncPolicies() {},
   };
 
   function generateWgPublicKey(): string {

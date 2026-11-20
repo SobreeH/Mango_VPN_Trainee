@@ -71,6 +71,7 @@ describe('Admin Users, Devices, Sessions & Real-time Revocation (app.inject agai
     await prisma.vpnPeer.deleteMany();
     await prisma.device.deleteMany();
     await prisma.connectTicket.deleteMany();
+    await prisma.agentVersion.deleteMany();
     await prisma.refreshToken.deleteMany();
     await prisma.auditLog.deleteMany();
     await prisma.user.deleteMany();
