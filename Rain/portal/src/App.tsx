@@ -2,9 +2,25 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Shield, KeyRound, LogOut, AlertCircle } from 'lucide-react';
 import { z } from 'zod';
 import QRCode from 'qrcode';
-import type { AuthTokensResponse, LoginResponse } from '@mango/shared';
+import { RoleName, type AuthTokensResponse, type AuthUserDto, type LoginResponse } from '@mango/shared';
 import { loginUser, logoutUser, verifyOtpCode } from './api/auth';
 import { AgentStatusCard } from './components/AgentStatusCard';
+import { DEFAULT_API_URL } from './lib/adminApi';
+import { AuditLogsTab } from './components/AuditLogsTab';
+import { AgentVersionsTab } from './components/AgentVersionsTab';
+
+export interface PortalSession {
+  accessToken: string;
+  refreshToken?: string;
+  user: AuthUserDto;
+}
+
+export interface AppProps {
+  initialSession?: PortalSession | null;
+  apiBaseUrl?: string;
+}
+
+type AdminTab = 'audit-logs' | 'agent-versions';
 
 const loginSchema = z.object({
   username: z.string().trim().min(1, 'Username is required'),
@@ -20,8 +36,21 @@ type AuthStep =
   | { kind: 'mfa'; challenge: LoginResponse }
   | { kind: 'authenticated'; session: AuthTokensResponse };
 
-export function App() {
-  const [step, setStep] = useState<AuthStep>({ kind: 'login' });
+export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppProps) {
+  const [step, setStep] = useState<AuthStep>(
+    initialSession
+      ? {
+          kind: 'authenticated',
+          session: {
+            accessToken: initialSession.accessToken,
+            refreshToken: initialSession.refreshToken ?? '',
+            expiresIn: 900,
+            user: initialSession.user,
+          },
+        }
+      : { kind: 'login' },
+  );
+  const [activeTab, setActiveTab] = useState<AdminTab>('audit-logs');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [otpCode, setOtpCode] = useState('');
@@ -101,6 +130,8 @@ export function App() {
     setErrorMessage(null);
     try {
       await logoutUser({ refreshToken: step.session.refreshToken });
+    } catch {
+      // Clear local session even if server revocation request fails
     } finally {
       setUsername('');
       setPassword('');
@@ -239,6 +270,47 @@ export function App() {
             </div>
 
             <AgentStatusCard accessToken={step.session.accessToken} />
+
+            {step.session.user.role === RoleName.ADMIN && (
+              <div className="space-y-4 border-t border-slate-800 pt-4">
+                <div role="tablist" aria-label="Admin Governance" className="flex gap-2 border-b border-slate-800 pb-2">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === 'audit-logs'}
+                    onClick={() => setActiveTab('audit-logs')}
+                    className={`rounded-lg px-4 py-2 text-sm font-medium ${
+                      activeTab === 'audit-logs'
+                        ? 'bg-amber-500 text-slate-950'
+                        : 'text-slate-300 hover:bg-slate-900'
+                    }`}
+                  >
+                    Audit Logs
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === 'agent-versions'}
+                    onClick={() => setActiveTab('agent-versions')}
+                    className={`rounded-lg px-4 py-2 text-sm font-medium ${
+                      activeTab === 'agent-versions'
+                        ? 'bg-amber-500 text-slate-950'
+                        : 'text-slate-300 hover:bg-slate-900'
+                    }`}
+                  >
+                    Agent Versions
+                  </button>
+                </div>
+
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+                  {activeTab === 'audit-logs' ? (
+                    <AuditLogsTab apiBaseUrl={apiBaseUrl} accessToken={step.session.accessToken} />
+                  ) : (
+                    <AgentVersionsTab apiBaseUrl={apiBaseUrl} accessToken={step.session.accessToken} />
+                  )}
+                </div>
+              </div>
+            )}
 
             <button
               type="button"

@@ -1,4 +1,4 @@
-import type { FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyReply, FastifyRequest, preHandlerHookHandler } from 'fastify';
 import type { PrismaClient } from '@prisma/client';
 import type { AuthUserDto, RoleName } from '@mango/shared';
 import jwt from 'jsonwebtoken';
@@ -20,7 +20,7 @@ export interface AccessTokenPayload extends jwt.JwtPayload {
 /**
  * Verifies the HS256-pinned Bearer access token and attaches `request.authUser`.
  */
-export function createAuthenticateHook(config: ApiConfig, prisma: PrismaClient) {
+export function createAuthenticateHook(config: ApiConfig, prisma: PrismaClient): preHandlerHookHandler {
   return async function authenticate(request: FastifyRequest, reply: FastifyReply) {
     const authHeader = request.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -79,7 +79,7 @@ export function createAuthenticateHook(config: ApiConfig, prisma: PrismaClient) 
 /**
  * Enforces that the authenticated user holds one of the allowed roles.
  */
-export function requireRole(...allowedRoles: RoleName[]) {
+export function requireRole(...allowedRoles: RoleName[]): preHandlerHookHandler {
   return async function roleGuard(request: FastifyRequest, reply: FastifyReply) {
     if (!request.authUser) {
       return reply.status(401).send({
@@ -95,5 +95,12 @@ export function requireRole(...allowedRoles: RoleName[]) {
         message: 'Insufficient role permissions',
       });
     }
+  };
+}
+
+export function createAuthMiddleware(config: ApiConfig, prisma: PrismaClient) {
+  return {
+    authenticate: createAuthenticateHook(config, prisma),
+    requireRole,
   };
 }

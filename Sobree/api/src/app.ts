@@ -1,12 +1,13 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import type { PrismaClient } from '@prisma/client';
-import type { HealthResponse } from '@mango/shared';
+import { RoleName, type HealthResponse } from '@mango/shared';
 import { adminPlugin } from '@mango/rain-admin';
 import type { ApiConfig } from './config.js';
 import { HttpVpnDaemonClient, type VpnDaemonClient } from './lib/vpn-daemon.js';
 import { registerAuthRoutes } from './modules/auth/auth.routes.js';
 import { registerVpnRoutes } from './modules/vpn/vpn.routes.js';
+import { createAuthMiddleware } from './middleware/auth.js';
 
 export type { VpnDaemonClient };
 
@@ -50,9 +51,15 @@ export async function buildApp({
     }
   });
 
+  const { authenticate, requireRole } = createAuthMiddleware(config, prisma);
   await registerAuthRoutes(app, { config, prisma });
   await registerVpnRoutes(app, { config, prisma, vpnDaemon: daemonClient });
-  await app.register(adminPlugin, { prefix: '/api' });
+  await app.register(adminPlugin, {
+    prefix: '/api',
+    prisma,
+    authenticate,
+    requireAdmin: requireRole(RoleName.ADMIN),
+  });
 
   app.addHook('onClose', async () => {
     await prisma.$disconnect();
