@@ -65,6 +65,3 @@ docker-compose.override.yml
 *.dylib
 bin/
 
-# Local Learning & Trainee Notes
-Sobree/LEARNING_RESOURCES.md
-
