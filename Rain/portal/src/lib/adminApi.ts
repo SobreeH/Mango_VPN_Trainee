@@ -6,6 +6,7 @@ import type {
   CreateAgentVersionRequest,
   CreateUserRequest,
   CreateVpnPolicyRequest,
+  DeletePolicyResponse,
   DeviceDto,
   DeviceListResponse,
   UpdateAgentVersionRequest,
@@ -117,7 +118,7 @@ export function updateAgentVersion(
   auth?: AuthRefreshContext,
 ): Promise<AgentVersionDto> {
   return requestJson<AgentVersionDto>(
-    `${apiBaseUrl}/api/agent-versions/${id}`,
+    `${apiBaseUrl}/api/agent-versions/${encodeURIComponent(id)}`,
     accessToken,
     {
       method: 'PATCH',
@@ -160,7 +161,7 @@ export function updateUserStatus(
   auth?: AuthRefreshContext,
 ): Promise<UserDto> {
   return requestJson<UserDto>(
-    `${apiBaseUrl}/api/users/${id}/status`,
+    `${apiBaseUrl}/api/users/${encodeURIComponent(id)}/status`,
     accessToken,
     {
       method: 'PATCH',
@@ -185,7 +186,7 @@ export function revokeDevice(
   auth?: AuthRefreshContext,
 ): Promise<DeviceDto> {
   return requestJson<DeviceDto>(
-    `${apiBaseUrl}/api/devices/${id}/revoke`,
+    `${apiBaseUrl}/api/devices/${encodeURIComponent(id)}/revoke`,
     accessToken,
     {
       method: 'POST',
@@ -215,7 +216,7 @@ export function disconnectSession(
   auth?: AuthRefreshContext,
 ): Promise<VpnSessionDto> {
   return requestJson<VpnSessionDto>(
-    `${apiBaseUrl}/api/sessions/${id}/disconnect`,
+    `${apiBaseUrl}/api/sessions/${encodeURIComponent(id)}/disconnect`,
     accessToken,
     {
       method: 'POST',
@@ -260,9 +261,9 @@ export function deletePolicy(
   accessToken: string,
   id: string,
   auth?: AuthRefreshContext,
-): Promise<{ success: boolean; id: string }> {
-  return requestJson<{ success: boolean; id: string }>(
-    `${apiBaseUrl}/api/policies/${id}`,
+): Promise<DeletePolicyResponse> {
+  return requestJson<DeletePolicyResponse>(
+    `${apiBaseUrl}/api/policies/${encodeURIComponent(id)}`,
     accessToken,
     { method: 'DELETE' },
     auth,

@@ -124,6 +124,11 @@ export interface VpnPolicyListResponse {
   items: VpnPolicyDto[];
 }
 
+export interface DeletePolicyResponse {
+  success: boolean;
+  id: string;
+}
+
 export interface AuditLogDto {
   id: string;
   actorUserId: string | null;
