@@ -46,6 +46,9 @@ jobs:
       - name: Install Monorepo Dependencies
         run: npm ci || npm install
 
+      - name: Check Environment Readiness
+        run: npm run check:env
+
       - name: Generate Prisma Client
         run: npm run db:generate
         env:
@@ -64,10 +67,13 @@ jobs:
         env:
           DATABASE_URL: postgresql://mango:mangosecret@localhost:5432/mangovpn?schema=public
 
-      - name: Vet & Build Go Agent (Windows)
+      - name: Vet, Test & Build Go Agent (Linux & Windows Cross-Compile)
         working-directory: Sobree/agent-windows
         run: |
           if [ -f go.mod ]; then
+            go vet ./...
+            go test ./...
+            go build ./...
             GOOS=windows go vet ./...
             GOOS=windows go build ./...
           fi

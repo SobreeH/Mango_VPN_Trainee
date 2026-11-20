@@ -57,7 +57,18 @@ const ALLOWED_ORIGINS = (
 const PAIRING_TOKEN =
   getenvFirst('AGENT_PAIRING_TOKEN', 'MANGO_AGENT_PAIRING_TOKEN') ||
   crypto.randomBytes(32).toString('base64url');
-const HOSTNAME = getenvFirst('AGENT_HOSTNAME') || os.hostname() || 'MOCK-WINDOWS-PC';
+function defaultAgentPlatform() {
+  const arch = os.arch() === 'arm64' ? 'arm64' : 'x64';
+  if (process.platform === 'linux') return `linux-${arch}`;
+  if (process.platform === 'darwin') return `darwin-${arch}`;
+  return `windows-${arch}`;
+}
+
+const PLATFORM = getenvFirst('AGENT_PLATFORM', 'MANGO_AGENT_PLATFORM') || defaultAgentPlatform();
+const HOSTNAME =
+  getenvFirst('AGENT_HOSTNAME') ||
+  os.hostname() ||
+  (process.platform === 'linux' ? 'MOCK-LINUX-PC' : 'MOCK-WINDOWS-PC');
 const DEVICE_FINGERPRINT =
   getenvFirst('AGENT_DEVICE_FINGERPRINT') ||
   'mock-' + crypto.createHash('sha256').update(HOSTNAME).digest('hex').slice(0, 24);
@@ -241,6 +252,7 @@ const server = http.createServer(async (req, res) => {
             deviceFingerprint: DEVICE_FINGERPRINT,
             hostname: HOSTNAME,
             agentVersion: agentState.version,
+            platform: PLATFORM,
           }),
         });
       } catch (err) {
@@ -326,6 +338,7 @@ if (require.main === module) {
   MANGO VPN - Local Windows Agent Simulator (v2)
 ============================================================
   Address:        http://${HOST}:${PORT}
+  Platform:       ${PLATFORM}
   AllowedOrigins: ${ALLOWED_ORIGINS.join(', ')}
   PairingToken:   ${PAIRING_TOKEN}
 ============================================================

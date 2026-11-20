@@ -18,12 +18,12 @@ This guide lists the **tools, runtimes, and configuration** needed to run MANGO 
 | **npm** | **Both** (Rain & Sobree) | `9.0.0` | `10.x` | Monorepo workspaces (`Rain/*`, `Sobree/*`, `packages/*`). npm only; there is no pnpm workspace. | Bundled with Node |
 | **Git** | **Both** (Rain & Sobree) | `2.30.0` | Latest | Version control and branching | [git-scm.com](https://git-scm.com/) |
 | **Docker Desktop** | **Sobree** (and Rain for full-stack runs) | `24.0.0` | Latest | PostgreSQL 16 container, Linux WireGuard gateway container (`NET_ADMIN`) | [docker.com](https://www.docker.com/products/docker-desktop/) |
-| **Go Toolchain** | **Sobree** | `1.22.0` (daemon) / `1.26.0` (agent) | Latest | Windows Agent (`Sobree/agent-windows/go.mod` requires `go 1.26.0`) and Linux VPN daemon (`Sobree/vpn-daemon/go.mod` requires `go 1.22`) | [go.dev](https://go.dev/dl/) |
-| **WireGuard for Windows** | **Sobree** | Latest | Latest | The agent runs `wireguard.exe /installtunnelservice` to bring up tunnel `mango0` | [wireguard.com](https://www.wireguard.com/install/) |
+| **Go Toolchain** | **Sobree** | `1.22.0` (daemon) / `1.26.0` (agent) | Latest | Client agent (`Sobree/agent-windows/go.mod` requires `go 1.26.0`; runs on Windows or Linux) and Linux VPN daemon (`Sobree/vpn-daemon/go.mod` requires `go 1.22`) | [go.dev](https://go.dev/dl/) |
+| **WireGuard** | **Sobree** (real tunnels only) | Latest | Latest | Windows: **WireGuard for Windows**, where the agent runs `wireguard.exe /installtunnelservice`. Linux: `wireguard-tools` (`wg`, `wg-quick`), `iproute2` (`ip`), and `nftables` (`nft`). The agent uses them to bring up tunnel `mango0` | [wireguard.com](https://www.wireguard.com/install/) |
 | **VS Code** *(Optional)* | **Both** | Latest | Latest | Editing | [code.visualstudio.com](https://code.visualstudio.com/) |
 
 > [!NOTE]
-> **Rain (Web Portal and Admin, Docker-free)**: You only need **Node.js and Git**, with **no Docker, Go, or WireGuard**, to run the portal, the API, and the admin CRUD. The Docker-free workflow uses three local tools: `npm run db:start` runs embedded PostgreSQL 16 (data in `.local/postgres`), `npm run mock:daemon` simulates the `:50051` gateway daemon (`[DEV MOCK DAEMON – no wg/nftables enforcement]`, dev-only), and `npm run mock:agent` simulates the `:47821` Windows Agent (`scripts/mock-agent.js`). Full-stack Docker runs still use Docker Desktop if you want them.
+> **Rain (Web Portal and Admin, Docker-free)**: You only need **Node.js and Git**, with **no Docker, Go, or WireGuard**, to run the portal, the API, and the admin CRUD. The Docker-free workflow uses three local tools: `npm run db:start` runs embedded PostgreSQL 16 (data in `.local/postgres`), `npm run mock:daemon` simulates the `:50051` gateway daemon (`[DEV MOCK DAEMON – no wg/nftables enforcement]`, dev-only), and `npm run mock:agent` simulates the `:47821` client agent (`scripts/mock-agent.js`, which mirrors `Sobree/agent-windows`). Full-stack Docker runs still use Docker Desktop if you want them.
 
 ---
 
@@ -33,13 +33,27 @@ This guide lists the **tools, runtimes, and configuration** needed to run MANGO 
 npm run check:env
 ```
 
-This runs `scripts/check-environment.ps1`, which verifies tool availability on `PATH` and prints detected versions alongside the minimum requirements (Node.js, npm, Git, Docker, Docker Compose, and Go).
-
-For Rain's Docker-free setup, run the role-specific check instead. It marks Docker, Docker Compose, Docker Desktop, and Go as `OPTIONAL`:
+This runs `scripts/check-environment.mjs` (Node.js only, no dependencies). It works the same on Linux, macOS, and Windows. It verifies tool availability on `PATH`, prints detected versions alongside the minimum requirements (Node.js, npm, Git, Docker, Docker Compose, and Go), checks the Docker daemon with `docker info`, and reports the WireGuard and gateway tools for your OS (`wireguard.exe` on Windows; `wg`, `wg-quick`, `ip`, and `nft` on Linux).
 
 ```powershell
-npm run check:env -- -Role Rain
+npm run check:env
 ```
+
+```bash
+npm run check:env
+```
+
+For Rain's Docker-free setup, run the role-specific check instead. It marks Docker, Docker Compose, and Go as `OPTIONAL`:
+
+```powershell
+npm run check:env -- --role Rain
+```
+
+```bash
+npm run check:env -- --role Rain
+```
+
+Options: `--role All|Rain|Sobree` (case-insensitive, default `All`), `--strict` (under `All`, also fail when Sobree tools are missing), and `--help`. The exit code is `0` when the required tools for the role are `READY`, `1` when one is missing, and `2` for invalid arguments. Under `All`, missing Sobree tools print `[PARTIAL]` and still exit `0`. On Windows, `scripts/check-environment.ps1 -Role Rain` runs the same checker.
 
 ---
 
@@ -66,11 +80,24 @@ docker info
 ```
 If `docker info` reports `error during connect`, start **Docker Desktop** and wait until the engine is running.
 
+On Linux, start the Docker Engine with `sudo systemctl start docker`. To run `docker` without `sudo`, add your user to the `docker` group (`sudo usermod -aG docker $USER`), then log out and back in.
+
+```bash
+docker -v
+docker compose version
+docker info
+```
+
 ### Go Toolchain (Sobree)
 ```powershell
 go version
 ```
 - **If missing**: Install the Windows `.msi` from [go.dev/dl](https://go.dev/dl/). The agent module needs Go 1.26 or newer, so check the `go` line in `Sobree/agent-windows/go.mod` before you install.
+- **If missing (Linux)**: Install Go 1.26 or newer from the tarball at [go.dev/dl](https://go.dev/dl/), or from your distribution's package if it is new enough. Confirm with `go version`.
+
+```bash
+go version
+```
 
 ---
 
@@ -80,6 +107,10 @@ All backend and gateway settings come from a single `.env` file at the repositor
 
 ```powershell
 copy .env.example .env
+```
+
+```bash
+cp .env.example .env
 ```
 
 Then replace every placeholder before you start anything:
@@ -128,13 +159,18 @@ Do not put a default password in source or in `.env.example`.
 | **3000** | TCP (HTTP) | Web Portal | Docker portal container and Vite dev server (`Rain/portal/vite.config.ts` pins port `3000`). |
 | **4000** | TCP (HTTP) | Control Plane API (Fastify) | `PORT` |
 | **15432** / **5432** | TCP (PostgreSQL) | PostgreSQL 16 on `127.0.0.1:15432` | Started by `npm run db:start` (embedded, Docker-free), or by the Docker `postgres` container (container port `5432`, host port `POSTGRES_PORT`, default `15432`). |
-| **47821** | TCP (HTTP, loopback) | Windows Agent or `mock-agent.js` | Binds `127.0.0.1` only. |
+| **47821** | TCP (HTTP, loopback) | Client agent (`Sobree/agent-windows`) or `mock-agent.js` | Binds `127.0.0.1` only. |
 | **51820** | UDP (WireGuard) | VPN gateway | `WG_LISTEN_PORT` |
 | **50051** | TCP (HTTP) | VPN gateway daemon API | Bearer-authenticated HTTP on `127.0.0.1:50051`. Started by `npm run mock:daemon` (dev-only simulator, no `wg`/`nftables` enforcement) or by the Docker `vpn-gateway` service (bound to host loopback in `docker-compose.yml` for local host API dev). |
 
 To check whether a port is in use on Windows:
 ```powershell
 Get-NetTCPConnection -LocalPort 4000 -ErrorAction SilentlyContinue
+```
+
+On Linux:
+```bash
+ss -tlnp | grep 4000
 ```
 
 ---
@@ -154,6 +190,8 @@ npm run build
 copy .env.example .env
 ```
 
+On Linux or macOS (Bash), run the same steps with `cp .env.example .env` in place of `copy`.
+
 ### Rain workflow (portal and admin, Docker-free)
 
 Rain needs **no Docker**. Run these from the repository root, one block per terminal:
@@ -170,7 +208,7 @@ npm run db:seed                      # needs SEED_ADMIN_* variables
 # Terminal 2: dev-only gateway daemon simulator on 127.0.0.1:50051 (no wg/nftables enforcement)
 npm run mock:daemon
 
-# Terminal 3: mock Windows Agent (prints its PairingToken on startup)
+# Terminal 3: mock client agent (prints its PairingToken on startup)
 npm run mock:agent
 
 # Terminal 4: API on :4000
@@ -179,6 +217,8 @@ npm run dev:api
 # Terminal 5: portal dev server on :3000
 npm run dev:portal
 ```
+
+These commands are plain `npm run` calls, so they work unchanged in Bash on Linux and macOS.
 
 The API's default `CORS_ORIGIN` and the agent's default allowed origin are `http://localhost:3000`, and `Rain/portal/vite.config.ts` pins Vite to port `3000` automatically so `npm run dev:portal` works directly without extra flags. `npm run dev:api` and `npm run db:seed` also automatically fall back to loading the monorepo root `.env`.
 
@@ -192,12 +232,27 @@ npm run db:generate
 npm run db:migrate
 npm run dev:api
 
-# Windows Agent (console mode, unless started by the Service Control Manager)
+# Client agent on Windows (console mode, unless started by the Service Control Manager)
 cd Sobree/agent-windows
 go run .
 
 # Gateway daemon. On Windows, run it in the container instead:
 docker compose up -d vpn-gateway
+```
+
+```bash
+docker compose up -d postgres
+npm run db:generate
+npm run db:migrate
+npm run dev:api
+
+# Client agent on Linux (root or CAP_NET_ADMIN, plus wg-quick)
+cd Sobree/agent-windows
+sudo -E go run .
+
+# Gateway daemon on Linux (root or NET_ADMIN, plus ip, wg, and nft)
+cd Sobree/vpn-daemon
+sudo -E go run .
 ```
 
 The `vpn-gateway` service needs `NET_ADMIN` and `wg`/`nft` on Linux. Run the daemon natively only on Linux.
@@ -216,6 +271,15 @@ $env:SEED_ADMIN_USERNAME="admin"
 $env:SEED_ADMIN_PASSWORD="<at-least-12-characters>"
 npm run db:seed
 Remove-Item Env:SEED_ADMIN_PASSWORD
+
+npm run docker:down
+```
+
+```bash
+export SEED_ADMIN_USERNAME="admin"
+export SEED_ADMIN_PASSWORD="<at-least-12-characters>"
+npm run db:seed
+unset SEED_ADMIN_PASSWORD
 
 npm run docker:down
 ```
@@ -242,6 +306,13 @@ npm test
 Remove-Item Env:DATABASE_URL         # keep it unset so `npm run dev:api` uses the mangovpn DB from .env
 ```
 
+```bash
+export DATABASE_URL="postgresql://mango:<password>@127.0.0.1:15432/mangovpn_v2_test?schema=public"
+npx prisma migrate deploy --schema=Sobree/api/prisma/schema.prisma
+npm test
+unset DATABASE_URL                   # keep it unset so `npm run dev:api` uses the mangovpn DB from .env
+```
+
 Replace `<password>` with `POSTGRES_PASSWORD` from `.env`.
 
 If your local `mangovpn` database still contains older v1 tables/migrations and tests fail with missing v2 types or tables (such as `type "public.RoleName" does not exist` or `table "public.connect_tickets" does not exist`), reset it to the v2 schema and re-seed:
@@ -255,6 +326,11 @@ For Go changes, run the vet and tests in each module:
 ```powershell
 cd Sobree/agent-windows; go vet ./...; go test ./...; cd ../..
 cd Sobree/vpn-daemon; go vet ./...; go test ./...; cd ../..
+```
+
+```bash
+(cd Sobree/agent-windows && go vet ./... && go test ./... && GOOS=windows go vet ./... && cd ../..)
+(cd Sobree/vpn-daemon && go vet ./... && go test ./... && cd ../..)
 ```
 
 ---
@@ -271,6 +347,14 @@ cd Sobree/vpn-daemon; go vet ./...; go test ./...; cd ../..
      $env:API_URL="http://localhost:4000"
      cd Sobree/agent-windows; go run .
      ```
+   Linux (Bash): run the agent as root (or with `CAP_NET_ADMIN`). It writes `/tmp/mango-vpn/mango0.conf` and runs `wg-quick up` on that file. Use the same `AGENT_*` and `API_URL` values:
+   ```bash
+   export AGENT_LISTEN_ADDR="127.0.0.1:47821"
+   export AGENT_ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:3000"
+   export AGENT_PAIRING_TOKEN="<your-chosen-local-pairing-token>"
+   export API_URL="http://localhost:4000"
+   cd Sobree/agent-windows && sudo -E go run .
+   ```
 2. **Sign in (`http://localhost:3000`)**: Enter your seeded `ADMIN` username/password (`POST /api/auth/login`).
 3. **Complete TOTP MFA**: On first login (`MFA_SETUP_REQUIRED`), scan the QR code (`otpauthUri`) in an authenticator app and enter the 6-digit code (`POST /api/auth/verify-otp`).
 4. **Pair the local agent**: Paste the `PairingToken` into the Portal's pairing-token field (`X-Mango-Agent-Token`).
@@ -286,11 +370,11 @@ cd Sobree/vpn-daemon; go vet ./...; go test ./...; cd ../..
 | API refuses to start | Missing or short secret in `.env` (`Sobree/api/src/config.ts`) | Ensure `JWT_SECRET`, `REFRESH_SECRET`, `DAEMON_SHARED_SECRET` are `>= 32` chars and `TOTP_ENCRYPTION_KEY` is `64` hex chars. |
 | `RoleName` or `connect_tickets` does not exist | Local `mangovpn` DB still has v1 schema/migrations | Run `npx prisma migrate reset --force --schema=Sobree/api/prisma/schema.prisma` and `npm run db:seed`. |
 | `403 FORBIDDEN_ORIGIN` from agent | Portal running on an unexpected origin outside `AGENT_ALLOWED_ORIGINS` | Run `npm run dev:portal` (pinned to `:3000`) or add the origin to `AGENT_ALLOWED_ORIGINS` and `CORS_ORIGIN`. |
-| `401 Unauthorized` from agent | Missing/mismatched `X-Mango-Agent-Token` | Paste `PairingToken` from `npm run mock:agent`, or set `$env:AGENT_PAIRING_TOKEN` explicitly before `go run .` (Go agent does not print ephemeral tokens). |
+| `401 Unauthorized` from agent | Missing/mismatched `X-Mango-Agent-Token` | Paste `PairingToken` from `npm run mock:agent`, or set `$env:AGENT_PAIRING_TOKEN` (PowerShell) / `export AGENT_PAIRING_TOKEN=...` (Bash) explicitly before `go run .` (Go agent does not print ephemeral tokens). |
 | `426` (`AGENT_VERSION_OUTDATED` / `INACTIVE`) | `windows-x64` agent version blocked or outdated in `agent_versions` | Activate or update version `2.0.0` for `windows-x64` in the Portal's **Agent Versions** tab. |
 | `502` on Connect / Policy Sync / Revoke | `api` cannot reach `vpn-gateway` or `DAEMON_SHARED_SECRET` mismatch | Docker-free (Track A): confirm `npm run mock:daemon` is running on `127.0.0.1:50051` and `DAEMON_SHARED_SECRET` is at least 32 characters. Docker: check `docker compose ps vpn-gateway`, `docker compose logs vpn-gateway`, and `VPN_DAEMON_URL`. |
 
-**Quick live diagnostics**:
+**Quick live diagnostics** (PowerShell; Bash equivalents follow):
 ```powershell
 # Inspect WireGuard peers and nftables policy chain inside vpn-gateway
 docker exec mango-vpn-gateway wg show
@@ -299,6 +383,17 @@ docker exec mango-vpn-gateway nft list table inet mango_vpn
 # Probe local Windows Agent / mock-agent loopback endpoints
 Invoke-RestMethod http://127.0.0.1:47821/health
 Invoke-RestMethod http://127.0.0.1:47821/status -Headers @{ "X-Mango-Agent-Token" = "<your-token>" }
+Get-Content "$env:TEMP\mango-vpn\mango0.conf"
+```
+
+```bash
+# Same checks on Linux
+ss -tlnp | grep 4000
+docker exec mango-vpn-gateway wg show
+docker exec mango-vpn-gateway nft list table inet mango_vpn
+curl -s http://127.0.0.1:47821/health
+curl -s -H "X-Mango-Agent-Token: <your-token>" http://127.0.0.1:47821/status
+cat /tmp/mango-vpn/mango0.conf
 ```
 
 ---
@@ -310,6 +405,7 @@ Invoke-RestMethod http://127.0.0.1:47821/status -Headers @{ "X-Mango-Agent-Token
 2. **Deploy Linux gateway & control plane (AWS EC2 — Profile B in `.env.example`)**:
    - Open **UDP `51820`** (WireGuard) and **HTTPS `443`** (reverse proxy/ALB -> Portal `:3000` and API `:4000`); block `15432` in the EC2 Security Group (`:50051` is bound to `127.0.0.1` on the host and internal to `mango-net`).
    - Set `NODE_ENV=production`, strong secrets, `WG_SERVER_ENDPOINT=<AWS_PUBLIC_IP_OR_DNS>:51820`, `CORS_ORIGIN=https://vpn.example.com`, and `VITE_API_URL=https://api.vpn.example.com`, then run `docker compose up -d --build` and `npm run db:seed`.
-3. **Build & roll out the Windows Agent (`Sobree/agent-windows`)**:
+3. **Build & roll out the client agent (`Sobree/agent-windows`, Windows or Linux)**:
    - Build binary (`$env:GOOS="windows"; $env:GOARCH="amd64"; go build -trimpath -ldflags="-s -w" -o mango-agent-windows.exe .`) and record SHA-256 (`Get-FileHash`).
-   - Register the release in Admin **Agent Versions** (`platform`: `windows-x64`) and configure client env vars (`AGENT_LISTEN_ADDR`, `AGENT_ALLOWED_ORIGINS`, `AGENT_PAIRING_TOKEN`, `API_URL`).
+   - Linux / macOS (Bash): `GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o mango-agent-linux-x64 .` and `GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o mango-agent-windows-x64.exe .`, then `sha256sum` each file.
+   - Register each release in Admin **Agent Versions** (`platform`: `windows-x64` or `linux-x64`) and configure client env vars (`AGENT_LISTEN_ADDR`, `AGENT_ALLOWED_ORIGINS`, `AGENT_PAIRING_TOKEN`, `API_URL`).

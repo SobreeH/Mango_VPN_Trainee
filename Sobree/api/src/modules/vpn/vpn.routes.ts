@@ -124,6 +124,7 @@ export async function registerVpnRoutes(
       const deviceFingerprint = request.body?.deviceFingerprint?.trim() ?? '';
       const hostname = request.body?.hostname?.trim() ?? '';
       const agentVersion = request.body?.agentVersion?.trim() ?? '';
+      const platform = request.body?.platform?.trim() || 'windows-x64';
 
       if (!ticket || !publicKey || !deviceFingerprint || !hostname || !agentVersion) {
         return reply.status(400).send({
@@ -142,7 +143,7 @@ export async function registerVpnRoutes(
       }
 
       try {
-        await assertAgentVersionAllowed(prisma, agentVersion, 'windows-x64');
+        await assertAgentVersionAllowed(prisma, agentVersion, platform);
       } catch (err) {
         if (err instanceof AgentVersionError) {
           return reply.status(err.statusCode).send({
