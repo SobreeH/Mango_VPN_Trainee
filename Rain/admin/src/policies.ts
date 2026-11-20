@@ -13,6 +13,7 @@ import {
   type CreateVpnPolicyRequest,
   type DaemonPolicyRule,
   type DaemonSyncPoliciesRequest,
+  type DeletePolicyResponse,
   type VpnPolicyDto,
   type VpnPolicyListResponse,
 } from '@mango/shared';
@@ -360,6 +361,7 @@ export function registerPolicyRoutes(
       }
     }
 
-    return reply.status(200).send({ success: true, id });
+    const result: DeletePolicyResponse = { success: true, id };
+    return reply.status(200).send(result);
   });
 }

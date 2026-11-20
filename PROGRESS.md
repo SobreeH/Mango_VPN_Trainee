@@ -46,7 +46,7 @@ The full monorepo builds cleanly, passes all 70 Vitest tests on both `mangovpn_v
 
 | Component | Path | Build / Test Status | Runtime / Deployment Readiness |
 | :--- | :--- | :--- | :--- |
-| **Shared Contracts** | `packages/shared` (`@mango/shared`) | ✅ Compiles (`tsc`) | Ready (`DeletePolicyResponse` cleanup tracked in `#19`) |
+| **Shared Contracts** | `packages/shared` (`@mango/shared`) | ✅ Compiles (`tsc`) | Ready (`DeletePolicyResponse` DTO & URL-encoded IDs completed) |
 | **Control Plane API** | `Sobree/api` (`@mango/api`) | ✅ Compiles & `40/40` tests pass (vs `mangovpn` & `mangovpn_v2_test`) | Auto-loads root `.env`, cleans rotated device keys on reconnect; production auth hardening in `#19` |
 | **Admin CRUD Plugin** | `Rain/admin` (`@mango/rain-admin`) | ✅ Compiles & `3/3` seed tests pass | Mounted under `/api` in `Sobree/api/src/app.ts`; `seed.ts` auto-loads root `.env` |
 | **Web Portal UI** | `Rain/portal` (`@mango/portal`) | ✅ Compiles (`tsc && vite build`) & `27/27` tests pass | Ready (`nginx.conf` added, LF `docker-entrypoint.sh`, Vite pinned to `:3000`, honest error-vs-empty states & `priority: 0` fixed) |
@@ -80,7 +80,7 @@ The full monorepo builds cleanly, passes all 70 Vitest tests on both `mangovpn_v
 ### Deferred — Pre-Production Hardening & Live Cloud/Windows Rollout
 
 - [ ] **5. Production hardening & live environment rollout (Tracked in GitHub Issues)**
-  - **Issue `#19`** (`ready-for-agent`): Atomic refresh-token reuse check inside `prisma.$transaction`, authenticate/authorize `POST /api/vpn/disconnect`, wire `recordAuthAuditEvent` into auth routes, require `WG_SERVER_PUBLIC_KEY` in production, and add `DeletePolicyResponse` DTO + URL-encoded IDs.
+  - **Issue `#19`** (`ready-for-agent`): Atomic refresh-token reuse check inside `prisma.$transaction`, authenticate/authorize `POST /api/vpn/disconnect`, wire `recordAuthAuditEvent` into auth routes, and require `WG_SERVER_PUBLIC_KEY` in production (`DeletePolicyResponse` DTO + URL-encoded IDs completed in `Rain/` and `@mango/shared`).
   - **Issue `#20`** (`ready-for-agent`): Serialize `applyNftables` execution in `Sobree/vpn-daemon/main.go`, validate `WG_PRIVATE_KEY` at startup, expand Go concurrency/failure-rollback unit tests, and add semantic version comparisons to `scripts/check-environment.ps1`.
   - **Issue `#21`** (`ready-for-human`): Verify live `wireguard.exe` `mango0` tunnel bring-up/teardown on an elevated Windows host/VM, provision AWS EC2 Profile B with TLS reverse proxy (`:443` -> `:3000`/`:4000`, block `:15432`), and publish the signed Windows Agent binary in Admin **Agent Versions**.
 
