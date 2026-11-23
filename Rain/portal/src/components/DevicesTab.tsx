@@ -68,14 +68,14 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="ค้นหาชื่อเครื่องหรือผู้ใช้"
             aria-label="Search devices"
-            className="w-full h-12 rounded-2xl border border-[#1c2838] bg-[#0c1524]/80 px-5 pr-10 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:border-[#007dfc] focus:ring-1 focus:ring-[#007dfc] focus:outline-none transition-colors"
+            className="w-full h-12 rounded-2xl border border-white/5 bg-[#262420]/70 px-5 pr-10 text-xs sm:text-sm text-stone-100 placeholder-stone-500 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 focus:outline-none transition-colors"
           />
           {searchTerm && (
             <button
               type="button"
               onClick={() => setSearchTerm('')}
               aria-label="Clear search"
-              className="absolute right-3.5 top-3.5 p-0.5 rounded-full text-slate-400 hover:text-slate-200"
+              className="absolute right-3.5 top-3.5 p-0.5 rounded-full text-stone-400 hover:text-stone-200"
             >
               <X className="h-4 w-4" />
             </button>
@@ -86,24 +86,24 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as 'ALL' | DeviceStatus)}
             aria-label="Filter status"
-            className="w-full h-12 rounded-2xl border border-[#1c2838] bg-[#0c1524]/80 px-5 pr-10 text-xs sm:text-sm text-slate-200 focus:border-[#007dfc] focus:ring-1 focus:ring-[#007dfc] focus:outline-none transition-colors appearance-none cursor-pointer"
+            className="w-full h-12 rounded-2xl border border-white/5 bg-[#262420]/70 px-5 pr-10 text-xs sm:text-sm text-stone-200 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 focus:outline-none transition-colors appearance-none cursor-pointer"
           >
             <option value="ALL">ทุกสถานะ</option>
             <option value={DeviceStatus.ACTIVE}>ใช้งานอยู่</option>
             <option value={DeviceStatus.REVOKED}>เพิกถอนแล้ว</option>
           </select>
-          <ChevronDown className="absolute right-4 top-4 h-4 w-4 text-slate-400 pointer-events-none" />
+          <ChevronDown className="absolute right-4 top-4 h-4 w-4 text-stone-400 pointer-events-none" />
         </div>
       </div>
 
       {listQuery.isLoading ? (
-        <p className="text-sm text-slate-400">Loading devices...</p>
+        <p className="text-sm text-stone-400">Loading devices...</p>
       ) : devices.length === 0 && !listQuery.error ? (
-        <div className="rounded-3xl border border-[#1c2838] bg-[#0c1524]/80 p-8 text-center text-sm text-slate-400">
+        <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/80 p-8 text-center text-sm text-stone-400">
           No devices found.
         </div>
       ) : filteredDevices.length === 0 ? (
-        <div className="rounded-3xl border border-[#1c2838] bg-[#0c1524]/80 p-8 text-center text-sm text-slate-400 space-y-2">
+        <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/80 p-8 text-center text-sm text-stone-400 space-y-2">
           <p>ไม่พบอุปกรณ์ที่ตรงกับเงื่อนไขการค้นหา</p>
           <button
             type="button"
@@ -111,15 +111,15 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
               setSearchTerm('');
               setStatusFilter('ALL');
             }}
-            className="text-xs text-[#007dfc] hover:underline"
+            className="text-xs text-amber-400 hover:underline"
           >
             ล้างคำค้นหา
           </button>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-3xl border border-[#1c2838] bg-[#0c1524]/85 shadow-2xl backdrop-blur-xl">
-          <table className="w-full text-left text-xs sm:text-sm text-slate-300">
-            <thead className="border-b border-[#1c2838] text-slate-400 text-xs font-semibold">
+        <div className="overflow-x-auto rounded-3xl border border-white/5 bg-[#1e1d1a]/80 shadow-2xl backdrop-blur-xl">
+          <table className="w-full text-left text-xs sm:text-sm text-stone-300">
+            <thead className="border-b border-white/5 text-stone-400 text-xs font-semibold">
               <tr>
                 <th className="px-6 py-4">อุปกรณ์</th>
                 <th className="px-6 py-4">ผู้ใช้</th>
@@ -127,28 +127,28 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
                 <th className="px-6 py-4 text-right">การทำงาน</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#1c2838]">
+            <tbody className="divide-y divide-white/5">
               {filteredDevices.map((d) => (
-                <tr key={d.id} className="hover:bg-slate-800/20 transition-colors">
+                <tr key={d.id} className="hover:bg-white/[0.02] transition-colors">
                   <td className="px-6 py-4">
                     <div>
-                      <div className="font-bold text-slate-100 text-sm tracking-tight">{d.hostname}</div>
-                      <div className="font-mono text-xs text-slate-400 bg-[#080e18] px-2 py-0.5 rounded border border-[#1c2838] mt-1 inline-block">
+                      <div className="font-bold text-stone-100 text-sm tracking-tight">{d.hostname}</div>
+                      <div className="font-mono text-xs text-stone-400 bg-[#141311] px-2 py-0.5 rounded border border-white/5 mt-1 inline-block">
                         {d.fingerprint.length > 16
                           ? `${d.fingerprint.slice(0, 4)}...${d.fingerprint.slice(-4)}`
                           : d.fingerprint}
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-slate-300 font-medium">
+                  <td className="px-6 py-4 text-stone-300 font-medium">
                     {d.username ?? d.userId}
                   </td>
                   <td className="px-6 py-4">
                     <span
                       className={`inline-flex items-center gap-2 rounded-full px-4 py-1 text-xs font-medium border ${
                         d.status === DeviceStatus.ACTIVE
-                          ? 'bg-emerald-950/60 border-emerald-800/60 text-emerald-400'
-                          : 'bg-rose-950/60 border-rose-900/60 text-rose-400'
+                          ? 'bg-[#162a1e]/90 border-emerald-900/40 text-emerald-400'
+                          : 'bg-[#2a1719]/90 border-rose-900/40 text-rose-400'
                       }`}
                     >
                       <span
@@ -172,7 +172,7 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
                           fingerprint: d.fingerprint,
                         })
                       }
-                      className="rounded-xl border border-rose-900/60 bg-rose-950/40 px-5 py-1.5 text-xs font-medium text-rose-200 hover:bg-rose-900/60 hover:text-rose-100 transition-colors disabled:opacity-35 disabled:cursor-not-allowed shadow-sm"
+                      className="rounded-xl border border-rose-900/50 bg-[#381a1c]/80 px-5 py-1.5 text-xs font-medium text-rose-200 hover:bg-rose-900/60 hover:text-rose-100 transition-colors disabled:opacity-35 disabled:cursor-not-allowed shadow-sm"
                     >
                       เพิกถอน
                     </button>
