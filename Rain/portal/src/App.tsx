@@ -209,27 +209,27 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
       <main className={`min-h-screen p-4 sm:p-6 lg:p-8 relative overflow-hidden transition-colors duration-300 ${
         isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'
       }`}>
-        {/* Ambient Glows */}
+        {/* Ambient Glows: Electric Blue & Mango Orange (Mango Consultant style) */}
         <div className={`absolute -top-32 left-1/3 w-96 h-96 rounded-full blur-3xl pointer-events-none transition-colors duration-500 ${
-          isDark ? 'bg-amber-500/10' : 'bg-amber-300/25'
+          isDark ? 'bg-[#007dfc]/15' : 'bg-[#007dfc]/20'
         }`} />
         <div className={`absolute -bottom-32 right-12 w-96 h-96 rounded-full blur-3xl pointer-events-none transition-colors duration-500 ${
-          isDark ? 'bg-emerald-500/10' : 'bg-emerald-300/20'
+          isDark ? 'bg-[#f97316]/12' : 'bg-[#f97316]/15'
         }`} />
 
         {/* Top Utility Bar (Language & Theme) - Only shown outside Admin dashboard or if non-admin */}
         {!isAdmin && (
           <div className="w-full flex justify-end items-center gap-2 mb-4 relative z-20">
             <div className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
-              isDark ? 'bg-black/40 border-stone-800/80' : 'bg-white border-slate-200'
+              isDark ? 'bg-[#0c1524] border-[#1c2838]' : 'bg-white border-slate-200'
             }`}>
               <button
                 type="button"
                 onClick={() => setLang('th')}
                 className={`px-3 py-1 rounded-full transition-colors ${
                   lang === 'th'
-                    ? 'bg-amber-500 text-stone-950 shadow-sm font-bold'
-                    : isDark ? 'text-stone-400 hover:text-stone-200' : 'text-slate-500 hover:text-slate-800'
+                    ? 'bg-[#007dfc] text-white shadow-sm font-bold'
+                    : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
                 TH
@@ -239,8 +239,8 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                 onClick={() => setLang('en')}
                 className={`px-3 py-1 rounded-full transition-colors ${
                   lang === 'en'
-                    ? 'bg-amber-500 text-stone-950 shadow-sm font-bold'
-                    : isDark ? 'text-stone-400 hover:text-stone-200' : 'text-slate-500 hover:text-slate-800'
+                    ? 'bg-[#007dfc] text-white shadow-sm font-bold'
+                    : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
                 EN
@@ -251,7 +251,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
               role="group"
               aria-label="Toggle theme"
               className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
-                isDark ? 'bg-black/40 border-stone-800/80' : 'bg-white border-slate-200'
+                isDark ? 'bg-[#0c1524] border-[#1c2838]' : 'bg-white border-slate-200'
               }`}
             >
               <button
@@ -260,8 +260,8 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                 aria-label="Light mode"
                 className={`p-1.5 rounded-full transition-colors ${
                   !isDark
-                    ? 'bg-amber-500 text-stone-950 shadow-sm font-bold'
-                    : 'text-stone-400 hover:text-stone-200'
+                    ? 'bg-[#007dfc] text-white shadow-sm font-bold'
+                    : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
                 <Sun className="h-3.5 w-3.5" />
@@ -272,8 +272,8 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                 aria-label="Dark mode"
                 className={`p-1.5 rounded-full transition-colors ${
                   isDark
-                    ? 'bg-amber-500 text-stone-950 shadow-sm font-bold'
-                    : 'text-stone-400 hover:text-stone-200'
+                    ? 'bg-[#007dfc] text-white shadow-sm font-bold'
+                    : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
                 <Moon className="h-3.5 w-3.5" />
@@ -288,17 +288,17 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
             
             {/* Left Sidebar */}
             <aside className={`w-full md:w-64 lg:w-72 shrink-0 rounded-3xl border shadow-2xl p-6 flex flex-col justify-between backdrop-blur-xl transition-colors min-h-[calc(100vh-6rem)] ${
-              isDark ? 'border-white/5 bg-[#181614]/80' : 'border-slate-200/90 bg-white/95'
+              isDark ? 'border-[#1c2838] bg-[#0c1524]/90' : 'border-slate-200/90 bg-white/95'
             }`}>
               <div className="space-y-7">
                 {/* Brand Header */}
                 <div className="flex items-center gap-2.5">
                   <span className="text-3xl" role="img" aria-label="Mango">🥭</span>
                   <div>
-                    <h1 className={`text-base font-bold tracking-tight ${isDark ? 'text-stone-100' : 'text-slate-900'}`}>
+                    <h1 className={`text-base font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                       MANGO VPN
                     </h1>
-                    <p className={`text-[10px] font-medium ${isDark ? 'text-stone-400' : 'text-amber-700'}`}>
+                    <p className={`text-[10px] font-medium ${isDark ? 'text-[#4a9ff8]' : 'text-[#005fca]'}`}>
                       Mango Consultant Co., Ltd.
                     </p>
                   </div>
@@ -308,7 +308,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                 <nav role="tablist" aria-label="Admin Governance" className="space-y-6">
                   {/* Group 1: Management (จัดการ) */}
                   <div className="space-y-1">
-                    <p className={`text-xs font-semibold px-3 pb-1 tracking-wide ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
+                    <p className={`text-xs font-semibold px-3 pb-1 tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                       {lang === 'th' ? 'จัดการ' : 'Management'}
                     </p>
                     {[
@@ -328,10 +328,10 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                           className={`w-full flex items-center px-4 py-2.5 rounded-xl text-xs sm:text-sm transition-all text-left ${
                             isActive
                               ? isDark
-                                ? 'bg-[#7a4816] text-amber-50 font-semibold shadow-sm'
-                                : 'bg-amber-500 text-slate-950 font-semibold shadow-sm'
+                                ? 'bg-[#007dfc] text-white font-semibold shadow-md shadow-blue-500/25'
+                                : 'bg-[#007dfc] text-white font-semibold shadow-md shadow-blue-500/20'
                               : isDark
-                                ? 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40 font-medium'
+                                ? 'text-slate-400 hover:text-slate-100 hover:bg-[#132238] font-medium'
                                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium'
                           }`}
                         >
@@ -343,7 +343,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
 
                   {/* Group 2: Live Monitoring (ติดตามสด) */}
                   <div className="space-y-1">
-                    <p className={`text-xs font-semibold px-3 pb-1 tracking-wide ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
+                    <p className={`text-xs font-semibold px-3 pb-1 tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                       {lang === 'th' ? 'ติดตามสด' : 'Live Monitoring'}
                     </p>
                     {[
@@ -361,10 +361,10 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                           className={`w-full flex items-center px-4 py-2.5 rounded-xl text-xs sm:text-sm transition-all text-left ${
                             isActive
                               ? isDark
-                                ? 'bg-[#7a4816] text-amber-50 font-semibold shadow-sm'
-                                : 'bg-amber-500 text-slate-950 font-semibold shadow-sm'
+                                ? 'bg-[#007dfc] text-white font-semibold shadow-md shadow-blue-500/25'
+                                : 'bg-[#007dfc] text-white font-semibold shadow-md shadow-blue-500/20'
                               : isDark
-                                ? 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40 font-medium'
+                                ? 'text-slate-400 hover:text-slate-100 hover:bg-[#132238] font-medium'
                                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium'
                           }`}
                         >
@@ -376,7 +376,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
 
                   {/* Group 3: Audit & System (ตรวจสอบ) */}
                   <div className="space-y-1">
-                    <p className={`text-xs font-semibold px-3 pb-1 tracking-wide ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
+                    <p className={`text-xs font-semibold px-3 pb-1 tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                       {lang === 'th' ? 'ตรวจสอบ' : 'Audit & System'}
                     </p>
                     {[
@@ -395,10 +395,10 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                           className={`w-full flex items-center px-4 py-2.5 rounded-xl text-xs sm:text-sm transition-all text-left ${
                             isActive
                               ? isDark
-                                ? 'bg-[#7a4816] text-amber-50 font-semibold shadow-sm'
-                                : 'bg-amber-500 text-slate-950 font-semibold shadow-sm'
+                                ? 'bg-[#007dfc] text-white font-semibold shadow-md shadow-blue-500/25'
+                                : 'bg-[#007dfc] text-white font-semibold shadow-md shadow-blue-500/20'
                               : isDark
-                                ? 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40 font-medium'
+                                ? 'text-slate-400 hover:text-slate-100 hover:bg-[#132238] font-medium'
                                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium'
                           }`}
                         >
@@ -411,19 +411,19 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
               </div>
 
               {/* Sidebar Footer */}
-              <div className={`pt-4 border-t space-y-1.5 ${isDark ? 'border-stone-800/60' : 'border-slate-200/80'}`}>
+              <div className={`pt-4 border-t space-y-1.5 ${isDark ? 'border-[#1c2838]' : 'border-slate-200/80'}`}>
                 <div className="text-xs">
-                  <span className={`font-semibold ${isDark ? 'text-stone-300' : 'text-slate-800'}`}>
+                  <span className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
                     {step.session.user.username}
                   </span>
-                  <span className="text-stone-500 mx-1.5">·</span>
-                  <span className="text-amber-400 font-bold">{step.session.user.role}</span>
+                  <span className="text-slate-500 mx-1.5">·</span>
+                  <span className="text-[#007dfc] font-bold">{step.session.user.role}</span>
                 </div>
                 <button
                   type="button"
                   onClick={handleLogout}
                   aria-label="Log Out"
-                  className="w-full flex items-center gap-1.5 text-xs font-medium text-stone-400 hover:text-rose-400 transition-colors pt-1"
+                  className="w-full flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-rose-400 transition-colors pt-1"
                 >
                   <LogOut className="h-3 w-3" />
                   <span>{lang === 'th' ? 'ออกจากระบบ' : 'Log Out'}</span>
@@ -436,7 +436,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
               {/* Main Content Header */}
               <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                  <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${isDark ? 'text-stone-100' : 'text-slate-900'}`}>
+                  <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                     {activeTab === 'users' && (lang === 'th' ? 'ผู้ใช้' : 'Users')}
                     {activeTab === 'devices' && (lang === 'th' ? 'อุปกรณ์' : 'Devices')}
                     {activeTab === 'policies' && (lang === 'th' ? 'นโยบาย' : 'Policies')}
@@ -455,27 +455,27 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                     title={lang === 'th' ? 'แผงควบคุม VPN' : 'VPN Control Panel'}
                     className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold border transition-all ${
                       showVpnPanel
-                        ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                        ? 'bg-[#007dfc]/20 border-[#007dfc]/40 text-[#4a9ff8]'
                         : isDark
-                          ? 'border-stone-800 bg-[#181614]/70 text-stone-400 hover:text-stone-200'
+                          ? 'border-[#1c2838] bg-[#0c1524] text-slate-400 hover:text-slate-200'
                           : 'border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
-                    <Power className="h-3 w-3 text-amber-400" />
+                    <Power className="h-3 w-3 text-[#007dfc]" />
                     <span className="hidden sm:inline">{lang === 'th' ? 'VPN' : 'VPN'}</span>
                   </button>
 
                   {/* Language Switcher Pills */}
                   <div className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
-                    isDark ? 'bg-black/40 border-stone-800/80' : 'bg-white border-slate-200'
+                    isDark ? 'bg-[#0c1524] border-[#1c2838]' : 'bg-white border-slate-200'
                   }`}>
                     <button
                       type="button"
                       onClick={() => setLang('th')}
                       className={`px-3 py-1 rounded-full transition-colors ${
                         lang === 'th'
-                          ? 'bg-amber-500 text-stone-950 shadow-sm font-bold'
-                          : isDark ? 'text-stone-400 hover:text-stone-200' : 'text-slate-500 hover:text-slate-800'
+                          ? 'bg-[#007dfc] text-white shadow-sm font-bold'
+                          : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
                       }`}
                     >
                       TH
@@ -485,8 +485,8 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                       onClick={() => setLang('en')}
                       className={`px-3 py-1 rounded-full transition-colors ${
                         lang === 'en'
-                          ? 'bg-amber-500 text-stone-950 shadow-sm font-bold'
-                          : isDark ? 'text-stone-400 hover:text-stone-200' : 'text-slate-500 hover:text-slate-800'
+                          ? 'bg-[#007dfc] text-white shadow-sm font-bold'
+                          : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
                       }`}
                     >
                       EN
@@ -498,7 +498,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                     role="group"
                     aria-label="Toggle theme"
                     className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
-                      isDark ? 'bg-black/40 border-stone-800/80' : 'bg-white border-slate-200'
+                      isDark ? 'bg-[#0c1524] border-[#1c2838]' : 'bg-white border-slate-200'
                     }`}
                   >
                     <button
@@ -507,8 +507,8 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                       aria-label="Light mode"
                       className={`p-1.5 rounded-full transition-colors ${
                         !isDark
-                          ? 'bg-amber-500 text-stone-950 shadow-sm font-bold'
-                          : 'text-stone-400 hover:text-stone-200'
+                          ? 'bg-[#007dfc] text-white shadow-sm font-bold'
+                          : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
                       <Sun className="h-3.5 w-3.5" />
@@ -519,8 +519,8 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                       aria-label="Dark mode"
                       className={`p-1.5 rounded-full transition-colors ${
                         isDark
-                          ? 'bg-amber-500 text-stone-950 shadow-sm font-bold'
-                          : 'text-stone-400 hover:text-stone-200'
+                          ? 'bg-[#007dfc] text-white shadow-sm font-bold'
+                          : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
                       <Moon className="h-3.5 w-3.5" />
@@ -636,32 +636,32 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
 
   return (
     <main className={`min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden transition-colors duration-300 ${
-      isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'
+      isDark ? 'bg-[#080e18] text-slate-100' : 'bg-[#f8faff] text-slate-900'
     }`}>
-      {/* Ambient warm gradient glows */}
+      {/* Ambient gradient glows (Mango Consultant: Electric Blue & Mango Orange) */}
       <div className={`absolute -top-32 -left-32 w-80 h-80 rounded-full blur-3xl pointer-events-none transition-colors duration-500 ${
-        isDark ? 'bg-amber-500/15' : 'bg-amber-300/35'
+        isDark ? 'bg-[#007dfc]/15' : 'bg-[#007dfc]/20'
       }`} />
       <div className={`absolute -bottom-32 -right-32 w-80 h-80 rounded-full blur-3xl pointer-events-none transition-colors duration-500 ${
-        isDark ? 'bg-emerald-500/10' : 'bg-emerald-300/25'
+        isDark ? 'bg-[#f97316]/12' : 'bg-[#f97316]/15'
       }`} />
 
       {/* Centered Floating 2-Column Card (Compact / Non-full width, with roomy vertical min-height) */}
       <section className={`w-full max-w-3xl lg:max-w-4xl min-h-[580px] grid grid-cols-1 md:grid-cols-12 rounded-3xl border shadow-2xl overflow-hidden backdrop-blur-md relative z-10 transition-colors duration-300 ${
         isDark
-          ? 'border-slate-800/80 bg-slate-900/95 shadow-black/40'
-          : 'border-slate-200/90 bg-white/95 shadow-slate-300/60'
+          ? 'border-[#1c2838] bg-[#0c1524]/95 shadow-black/60'
+          : 'border-slate-200/90 bg-white/95 shadow-blue-500/5'
       }`}>
         
         {/* Left Column: Mango Hero Banner */}
         <div className={`md:col-span-5 p-8 sm:p-10 flex flex-col justify-between border-b md:border-b-0 md:border-r relative overflow-hidden transition-colors duration-300 ${
           isDark
-            ? 'bg-gradient-to-br from-amber-600/25 via-amber-950/20 to-slate-950 border-slate-800/60'
-            : 'bg-gradient-to-br from-amber-500/15 via-amber-100/50 to-slate-50 border-slate-200/80'
+            ? 'bg-gradient-to-br from-[#007dfc]/20 via-[#0d1b2a] to-[#080e18] border-[#1c2838]'
+            : 'bg-gradient-to-br from-[#007dfc]/10 via-[#f0f7ff] to-white border-slate-200/80'
         }`}>
           {/* Subtle inner accent glow */}
           <div className={`absolute -top-12 -left-12 w-44 h-44 rounded-full blur-2xl pointer-events-none ${
-            isDark ? 'bg-amber-500/20' : 'bg-amber-300/30'
+            isDark ? 'bg-[#007dfc]/20' : 'bg-[#007dfc]/30'
           }`} />
 
           {/* Top Brand Header */}
@@ -675,7 +675,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                   MANGO VPN
                 </h1>
                 <p className={`text-[11px] font-medium ${
-                  isDark ? 'text-amber-300/80' : 'text-amber-700'
+                  isDark ? 'text-[#4a9ff8]' : 'text-[#005fca]'
                 }`}>Mango Consultant Co., Ltd.</p>
               </div>
             </div>
@@ -699,7 +699,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
 
           {/* Bottom Copyright Footer */}
           <div className={`relative z-10 pt-4 border-t ${
-            isDark ? 'border-slate-800/50' : 'border-slate-200/80'
+            isDark ? 'border-[#1c2838]' : 'border-slate-200/80'
           }`}>
             <p className={`text-[10px] ${
               isDark ? 'text-slate-500' : 'text-slate-400'
@@ -711,7 +711,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
 
         {/* Right Column: Sign In & MFA Form */}
         <div className={`md:col-span-7 p-8 sm:p-10 flex flex-col justify-between space-y-6 transition-colors duration-300 ${
-          isDark ? 'bg-slate-950/80' : 'bg-white/95'
+          isDark ? 'bg-[#0c1524]/80' : 'bg-white/95'
         }`}>
           {/* Top Bar: Language & Theme Switches */}
           <div className="flex items-center justify-between">
@@ -726,15 +726,15 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
             <div className="flex items-center gap-2">
               {/* Language Switcher Pills */}
               <div className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
-                isDark ? 'bg-black/40 border-stone-800/80' : 'bg-slate-100 border-slate-200'
+                isDark ? 'bg-[#080e18] border-[#1c2838]' : 'bg-slate-100 border-slate-200'
               }`}>
                 <button
                   type="button"
                   onClick={() => setLang('th')}
                   className={`px-3 py-1 rounded-full transition-colors ${
                     lang === 'th'
-                      ? 'bg-amber-500 text-stone-950 shadow-sm font-bold'
-                      : isDark ? 'text-stone-400 hover:text-stone-200' : 'text-slate-500 hover:text-slate-800'
+                      ? 'bg-[#007dfc] text-white shadow-sm font-bold'
+                      : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
                   TH
@@ -744,8 +744,8 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                   onClick={() => setLang('en')}
                   className={`px-3 py-1 rounded-full transition-colors ${
                     lang === 'en'
-                      ? 'bg-amber-500 text-stone-950 shadow-sm font-bold'
-                      : isDark ? 'text-stone-400 hover:text-stone-200' : 'text-slate-500 hover:text-slate-800'
+                      ? 'bg-[#007dfc] text-white shadow-sm font-bold'
+                      : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
                   EN
@@ -757,7 +757,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                 role="group"
                 aria-label="Toggle theme"
                 className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
-                  isDark ? 'bg-black/40 border-stone-800/80' : 'bg-slate-100 border-slate-200'
+                  isDark ? 'bg-[#080e18] border-[#1c2838]' : 'bg-slate-100 border-slate-200'
                 }`}
               >
                 <button
@@ -766,8 +766,8 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                   aria-label="Light mode"
                   className={`p-1.5 rounded-full transition-colors ${
                     !isDark
-                      ? 'bg-amber-500 text-stone-950 shadow-sm font-bold'
-                      : 'text-stone-400 hover:text-stone-200'
+                      ? 'bg-[#007dfc] text-white shadow-sm font-bold'
+                      : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
                   <Sun className="h-3.5 w-3.5" />
@@ -778,8 +778,8 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                   aria-label="Dark mode"
                   className={`p-1.5 rounded-full transition-colors ${
                     isDark
-                      ? 'bg-amber-500 text-stone-950 shadow-sm font-bold'
-                      : 'text-stone-400 hover:text-stone-200'
+                      ? 'bg-[#007dfc] text-white shadow-sm font-bold'
+                      : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
                   <Moon className="h-3.5 w-3.5" />
@@ -862,10 +862,10 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder={lang === 'th' ? 'เช่น somchai หรือ admin' : 'e.g. somchai or admin'}
-                    className={`w-full h-11 rounded-xl border pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-colors ${
+                    className={`w-full h-11 rounded-xl border pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#007dfc]/30 transition-colors ${
                       isDark
-                        ? 'border-slate-700 bg-slate-900/80 text-slate-100 placeholder-slate-500 focus:border-amber-400'
-                        : 'border-slate-300 bg-slate-50 text-slate-900 placeholder-slate-400 focus:border-amber-500'
+                        ? 'border-[#1c2838] bg-[#080e18]/80 text-slate-100 placeholder-slate-500 focus:border-[#007dfc]'
+                        : 'border-slate-300 bg-slate-50 text-slate-900 placeholder-slate-400 focus:border-[#007dfc]'
                     }`}
                   />
                 </div>
@@ -889,10 +889,10 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••••••"
-                    className={`w-full h-11 rounded-xl border pl-9 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-colors ${
+                    className={`w-full h-11 rounded-xl border pl-9 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#007dfc]/30 transition-colors ${
                       isDark
-                        ? 'border-slate-700 bg-slate-900/80 text-slate-100 placeholder-slate-500 focus:border-amber-400'
-                        : 'border-slate-300 bg-slate-50 text-slate-900 placeholder-slate-400 focus:border-amber-500'
+                        ? 'border-[#1c2838] bg-[#080e18]/80 text-slate-100 placeholder-slate-500 focus:border-[#007dfc]'
+                        : 'border-slate-300 bg-slate-50 text-slate-900 placeholder-slate-400 focus:border-[#007dfc]'
                     }`}
                   />
                   <button
@@ -902,7 +902,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                     title={lang === 'th' ? (showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน') : (showPassword ? 'Hide password' : 'Show password')}
                     className={`absolute right-3 top-3 p-1 rounded-lg transition-colors ${
                       isDark
-                        ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                        ? 'text-slate-400 hover:text-slate-200 hover:bg-[#132238]'
                         : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200'
                     }`}
                   >
@@ -915,7 +915,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                 type="submit"
                 disabled={isSubmitting}
                 aria-label="Sign In"
-                className="w-full h-11 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 text-sm shadow-lg shadow-amber-500/20 transition-all hover:shadow-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full h-11 rounded-xl bg-[#007dfc] hover:bg-[#005fca] text-white font-bold px-4 text-sm shadow-lg shadow-blue-500/25 transition-all hover:shadow-blue-500/35 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (lang === 'th' ? 'กำลังเข้าสู่ระบบ...' : 'Signing in...') : (lang === 'th' ? 'เข้าสู่ระบบ' : 'Sign In')}
               </button>
@@ -925,7 +925,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
           {/* MFA Challenge Form */}
           {step.kind === 'mfa' && (
             <form onSubmit={handleOtpSubmit} className="space-y-5" noValidate>
-              <div className="flex items-center gap-2 text-sm font-medium text-amber-500">
+              <div className="flex items-center gap-2 text-sm font-medium text-[#007dfc]">
                 <KeyRound className="h-4 w-4" />
                 <span>
                   {step.challenge.status === 'MFA_SETUP_REQUIRED'
@@ -937,7 +937,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
               {/* QR Code and Secret Key block for First-time setup */}
               {step.challenge.status === 'MFA_SETUP_REQUIRED' && (
                 <div className={`space-y-3 rounded-2xl border p-4 text-center ${
-                  isDark ? 'border-slate-800 bg-slate-900/60' : 'border-slate-200 bg-slate-50'
+                  isDark ? 'border-[#1c2838] bg-[#080e18]/80' : 'border-slate-200 bg-slate-50'
                 }`}>
                   <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                     Scan this QR code with your Authenticator app, or enter the key manually.
@@ -950,7 +950,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                     />
                   )}
                   <code className={`block break-all rounded-lg px-2 py-1 text-xs font-mono font-bold ${
-                    isDark ? 'bg-slate-950 text-amber-300' : 'bg-slate-200 text-amber-700'
+                    isDark ? 'bg-[#080e18] text-[#4a9ff8]' : 'bg-slate-200 text-[#005fca]'
                   }`}>
                     {step.challenge.secretBase32}
                   </code>
@@ -994,21 +994,21 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                           className={`h-14 sm:h-16 rounded-2xl flex items-center justify-center font-mono text-2xl font-bold transition-all shadow-sm ${
                             char
                               ? isDark
-                                ? 'bg-slate-900 border-2 border-slate-700 text-slate-100 shadow-inner'
+                                ? 'bg-[#080e18] border-2 border-[#1c2838] text-slate-100 shadow-inner'
                                 : 'bg-white border-2 border-slate-300 text-slate-900 shadow-inner'
                               : isCurrent
                                 ? isDark
-                                  ? 'bg-slate-900/90 border-2 border-amber-500 ring-2 ring-amber-500/20 text-slate-100'
-                                  : 'bg-white border-2 border-amber-500 ring-2 ring-amber-500/20 text-slate-900'
+                                  ? 'bg-[#080e18] border-2 border-[#007dfc] ring-2 ring-[#007dfc]/25 text-slate-100'
+                                  : 'bg-white border-2 border-[#007dfc] ring-2 ring-[#007dfc]/25 text-slate-900'
                                 : isDark
-                                  ? 'bg-slate-900/60 border border-slate-800 text-slate-500'
+                                  ? 'bg-[#080e18]/60 border border-[#1c2838] text-slate-500'
                                   : 'bg-slate-50 border border-slate-200 text-slate-400'
                           }`}
                         >
                           {char ? (
                             <span>{char}</span>
                           ) : isCurrent ? (
-                            <span className="w-0.5 h-6 bg-amber-400 animate-pulse rounded" />
+                            <span className="w-0.5 h-6 bg-[#007dfc] animate-pulse rounded" />
                           ) : null}
                         </div>
                       );
@@ -1022,7 +1022,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                 type="submit"
                 disabled={isSubmitting}
                 aria-label="Verify"
-                className="w-full h-11 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 text-sm shadow-lg shadow-amber-500/20 transition-all hover:shadow-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full h-11 rounded-xl bg-[#007dfc] hover:bg-[#005fca] text-white font-bold px-4 text-sm shadow-lg shadow-blue-500/25 transition-all hover:shadow-blue-500/35 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isSubmitting
                   ? (lang === 'th' ? 'กำลังตรวจสอบ...' : 'Verifying...')
@@ -1035,7 +1035,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                   type="button"
                   onClick={() => setShowSetupKey(!showSetupKey)}
                   className={`text-xs underline transition-colors ${
-                    isDark ? 'text-slate-400 hover:text-amber-400' : 'text-slate-600 hover:text-amber-600'
+                    isDark ? 'text-slate-400 hover:text-[#4a9ff8]' : 'text-slate-600 hover:text-[#005fca]'
                   }`}
                 >
                   {lang === 'th'
