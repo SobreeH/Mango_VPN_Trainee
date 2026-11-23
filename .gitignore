@@ -1,0 +1,7 @@
+# OS & Editor
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+*.swp
+*.swo
