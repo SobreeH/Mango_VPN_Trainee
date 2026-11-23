@@ -237,7 +237,24 @@ const server = http.createServer(async (req, res) => {
         return sendError(res, 400, 'MISSING_TICKET', 'Connect ticket is required');
       }
 
+      const origin = req.headers.origin || '';
+      let portSuffix = '';
+      try {
+        if (origin) {
+          const u = new URL(origin);
+          if (u.port) {
+            portSuffix = '-' + u.port;
+          }
+        }
+      } catch {
+        // ignore
+      }
+
+      const activeFingerprint = DEVICE_FINGERPRINT + portSuffix;
+      const activeHostname = HOSTNAME + (portSuffix ? portSuffix : '');
+
       agentState.publicKey = generateX25519PublicKeyB64();
+      agentState.deviceFingerprint = activeFingerprint;
       agentState.state = 'connecting';
       agentState.lastError = null;
 
@@ -249,8 +266,8 @@ const server = http.createServer(async (req, res) => {
           body: JSON.stringify({
             ticket,
             publicKey: agentState.publicKey,
-            deviceFingerprint: DEVICE_FINGERPRINT,
-            hostname: HOSTNAME,
+            deviceFingerprint: activeFingerprint,
+            hostname: activeHostname,
             agentVersion: agentState.version,
             platform: PLATFORM,
           }),
@@ -300,7 +317,7 @@ const server = http.createServer(async (req, res) => {
             body: JSON.stringify({
               sessionId: agentState.sessionId || undefined,
               publicKey: agentState.publicKey,
-              deviceFingerprint: DEVICE_FINGERPRINT,
+              deviceFingerprint: agentState.deviceFingerprint || DEVICE_FINGERPRINT,
             }),
           });
         } catch {
