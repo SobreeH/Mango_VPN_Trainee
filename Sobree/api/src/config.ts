@@ -10,7 +10,7 @@ export interface ApiConfig {
   wgServerPublicKey: string;
   wgServerEndpoint: string;
   wgDns: string[];
-  corsOrigin: string | boolean;
+  corsOrigin: string | string[] | boolean;
 }
 
 const MIN_SECRET_LENGTH = 32;
@@ -69,6 +69,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     wgServerPublicKey: env.WG_SERVER_PUBLIC_KEY?.trim() ?? '',
     wgServerEndpoint: env.WG_SERVER_ENDPOINT?.trim() || '127.0.0.1:51820',
     wgDns: wgDns.length > 0 ? wgDns : ['1.1.1.1'],
-    corsOrigin: env.CORS_ORIGIN ?? 'http://localhost:3000',
+    corsOrigin: env.CORS_ORIGIN
+      ? (env.CORS_ORIGIN.includes(',') ? env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean) : env.CORS_ORIGIN)
+      : [
+          'http://localhost:3000',
+          'http://localhost:3001',
+          'http://localhost:3002',
+          'http://127.0.0.1:3000',
+          'http://127.0.0.1:3001',
+          'http://127.0.0.1:3002',
+        ],
   };
 }
