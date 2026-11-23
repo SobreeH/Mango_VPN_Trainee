@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Shield, KeyRound, LogOut, AlertCircle } from 'lucide-react';
+import { KeyRound, LogOut, AlertCircle, Sun, Moon, Lock, User } from 'lucide-react';
 import { z } from 'zod';
 import QRCode from 'qrcode';
 import { RoleName, type AuthTokensResponse, type AuthUserDto, type LoginResponse } from '@mango/shared';
@@ -61,6 +61,8 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [lang, setLang] = useState<'th' | 'en'>('th');
+  const [isDark, setIsDark] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -159,228 +161,384 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
         }
       : undefined;
 
-  return (
-    <main className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-100 p-6">
-      <section className="max-w-md w-full rounded-xl border border-slate-800 bg-slate-900 p-8 shadow-xl space-y-6">
-        <header className="text-center space-y-2">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400">
-            <Shield className="h-6 w-6" />
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight">MANGO VPN</h1>
-          <p className="text-sm text-slate-400">Zero-Trust WireGuard Portal</p>
-        </header>
-
-        {errorMessage && (
-          <div
-            role="alert"
-            className="flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-950/50 p-3 text-sm text-red-200"
-          >
-            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-red-400" />
-            <span>{errorMessage}</span>
-          </div>
-        )}
-
-        {step.kind === 'login' && (
-          <form onSubmit={handleLoginSubmit} className="space-y-4" noValidate>
-            <div className="space-y-1.5">
-              <label htmlFor="username" className="block text-sm font-medium text-slate-300">
-                Username
-              </label>
-              <input
-                id="username"
-                type="text"
-                autoComplete="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-amber-400 focus:outline-none"
-              />
+  if (step.kind === 'authenticated') {
+    return (
+      <main className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 lg:p-8">
+        <div className="max-w-6xl mx-auto space-y-6">
+          <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-slate-800/80 bg-slate-900/80 p-4 sm:p-6 backdrop-blur-md shadow-xl">
+            <div className="flex items-center gap-3">
+              <span className="text-3xl" role="img" aria-label="Mango">🥭</span>
+              <div>
+                <h1 className="text-xl font-bold tracking-tight text-slate-100 flex items-center gap-2">
+                  MANGO VPN
+                  <span className="text-xs font-normal text-slate-400">Zero-Trust Portal</span>
+                </h1>
+                <p className="text-xs text-amber-400/90 font-medium">Mango Consultant Co., Ltd.</p>
+              </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label htmlFor="password" className="block text-sm font-medium text-slate-300">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-amber-400 focus:outline-none"
-              />
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <div className="flex items-center gap-2 justify-end">
+                  <span className="text-sm font-semibold text-slate-100">{step.session.user.username}</span>
+                  <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-xs font-semibold text-amber-300 border border-amber-500/30">
+                    {step.session.user.role}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400">{step.session.user.email}</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleLogout}
+                aria-label="Log Out"
+                className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800/90 px-3.5 py-2 text-xs font-medium text-slate-200 hover:bg-rose-950/60 hover:text-rose-200 hover:border-rose-700/50 transition-colors shadow-sm"
+              >
+                <LogOut className="h-4 w-4" />
+                <span>Log Out</span>
+              </button>
             </div>
+          </header>
 
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-amber-400 disabled:opacity-50"
-            >
-              {isSubmitting ? 'Signing in...' : 'Sign In'}
-            </button>
-          </form>
-        )}
+          <AgentStatusCard
+            accessToken={step.session.accessToken}
+            userRole={step.session.user.role}
+            auth={authContext}
+          />
 
-        {step.kind === 'mfa' && (
-          <form onSubmit={handleOtpSubmit} className="space-y-4" noValidate>
-            <div className="flex items-center gap-2 text-sm font-medium text-amber-300">
-              <KeyRound className="h-4 w-4" />
-              <span>
-                {step.challenge.status === 'MFA_SETUP_REQUIRED'
-                  ? 'Set Up Authenticator'
-                  : 'Two-Factor Verification'}
-              </span>
-            </div>
+          {step.session.user.role === RoleName.ADMIN && (
+            <div className="space-y-4 rounded-2xl border border-slate-800/80 bg-slate-900/80 p-4 sm:p-6 backdrop-blur-md shadow-xl">
+              <div role="tablist" aria-label="Admin Governance" className="flex flex-wrap gap-2 border-b border-slate-800 pb-3">
+                {(
+                  [
+                    ['audit-logs', 'Audit Logs'],
+                    ['agent-versions', 'Agent Versions'],
+                    ['users', 'Users'],
+                    ['devices', 'Devices'],
+                    ['sessions', 'Sessions'],
+                    ['policies', 'Policies'],
+                  ] as const
+                ).map(([tabKey, label]) => (
+                  <button
+                    key={tabKey}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === tabKey}
+                    onClick={() => setActiveTab(tabKey)}
+                    className={`rounded-xl px-4 py-2 text-sm font-medium transition-all ${
+                      activeTab === tabKey
+                        ? 'bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20'
+                        : 'text-slate-300 hover:bg-slate-800 hover:text-slate-100'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
 
-            {step.challenge.status === 'MFA_SETUP_REQUIRED' && (
-              <div className="space-y-3 rounded-lg border border-slate-800 bg-slate-950 p-4 text-center">
-                <p className="text-xs text-slate-400">
-                  Scan this QR code with your Authenticator app, or enter the key manually.
-                </p>
-                {qrDataUrl && (
-                  <img
-                    src={qrDataUrl}
-                    alt="TOTP Authenticator QR Code"
-                    className="mx-auto rounded bg-white p-2"
+              <div className="rounded-xl border border-slate-800 bg-slate-950/90 p-4 sm:p-5">
+                {activeTab === 'audit-logs' && (
+                  <AuditLogsTab
+                    apiBaseUrl={apiBaseUrl}
+                    accessToken={step.session.accessToken}
+                    auth={authContext}
                   />
                 )}
-                <code className="block break-all rounded bg-slate-900 px-2 py-1 text-xs text-amber-300">
-                  {step.challenge.secretBase32}
-                </code>
+                {activeTab === 'agent-versions' && (
+                  <AgentVersionsTab
+                    apiBaseUrl={apiBaseUrl}
+                    accessToken={step.session.accessToken}
+                    auth={authContext}
+                  />
+                )}
+                {activeTab === 'users' && (
+                  <UsersTab
+                    apiBaseUrl={apiBaseUrl}
+                    accessToken={step.session.accessToken}
+                    auth={authContext}
+                  />
+                )}
+                {activeTab === 'devices' && (
+                  <DevicesTab
+                    apiBaseUrl={apiBaseUrl}
+                    accessToken={step.session.accessToken}
+                    auth={authContext}
+                  />
+                )}
+                {activeTab === 'sessions' && (
+                  <SessionsTab
+                    apiBaseUrl={apiBaseUrl}
+                    accessToken={step.session.accessToken}
+                    auth={authContext}
+                  />
+                )}
+                {activeTab === 'policies' && (
+                  <PoliciesTab
+                    apiBaseUrl={apiBaseUrl}
+                    accessToken={step.session.accessToken}
+                    auth={authContext}
+                  />
+                )}
               </div>
-            )}
-
-            <div className="space-y-1.5">
-              <label htmlFor="otp-code" className="block text-sm font-medium text-slate-300">
-                6-Digit Code
-              </label>
-              <input
-                id="otp-code"
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                autoComplete="one-time-code"
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-center font-mono text-lg tracking-widest text-slate-100 focus:border-amber-400 focus:outline-none"
-              />
             </div>
+          )}
+        </div>
+      </main>
+    );
+  }
 
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-amber-400 disabled:opacity-50"
+  return (
+    <main className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-100 p-4 sm:p-6 relative overflow-hidden">
+      {/* Ambient warm gradient glows */}
+      <div className="absolute -top-32 -left-32 w-80 h-80 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-32 -right-32 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+      {/* Centered Floating 2-Column Card (Compact / Non-full width) */}
+      <section className="w-full max-w-3xl lg:max-w-4xl grid grid-cols-1 md:grid-cols-12 rounded-3xl border border-slate-800/80 bg-slate-900/95 shadow-2xl overflow-hidden backdrop-blur-md relative z-10">
+        
+        {/* Left Column: Mango Hero Banner */}
+        <div className="md:col-span-5 bg-gradient-to-br from-amber-600/25 via-amber-950/20 to-slate-950 p-6 sm:p-8 flex flex-col justify-between border-b md:border-b-0 md:border-r border-slate-800/60 relative overflow-hidden">
+          {/* Subtle inner accent glow */}
+          <div className="absolute -top-12 -left-12 w-44 h-44 bg-amber-500/20 rounded-full blur-2xl pointer-events-none" />
+
+          {/* Top Brand Header */}
+          <div className="space-y-1 relative z-10">
+            <div className="flex items-center gap-2.5">
+              <span className="text-3xl" role="img" aria-label="Mango">🥭</span>
+              <div>
+                <h1 className="text-lg font-bold tracking-tight text-slate-100 flex items-center gap-1.5">
+                  MANGO VPN
+                </h1>
+                <p className="text-[11px] text-amber-300/80 font-medium">Mango Consultant Co., Ltd.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Center Greeting & Tagline */}
+          <div className="my-8 md:my-0 space-y-2 relative z-10">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-100 tracking-tight leading-snug">
+              {lang === 'th' ? 'ยินดีต้อนรับกลับมา' : 'Welcome Back!'}
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-300/90 leading-relaxed">
+              {lang === 'th'
+                ? 'เข้าสู่ระบบเพื่อใช้งานเครือข่ายองค์กรของคุณ'
+                : 'Log in to access your organization secure zero-trust network.'}
+            </p>
+          </div>
+
+          {/* Bottom Copyright Footer */}
+          <div className="relative z-10 pt-4 border-t border-slate-800/50">
+            <p className="text-[10px] text-slate-500">
+              © {new Date().getFullYear()} บริษัท แมงโก้ คอนซัลแตนท์ จำกัด
+            </p>
+          </div>
+        </div>
+
+        {/* Right Column: Sign In & MFA Form */}
+        <div className="md:col-span-7 p-6 sm:p-8 bg-slate-950/80 flex flex-col justify-between space-y-5">
+          {/* Top Bar: Language & Theme Switches */}
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-slate-400">
+              {step.kind === 'mfa'
+                ? (lang === 'th' ? 'ขั้นตอนที่ 2: ยืนยันตัวตน' : 'Step 2: 2FA Verification')
+                : (lang === 'th' ? 'เข้าสู่ระบบเครือข่าย' : 'Network Access')}
+            </span>
+
+            <div className="flex items-center gap-2">
+              {/* Language Switcher Pills */}
+              <div className="flex items-center rounded-full bg-slate-900 border border-slate-800 p-0.5 text-xs font-semibold shadow-inner">
+                <button
+                  type="button"
+                  onClick={() => setLang('th')}
+                  className={`px-2.5 py-0.5 rounded-full transition-colors ${
+                    lang === 'th'
+                      ? 'bg-amber-500 text-slate-950 shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  TH
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLang('en')}
+                  className={`px-2.5 py-0.5 rounded-full transition-colors ${
+                    lang === 'en'
+                      ? 'bg-amber-500 text-slate-950 shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  EN
+                </button>
+              </div>
+
+              {/* Theme Toggle Button */}
+              <button
+                type="button"
+                onClick={() => setIsDark(!isDark)}
+                aria-label="Toggle theme"
+                className="flex items-center justify-center h-7 w-7 rounded-full bg-slate-900 border border-slate-800 text-amber-400 hover:text-amber-300 transition-colors shadow-inner"
+              >
+                {isDark ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+          </div>
+
+          {/* Form Header */}
+          <div>
+            <h3 className="text-xl sm:text-2xl font-bold text-slate-100">
+              {step.kind === 'login'
+                ? (lang === 'th' ? 'เข้าสู่ระบบ' : 'Sign In')
+                : (lang === 'th' ? 'ยืนยันความปลอดภัย' : 'Security Verification')}
+            </h3>
+            <p className="text-xs text-slate-400 mt-1">
+              {step.kind === 'login'
+                ? (lang === 'th' ? 'กรอกข้อมูลชื่อผู้ใช้และรหัสผ่านเพื่อเข้าใช้งาน' : 'Enter your credentials to access the VPN dashboard')
+                : (lang === 'th' ? 'กรอกรหัสยืนยัน 6 หลักจากแอป Authenticator' : 'Enter your 6-digit one-time code')}
+            </p>
+          </div>
+
+          {/* Error Banner */}
+          {errorMessage && (
+            <div
+              role="alert"
+              className="flex items-start gap-2 rounded-xl border border-red-500/40 bg-red-950/50 p-3 text-xs sm:text-sm text-red-200"
             >
-              {isSubmitting ? 'Verifying...' : 'Verify'}
-            </button>
-          </form>
-        )}
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-red-400" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
 
-        {step.kind === 'authenticated' && (
-          <div className="space-y-4">
-            <div className="rounded-lg border border-slate-800 bg-slate-950 p-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-400">Signed in as</span>
-                <span className="rounded bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-300">
-                  {step.session.user.role}
+          {/* Login Form */}
+          {step.kind === 'login' && (
+            <form onSubmit={handleLoginSubmit} className="space-y-4" noValidate>
+              <div className="space-y-1.5">
+                <label htmlFor="username" className="block text-xs sm:text-sm font-medium text-slate-300">
+                  {lang === 'th' ? 'ชื่อผู้ใช้' : 'Username'}
+                  <span className="text-[11px] text-slate-500 ml-1.5">(Username)</span>
+                </label>
+                <div className="relative">
+                  <User className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                  <input
+                    id="username"
+                    type="text"
+                    autoComplete="username"
+                    aria-label="Username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder={lang === 'th' ? 'เช่น somchai หรือ admin' : 'e.g. somchai or admin'}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-900/80 pl-9 pr-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 focus:outline-none transition-colors"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="password" className="block text-xs sm:text-sm font-medium text-slate-300">
+                  {lang === 'th' ? 'รหัสผ่าน' : 'Password'}
+                  <span className="text-[11px] text-slate-500 ml-1.5">(Password)</span>
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                  <input
+                    id="password"
+                    type="password"
+                    autoComplete="current-password"
+                    aria-label="Password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••••••"
+                    className="w-full rounded-xl border border-slate-700 bg-slate-900/80 pl-9 pr-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 focus:outline-none transition-colors"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                aria-label="Sign In"
+                className="w-full rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2.5 px-4 text-sm shadow-lg shadow-amber-500/20 transition-all hover:shadow-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? (lang === 'th' ? 'กำลังเข้าสู่ระบบ...' : 'Signing in...') : (lang === 'th' ? 'เข้าสู่ระบบ' : 'Sign In')}
+              </button>
+            </form>
+          )}
+
+          {/* MFA Challenge Form */}
+          {step.kind === 'mfa' && (
+            <form onSubmit={handleOtpSubmit} className="space-y-4" noValidate>
+              <div className="flex items-center gap-2 text-sm font-medium text-amber-300">
+                <KeyRound className="h-4 w-4" />
+                <span>
+                  {step.challenge.status === 'MFA_SETUP_REQUIRED'
+                    ? 'Set Up Authenticator'
+                    : 'Two-Factor Verification'}
                 </span>
               </div>
-              <p className="text-lg font-semibold text-slate-100">{step.session.user.username}</p>
-              <p className="text-xs text-slate-400">{step.session.user.email}</p>
-            </div>
 
-            <AgentStatusCard
-              accessToken={step.session.accessToken}
-              userRole={step.session.user.role}
-              auth={authContext}
-            />
-
-            {step.session.user.role === RoleName.ADMIN && (
-              <div className="space-y-4 border-t border-slate-800 pt-4">
-                <div role="tablist" aria-label="Admin Governance" className="flex flex-wrap gap-2 border-b border-slate-800 pb-2">
-                  {(
-                    [
-                      ['audit-logs', 'Audit Logs'],
-                      ['agent-versions', 'Agent Versions'],
-                      ['users', 'Users'],
-                      ['devices', 'Devices'],
-                      ['sessions', 'Sessions'],
-                      ['policies', 'Policies'],
-                    ] as const
-                  ).map(([tabKey, label]) => (
-                    <button
-                      key={tabKey}
-                      type="button"
-                      role="tab"
-                      aria-selected={activeTab === tabKey}
-                      onClick={() => setActiveTab(tabKey)}
-                      className={`rounded-lg px-3 py-2 text-sm font-medium ${
-                        activeTab === tabKey
-                          ? 'bg-amber-500 text-slate-950'
-                          : 'text-slate-300 hover:bg-slate-900'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
+              {step.challenge.status === 'MFA_SETUP_REQUIRED' && (
+                <div className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-center">
+                  <p className="text-xs text-slate-400">
+                    Scan this QR code with your Authenticator app, or enter the key manually.
+                  </p>
+                  {qrDataUrl && (
+                    <img
+                      src={qrDataUrl}
+                      alt="TOTP Authenticator QR Code"
+                      className="mx-auto rounded-xl bg-white p-2 shadow-md"
+                    />
+                  )}
+                  <code className="block break-all rounded-lg bg-slate-950 px-2 py-1 text-xs font-mono text-amber-300">
+                    {step.challenge.secretBase32}
+                  </code>
                 </div>
+              )}
 
-                <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
-                  {activeTab === 'audit-logs' && (
-                    <AuditLogsTab
-                      apiBaseUrl={apiBaseUrl}
-                      accessToken={step.session.accessToken}
-                      auth={authContext}
-                    />
-                  )}
-                  {activeTab === 'agent-versions' && (
-                    <AgentVersionsTab
-                      apiBaseUrl={apiBaseUrl}
-                      accessToken={step.session.accessToken}
-                      auth={authContext}
-                    />
-                  )}
-                  {activeTab === 'users' && (
-                    <UsersTab
-                      apiBaseUrl={apiBaseUrl}
-                      accessToken={step.session.accessToken}
-                      auth={authContext}
-                    />
-                  )}
-                  {activeTab === 'devices' && (
-                    <DevicesTab
-                      apiBaseUrl={apiBaseUrl}
-                      accessToken={step.session.accessToken}
-                      auth={authContext}
-                    />
-                  )}
-                  {activeTab === 'sessions' && (
-                    <SessionsTab
-                      apiBaseUrl={apiBaseUrl}
-                      accessToken={step.session.accessToken}
-                      auth={authContext}
-                    />
-                  )}
-                  {activeTab === 'policies' && (
-                    <PoliciesTab
-                      apiBaseUrl={apiBaseUrl}
-                      accessToken={step.session.accessToken}
-                      auth={authContext}
-                    />
-                  )}
-                </div>
+              <div className="space-y-1.5">
+                <label htmlFor="otp-code" className="block text-xs sm:text-sm font-medium text-slate-300">
+                  6-Digit Code
+                </label>
+                <input
+                  id="otp-code"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  autoComplete="one-time-code"
+                  aria-label="6-Digit Code"
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value)}
+                  placeholder="000000"
+                  className="w-full rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-center font-mono text-xl tracking-widest text-slate-100 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 focus:outline-none"
+                />
               </div>
-            )}
 
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm font-medium text-slate-200 hover:bg-slate-700"
-            >
-              <LogOut className="h-4 w-4" />
-              <span>Log Out</span>
-            </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => clearLocalSession(null)}
+                  className="w-1/3 rounded-xl border border-slate-700 bg-slate-900 py-2.5 px-3 text-xs font-medium text-slate-300 hover:bg-slate-800 transition-colors"
+                >
+                  {lang === 'th' ? 'ย้อนกลับ' : 'Back'}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  aria-label="Verify"
+                  className="w-2/3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2.5 px-4 text-sm shadow-lg shadow-amber-500/20 transition-all hover:shadow-amber-500/30 disabled:opacity-50"
+                >
+                  {isSubmitting ? (lang === 'th' ? 'กำลังตรวจสอบ...' : 'Verifying...') : (lang === 'th' ? 'ยืนยันรหัส' : 'Verify')}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Bottom IT Help Note */}
+          <div className="pt-2 text-center border-t border-slate-800/40">
+            <p className="text-[11px] text-slate-400">
+              {lang === 'th'
+                ? 'บัญชีสร้างโดยผู้ดูแลระบบ หากเข้าไม่ได้ติดต่อฝ่ายไอที'
+                : 'Accounts are provisioned by Administrator. Contact IT support for assistance.'}
+            </p>
           </div>
-        )}
+        </div>
       </section>
     </main>
   );
