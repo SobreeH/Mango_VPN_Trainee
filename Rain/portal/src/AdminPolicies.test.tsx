@@ -230,7 +230,23 @@ describe('Portal Admin Policies Tab (fetch seam)', () => {
       expect(screen.getByText('Priority 0')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /Delete/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Delete$/i }));
+
+    // ConfirmModal opens and asks for confirmation
+    expect(await screen.findByText('Delete Security Policy')).toBeInTheDocument();
+    expect(screen.getByText(/Are you sure you want to delete policy/i)).toBeInTheDocument();
+
+    // Test Cancel: policy should NOT be deleted
+    fireEvent.click(screen.getByRole('button', { name: /Cancel/i }));
+    await waitFor(() => {
+      expect(screen.queryByText('Delete Security Policy')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('Deny Production DB')).toBeInTheDocument();
+
+    // Click Delete again, and Confirm
+    fireEvent.click(screen.getByRole('button', { name: /^Delete$/i }));
+    expect(await screen.findByText('Delete Security Policy')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Delete Policy/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/No policies configured/i)).toBeInTheDocument();
