@@ -10,6 +10,7 @@ import {
   Eye,
   EyeOff,
   Power,
+  ShieldCheck,
 } from 'lucide-react';
 import { z } from 'zod';
 import QRCode from 'qrcode';
@@ -587,47 +588,176 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
           </div>
         ) : (
           /* Non-Admin User Portal (Staff / Client) */
-          <div className="max-w-2xl mx-auto space-y-6 relative z-10 pt-8">
-            <header className={`rounded-3xl border shadow-xl p-6 flex items-center justify-between backdrop-blur-md ${
-              isDark ? 'border-slate-800/80 bg-slate-900/90' : 'border-slate-200/90 bg-white/95'
+          <div className="max-w-2xl mx-auto space-y-6 relative z-10 pt-6 sm:pt-10">
+            {/* Header: Warm Obsidian Glass with Logo, Profile, Language, Theme, and Logout */}
+            <header className={`rounded-3xl border shadow-2xl p-5 sm:p-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 backdrop-blur-xl transition-colors duration-300 ${
+              isDark
+                ? 'border-white/5 bg-[#1e1d1a]/85 shadow-black/80'
+                : 'border-stone-200/90 bg-white/95 shadow-stone-200/60'
             }`}>
               <div className="flex items-center gap-3">
                 <span className="text-3xl" role="img" aria-label="Mango">🥭</span>
                 <div>
-                  <h1 className={`text-lg font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                  <h1 className={`text-base sm:text-lg font-bold tracking-tight ${
+                    isDark ? 'text-stone-100' : 'text-stone-900'
+                  }`}>
                     MANGO VPN
                   </h1>
-                  <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Zero-Trust Access Portal
+                  <p className={`text-[11px] font-medium ${
+                    isDark ? 'text-amber-400' : 'text-amber-600'
+                  }`}>
+                    {lang === 'th' ? 'พอร์ทัลเข้าถึงเครือข่าย Zero-Trust' : 'Zero-Trust Access Portal'}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="text-right text-xs">
-                  <span className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
-                    {step.session.user.username}
-                  </span>
-                  <span className="text-slate-500 mx-1">·</span>
-                  <span className="text-amber-400 font-bold">{step.session.user.role}</span>
+              <div className="flex flex-wrap items-center justify-between sm:justify-end gap-3">
+                {/* Language Switcher Pills */}
+                <div className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
+                  isDark ? 'bg-[#141311] border-white/5' : 'bg-stone-100 border-stone-200'
+                }`}>
+                  <button
+                    type="button"
+                    onClick={() => setLang('th')}
+                    className={`px-2.5 py-1 rounded-full transition-colors ${
+                      lang === 'th'
+                        ? 'bg-[#f59e0b] text-stone-950 shadow-sm font-bold'
+                        : isDark ? 'text-stone-400 hover:text-stone-200' : 'text-stone-500 hover:text-stone-800'
+                    }`}
+                  >
+                    TH
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLang('en')}
+                    className={`px-2.5 py-1 rounded-full transition-colors ${
+                      lang === 'en'
+                        ? 'bg-[#f59e0b] text-stone-950 shadow-sm font-bold'
+                        : isDark ? 'text-stone-400 hover:text-stone-200' : 'text-stone-500 hover:text-stone-800'
+                    }`}
+                  >
+                    EN
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  aria-label="Log Out"
-                  className="rounded-xl border border-white/10 bg-[#262420]/80 px-3 py-1.5 text-xs text-stone-300 hover:text-rose-300 hover:border-rose-900/50 transition-colors"
+
+                {/* Theme Switcher Capsule */}
+                <div
+                  role="group"
+                  aria-label="Toggle theme"
+                  className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
+                    isDark ? 'bg-[#141311] border-white/5' : 'bg-stone-100 border-stone-200'
+                  }`}
                 >
-                  <LogOut className="h-3.5 w-3.5 inline mr-1" />
-                  <span>{lang === 'th' ? 'ออกจากระบบ' : 'Log Out'}</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsDark(false)}
+                    aria-label="Light mode"
+                    className={`p-1 rounded-full transition-colors ${
+                      !isDark
+                        ? 'bg-[#f59e0b] text-stone-950 shadow-sm font-bold'
+                        : 'text-stone-400 hover:text-stone-200'
+                    }`}
+                  >
+                    <Sun className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsDark(true)}
+                    aria-label="Dark mode"
+                    className={`p-1 rounded-full transition-colors ${
+                      isDark
+                        ? 'bg-[#f59e0b] text-stone-950 shadow-sm font-bold'
+                        : 'text-stone-400 hover:text-stone-200'
+                    }`}
+                  >
+                    <Moon className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                {/* User Role Badge & Logout */}
+                <div className="flex items-center gap-2 pl-1 border-l border-white/5">
+                  <div className="text-right text-xs">
+                    <span className={`font-semibold ${isDark ? 'text-stone-200' : 'text-stone-800'}`}>
+                      {step.session.user.username}
+                    </span>
+                    <span className="text-stone-500 mx-1">·</span>
+                    <span
+                      className={`font-mono text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+                        step.session.user.role === 'STAFF'
+                          ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+                          : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                      }`}
+                    >
+                      {step.session.user.role}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    aria-label="Log Out"
+                    className="rounded-xl border border-white/10 bg-[#262420]/80 px-3 py-1.5 text-xs text-stone-300 hover:text-rose-300 hover:border-rose-900/50 transition-colors"
+                  >
+                    <LogOut className="h-3.5 w-3.5 inline mr-1" />
+                    <span>{lang === 'th' ? 'ออกจากระบบ' : 'Log Out'}</span>
+                  </button>
+                </div>
               </div>
             </header>
 
+            {/* Zero-Trust VPN Hub Card */}
             <AgentStatusCard
               accessToken={step.session.accessToken}
               userRole={step.session.user.role}
               auth={authContext}
             />
+
+            {/* Role-Specific Zero-Trust Resources Guide Card */}
+            <div className={`rounded-3xl border p-6 space-y-4 shadow-xl backdrop-blur-xl transition-colors duration-300 ${
+              isDark
+                ? 'border-white/5 bg-[#1e1d1a]/80 text-stone-300 shadow-black/60'
+                : 'border-stone-200/90 bg-white/90 text-stone-700 shadow-stone-200/40'
+            }`}>
+              <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                  <h3 className={`text-sm font-bold ${isDark ? 'text-stone-100' : 'text-stone-900'}`}>
+                    {lang === 'th' ? 'สิทธิ์การเข้าถึงเครือข่ายองค์กร' : 'Permitted Network Access'}
+                  </h3>
+                </div>
+                <span className="text-xs text-stone-400 font-mono">
+                  Role: <strong className="text-amber-400">{step.session.user.role}</strong>
+                </span>
+              </div>
+
+              <p className="text-xs leading-relaxed text-stone-400">
+                {step.session.user.role === 'STAFF'
+                  ? (lang === 'th'
+                      ? 'สิทธิ์พนักงาน (STAFF): คุณสามารถเข้าถึงเครือข่ายภายในองค์กร เซิร์ฟเวอร์ทดสอบ และฐานข้อมูลตามนโยบายความปลอดภัย Zero-Trust เมื่อเชื่อมต่อ VPN สำเร็จ'
+                      : 'Staff Privilege: You have access to authorized internal services, staging environments, and database clusters enforced by Zero-Trust role policies.')
+                  : (lang === 'th'
+                      ? 'สิทธิ์ลูกค้าภายนอก (CLIENT): คุณสามารถเข้าถึงระบบบริการเฉพาะทางและ API ปลายทางที่ได้รับอนุญาตผ่านช่องทางความปลอดภัย WireGuard'
+                      : 'Client Privilege: You have restricted remote access to designated customer endpoints and APIs isolated by Zero-Trust role policies.')}
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-xs">
+                <div className={`p-3 rounded-2xl border ${
+                  isDark ? 'border-white/5 bg-[#141311]/60' : 'border-stone-200 bg-stone-50'
+                }`}>
+                  <span className="text-stone-400 block text-[11px] mb-1">
+                    {lang === 'th' ? 'โปรโตคอลความปลอดภัย' : 'Security Protocol'}
+                  </span>
+                  <span className="font-mono font-bold text-stone-200">WireGuard (Curve25519)</span>
+                </div>
+                <div className={`p-3 rounded-2xl border ${
+                  isDark ? 'border-white/5 bg-[#141311]/60' : 'border-stone-200 bg-stone-50'
+                }`}>
+                  <span className="text-stone-400 block text-[11px] mb-1">
+                    {lang === 'th' ? 'การบังคับใช้นโยบาย' : 'Policy Enforcement'}
+                  </span>
+                  <span className="font-mono font-bold text-emerald-400">Linux nftables (Daemon)</span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </main>
