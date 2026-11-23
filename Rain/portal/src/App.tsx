@@ -74,6 +74,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
     }
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [showSetupKey, setShowSetupKey] = useState(false);
 
   useEffect(() => {
     try {
@@ -456,14 +457,14 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
             }`}>
               {step.kind === 'login'
                 ? (lang === 'th' ? 'เข้าสู่ระบบ' : 'Sign In')
-                : (lang === 'th' ? 'ยืนยันความปลอดภัย' : 'Security Verification')}
+                : (lang === 'th' ? 'ยืนยันตัวตน 2 ชั้น' : 'Two-Factor Authentication')}
             </h3>
             <p className={`text-xs mt-1 ${
               isDark ? 'text-slate-400' : 'text-slate-500'
             }`}>
               {step.kind === 'login'
                 ? (lang === 'th' ? 'กรอกข้อมูลชื่อผู้ใช้และรหัสผ่านเพื่อเข้าใช้งาน' : 'Enter your credentials to access the VPN dashboard')
-                : (lang === 'th' ? 'กรอกรหัสยืนยัน 6 หลักจากแอป Authenticator' : 'Enter your 6-digit one-time code')}
+                : (lang === 'th' ? 'กรอกรหัส 6 หลักจากแอป Authenticator' : 'Enter 6-digit code from Authenticator app')}
             </p>
           </div>
 
@@ -471,10 +472,34 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
           {errorMessage && (
             <div
               role="alert"
-              className="flex items-start gap-2 rounded-xl border border-red-500/40 bg-red-950/50 p-3 text-xs sm:text-sm text-red-200"
+              className={`rounded-2xl border p-3.5 text-xs text-red-200 space-y-1 shadow-inner ${
+                step.kind === 'mfa'
+                  ? 'border-red-900/60 bg-red-950/60 text-center'
+                  : 'flex items-start gap-2 border-red-500/40 bg-red-950/50'
+              }`}
             >
-              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-red-400" />
-              <span>{errorMessage}</span>
+              {step.kind === 'mfa' ? (
+                <>
+                  <div className="flex items-center justify-center gap-1.5 font-bold text-red-300">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-red-400" />
+                    <span>
+                      {errorMessage.includes('6 digits')
+                        ? errorMessage
+                        : (lang === 'th' ? 'รหัสไม่ถูกต้องหรือหมดอายุ' : errorMessage)}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-red-400/90">
+                    {lang === 'th'
+                      ? 'ใช้รหัสล่าสุดจากแอป รหัสเปลี่ยนทุก 30 วินาที'
+                      : 'Use the latest code from Authenticator app, rotates every 30s'}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-red-400" />
+                  <span>{errorMessage}</span>
+                </>
+              )}
             </div>
           )}
 
@@ -567,7 +592,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
 
           {/* MFA Challenge Form */}
           {step.kind === 'mfa' && (
-            <form onSubmit={handleOtpSubmit} className="space-y-4" noValidate>
+            <form onSubmit={handleOtpSubmit} className="space-y-5" noValidate>
               <div className="flex items-center gap-2 text-sm font-medium text-amber-500">
                 <KeyRound className="h-4 w-4" />
                 <span>
@@ -577,6 +602,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                 </span>
               </div>
 
+              {/* QR Code and Secret Key block for First-time setup */}
               {step.challenge.status === 'MFA_SETUP_REQUIRED' && (
                 <div className={`space-y-3 rounded-2xl border p-4 text-center ${
                   isDark ? 'border-slate-800 bg-slate-900/60' : 'border-slate-200 bg-slate-50'
@@ -599,50 +625,113 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                 </div>
               )}
 
-              <div className="space-y-1.5">
+              {/* 6-Digit Individual PIN Slots */}
+              <div className="space-y-2">
                 <label htmlFor="otp-code" className={`block text-xs sm:text-sm font-medium ${
                   isDark ? 'text-slate-300' : 'text-slate-700'
                 }`}>
                   6-Digit Code
                 </label>
-                <input
-                  id="otp-code"
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  autoComplete="one-time-code"
-                  aria-label="6-Digit Code"
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value)}
-                  placeholder="000000"
-                  className={`w-full h-12 rounded-xl border px-3 text-center font-mono text-xl tracking-widest focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-colors ${
-                    isDark
-                      ? 'border-slate-700 bg-slate-900/80 text-slate-100 focus:border-amber-400'
-                      : 'border-slate-300 bg-slate-50 text-slate-900 focus:border-amber-500'
-                  }`}
-                />
+                <div className="relative">
+                  {/* Accessible master input covering the PIN slots */}
+                  <input
+                    id="otp-code"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    autoComplete="one-time-code"
+                    aria-label="6-Digit Code"
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.slice(0, 6))}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-text z-20"
+                    autoFocus
+                  />
+
+                  {/* 6 Visual PIN Slots matching the Reference Image */}
+                  <div
+                    role="group"
+                    aria-label="OTP digit inputs"
+                    className="grid grid-cols-6 gap-2 sm:gap-3 relative z-10 pointer-events-none"
+                  >
+                    {[0, 1, 2, 3, 4, 5].map((index) => {
+                      const char = otpCode[index] ?? '';
+                      const isCurrent = otpCode.length === index || (otpCode.length === 6 && index === 5);
+                      return (
+                        <div
+                          key={index}
+                          className={`h-14 sm:h-16 rounded-2xl flex items-center justify-center font-mono text-2xl font-bold transition-all shadow-sm ${
+                            char
+                              ? isDark
+                                ? 'bg-slate-900 border-2 border-slate-700 text-slate-100 shadow-inner'
+                                : 'bg-white border-2 border-slate-300 text-slate-900 shadow-inner'
+                              : isCurrent
+                                ? isDark
+                                  ? 'bg-slate-900/90 border-2 border-amber-500 ring-2 ring-amber-500/20 text-slate-100'
+                                  : 'bg-white border-2 border-amber-500 ring-2 ring-amber-500/20 text-slate-900'
+                                : isDark
+                                  ? 'bg-slate-900/60 border border-slate-800 text-slate-500'
+                                  : 'bg-slate-50 border border-slate-200 text-slate-400'
+                          }`}
+                        >
+                          {char ? (
+                            <span>{char}</span>
+                          ) : isCurrent ? (
+                            <span className="w-0.5 h-6 bg-amber-400 animate-pulse rounded" />
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
-              <div className="flex gap-2">
+              {/* Verify Action Button */}
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                aria-label="Verify"
+                className="w-full h-11 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 text-sm shadow-lg shadow-amber-500/20 transition-all hover:shadow-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isSubmitting
+                  ? (lang === 'th' ? 'กำลังตรวจสอบ...' : 'Verifying...')
+                  : (lang === 'th' ? 'ยืนยัน' : 'Verify')}
+              </button>
+
+              {/* Bottom Setup & Back Links */}
+              <div className="space-y-2 pt-1 text-center">
                 <button
                   type="button"
-                  onClick={() => clearLocalSession(null)}
-                  className={`w-1/3 h-11 rounded-xl border text-xs font-medium transition-colors ${
-                    isDark
-                      ? 'border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800'
-                      : 'border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  onClick={() => setShowSetupKey(!showSetupKey)}
+                  className={`text-xs underline transition-colors ${
+                    isDark ? 'text-slate-400 hover:text-amber-400' : 'text-slate-600 hover:text-amber-600'
                   }`}
                 >
-                  {lang === 'th' ? 'ย้อนกลับ' : 'Back'}
+                  {lang === 'th'
+                    ? (showSetupKey ? 'ซ่อนคำแนะนำการตั้งค่า' : 'ตั้งค่าแอป Authenticator ใหม่ด้วยคีย์')
+                    : (showSetupKey ? 'Hide Setup Instructions' : 'Set up Authenticator app with key')}
                 </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  aria-label="Verify"
-                  className="w-2/3 h-11 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 text-sm shadow-lg shadow-amber-500/20 transition-all hover:shadow-amber-500/30 disabled:opacity-50"
-                >
-                  {isSubmitting ? (lang === 'th' ? 'กำลังตรวจสอบ...' : 'Verifying...') : (lang === 'th' ? 'ยืนยันรหัส' : 'Verify')}
-                </button>
+
+                {showSetupKey && (
+                  <p className={`text-[11px] p-2.5 rounded-xl border text-left leading-relaxed ${
+                    isDark ? 'border-slate-800 bg-slate-900/80 text-slate-300' : 'border-slate-200 bg-slate-100 text-slate-700'
+                  }`}>
+                    {lang === 'th'
+                      ? '💡 หากเปลี่ยนเครื่องหรือต้องการผูก Authenticator ใหม่ กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอรีเซ็ตคีย์ MFA ตามนโยบายความปลอดภัย Zero-Trust'
+                      : '💡 If you changed your device or need to re-link Authenticator, please contact your Administrator to reset your MFA token under Zero-Trust policy.'}
+                  </p>
+                )}
+
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => clearLocalSession(null)}
+                    className={`text-xs transition-colors ${
+                      isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-700'
+                    }`}
+                  >
+                    {lang === 'th' ? '← ย้อนกลับไปหน้าเข้าสู่ระบบ' : '← Back to Sign In'}
+                  </button>
+                </div>
               </div>
             </form>
           )}
