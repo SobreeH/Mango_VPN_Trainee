@@ -154,7 +154,7 @@ export function AgentStatusCard({ accessToken, userRole, auth }: AgentStatusCard
   }
 
   return (
-    <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-6 shadow-2xl backdrop-blur-xl max-w-2xl mx-auto space-y-4">
+    <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-6 shadow-2xl backdrop-blur-xl w-full space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold uppercase tracking-wider text-amber-400">

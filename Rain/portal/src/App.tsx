@@ -218,71 +218,6 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
           isDark ? 'bg-emerald-600/15' : 'bg-emerald-300/25'
         }`} />
 
-        {/* Top Utility Bar (Language & Theme) - Only shown outside Admin dashboard or if non-admin */}
-        {!isAdmin && (
-          <div className="w-full flex justify-end items-center gap-2 mb-4 relative z-20">
-            <div className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
-              isDark ? 'bg-[#1e1d1a]/85 border-white/5' : 'bg-white border-stone-200'
-            }`}>
-              <button
-                type="button"
-                onClick={() => setLang('th')}
-                className={`px-3 py-1 rounded-full transition-colors ${
-                  lang === 'th'
-                    ? 'bg-[#f59e0b] text-stone-950 shadow-sm font-bold'
-                    : isDark ? 'text-stone-400 hover:text-stone-200' : 'text-stone-500 hover:text-stone-800'
-                }`}
-              >
-                TH
-              </button>
-              <button
-                type="button"
-                onClick={() => setLang('en')}
-                className={`px-3 py-1 rounded-full transition-colors ${
-                  lang === 'en'
-                    ? 'bg-[#f59e0b] text-stone-950 shadow-sm font-bold'
-                    : isDark ? 'text-stone-400 hover:text-stone-200' : 'text-stone-500 hover:text-stone-800'
-                }`}
-              >
-                EN
-              </button>
-            </div>
-
-            <div
-              role="group"
-              aria-label="Toggle theme"
-              className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
-                isDark ? 'bg-[#1e1d1a]/85 border-white/5' : 'bg-white border-stone-200'
-              }`}
-            >
-              <button
-                type="button"
-                onClick={() => setIsDark(false)}
-                aria-label="Light mode"
-                className={`p-1.5 rounded-full transition-colors ${
-                  !isDark
-                    ? 'bg-[#f59e0b] text-stone-950 shadow-sm font-bold'
-                    : 'text-stone-400 hover:text-stone-200'
-                }`}
-              >
-                <Sun className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsDark(true)}
-                aria-label="Dark mode"
-                className={`p-1.5 rounded-full transition-colors ${
-                  isDark
-                    ? 'bg-[#f59e0b] text-stone-950 shadow-sm font-bold'
-                    : 'text-stone-400 hover:text-stone-200'
-                }`}
-              >
-                <Moon className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>
-        )}
-
         {isAdmin ? (
           /* Admin Modern Full-Screen Dashboard with Floating Sidebar */
           <div className="w-full flex-1 flex flex-col md:flex-row gap-6 relative z-10 items-stretch">
@@ -587,10 +522,10 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
             </section>
           </div>
         ) : (
-          /* Non-Admin User Portal (Staff / Client) */
-          <div className="max-w-2xl mx-auto space-y-6 relative z-10 pt-6 sm:pt-10">
-            {/* Header: Warm Obsidian Glass with Logo, Profile, Language, Theme, and Logout */}
-            <header className={`rounded-3xl border shadow-2xl p-5 sm:p-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 backdrop-blur-xl transition-colors duration-300 ${
+          /* Non-Admin User Portal (Staff / Client) - Reorganized 2-Column Responsive Dashboard */
+          <div className="w-full max-w-5xl mx-auto space-y-6 relative z-10 pt-4 sm:pt-6">
+            {/* Master Header: Wide, Elegant Glass with Brand, User Identity & Controls */}
+            <header className={`rounded-3xl border shadow-2xl p-5 sm:p-6 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 backdrop-blur-xl transition-colors duration-300 ${
               isDark
                 ? 'border-white/5 bg-[#1e1d1a]/85 shadow-black/80'
                 : 'border-stone-200/90 bg-white/95 shadow-stone-200/60'
@@ -598,20 +533,42 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
               <div className="flex items-center gap-3">
                 <span className="text-3xl" role="img" aria-label="Mango">🥭</span>
                 <div>
-                  <h1 className={`text-base sm:text-lg font-bold tracking-tight ${
+                  <h1 className={`text-base sm:text-lg font-bold tracking-tight flex items-center gap-2 ${
                     isDark ? 'text-stone-100' : 'text-stone-900'
                   }`}>
-                    MANGO VPN
+                    <span>MANGO VPN</span>
+                    <span className="text-stone-500 font-normal hidden sm:inline">|</span>
+                    <span className="text-xs font-medium text-stone-400 hidden sm:inline">Mango Consultant Co., Ltd.</span>
                   </h1>
-                  <p className={`text-[11px] font-medium ${
+                  <p className={`text-[11px] font-medium whitespace-nowrap ${
                     isDark ? 'text-amber-400' : 'text-amber-600'
                   }`}>
-                    {lang === 'th' ? 'พอร์ทัลเข้าถึงเครือข่าย Zero-Trust' : 'Zero-Trust Access Portal'}
+                    {lang === 'th' ? 'พอร์ทัลเข้าถึงเครือข่าย Zero-Trust' : 'Zero-Trust Remote Access Portal'}
                   </p>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center justify-between sm:justify-end gap-3">
+              {/* Right Side: Identity Badge, Language, Theme & Logout */}
+              <div className="flex flex-wrap items-center justify-between md:justify-end gap-3 pt-2 md:pt-0 border-t md:border-t-0 border-white/5">
+                {/* User Identity Chip */}
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border ${
+                  isDark ? 'border-white/5 bg-[#141311]/70' : 'border-stone-200 bg-stone-50'
+                }`}>
+                  <span className={`text-xs font-semibold ${isDark ? 'text-stone-200' : 'text-stone-800'}`}>
+                    {step.session.user.username}
+                  </span>
+                  <span className="text-stone-500">·</span>
+                  <span
+                    className={`font-mono text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+                      step.session.user.role === 'STAFF'
+                        ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+                        : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                    }`}
+                  >
+                    {step.session.user.role}
+                  </span>
+                </div>
+
                 {/* Language Switcher Pills */}
                 <div className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
                   isDark ? 'bg-[#141311] border-white/5' : 'bg-stone-100 border-stone-200'
@@ -652,7 +609,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                     type="button"
                     onClick={() => setIsDark(false)}
                     aria-label="Light mode"
-                    className={`p-1 rounded-full transition-colors ${
+                    className={`p-1.5 rounded-full transition-colors ${
                       !isDark
                         ? 'bg-[#f59e0b] text-stone-950 shadow-sm font-bold'
                         : 'text-stone-400 hover:text-stone-200'
@@ -664,7 +621,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                     type="button"
                     onClick={() => setIsDark(true)}
                     aria-label="Dark mode"
-                    className={`p-1 rounded-full transition-colors ${
+                    className={`p-1.5 rounded-full transition-colors ${
                       isDark
                         ? 'bg-[#f59e0b] text-stone-950 shadow-sm font-bold'
                         : 'text-stone-400 hover:text-stone-200'
@@ -674,87 +631,105 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                   </button>
                 </div>
 
-                {/* User Role Badge & Logout */}
-                <div className="flex items-center gap-2 pl-1 border-l border-white/5">
-                  <div className="text-right text-xs">
-                    <span className={`font-semibold ${isDark ? 'text-stone-200' : 'text-stone-800'}`}>
-                      {step.session.user.username}
-                    </span>
-                    <span className="text-stone-500 mx-1">·</span>
-                    <span
-                      className={`font-mono text-[11px] font-bold px-2 py-0.5 rounded-full border ${
-                        step.session.user.role === 'STAFF'
-                          ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
-                          : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
-                      }`}
-                    >
-                      {step.session.user.role}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    aria-label="Log Out"
-                    className="rounded-xl border border-white/10 bg-[#262420]/80 px-3 py-1.5 text-xs text-stone-300 hover:text-rose-300 hover:border-rose-900/50 transition-colors"
-                  >
-                    <LogOut className="h-3.5 w-3.5 inline mr-1" />
-                    <span>{lang === 'th' ? 'ออกจากระบบ' : 'Log Out'}</span>
-                  </button>
-                </div>
+                {/* Logout Button */}
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  aria-label="Log Out"
+                  className="rounded-xl border border-white/10 bg-[#262420]/80 px-3 py-1.5 text-xs text-stone-300 hover:text-rose-300 hover:border-rose-900/50 transition-colors"
+                >
+                  <LogOut className="h-3.5 w-3.5 inline mr-1" />
+                  <span>{lang === 'th' ? 'ออกจากระบบ' : 'Log Out'}</span>
+                </button>
               </div>
             </header>
 
-            {/* Zero-Trust VPN Hub Card */}
-            <AgentStatusCard
-              accessToken={step.session.accessToken}
-              userRole={step.session.user.role}
-              auth={authContext}
-            />
-
-            {/* Role-Specific Zero-Trust Resources Guide Card */}
-            <div className={`rounded-3xl border p-6 space-y-4 shadow-xl backdrop-blur-xl transition-colors duration-300 ${
-              isDark
-                ? 'border-white/5 bg-[#1e1d1a]/80 text-stone-300 shadow-black/60'
-                : 'border-stone-200/90 bg-white/90 text-stone-700 shadow-stone-200/40'
-            }`}>
-              <div className="flex items-center justify-between border-b border-white/5 pb-3">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-emerald-400" />
-                  <h3 className={`text-sm font-bold ${isDark ? 'text-stone-100' : 'text-stone-900'}`}>
-                    {lang === 'th' ? 'สิทธิ์การเข้าถึงเครือข่ายองค์กร' : 'Permitted Network Access'}
-                  </h3>
-                </div>
-                <span className="text-xs text-stone-400 font-mono">
-                  Role: <strong className="text-amber-400">{step.session.user.role}</strong>
-                </span>
+            {/* 2-Column Responsive Dashboard Body */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Left Column (Col 1-7): Primary VPN Connection Station */}
+              <div className="lg:col-span-7 w-full">
+                <AgentStatusCard
+                  accessToken={step.session.accessToken}
+                  userRole={step.session.user.role}
+                  auth={authContext}
+                />
               </div>
 
-              <p className="text-xs leading-relaxed text-stone-400">
-                {step.session.user.role === 'STAFF'
-                  ? (lang === 'th'
-                      ? 'สิทธิ์พนักงาน (STAFF): คุณสามารถเข้าถึงเครือข่ายภายในองค์กร เซิร์ฟเวอร์ทดสอบ และฐานข้อมูลตามนโยบายความปลอดภัย Zero-Trust เมื่อเชื่อมต่อ VPN สำเร็จ'
-                      : 'Staff Privilege: You have access to authorized internal services, staging environments, and database clusters enforced by Zero-Trust role policies.')
-                  : (lang === 'th'
-                      ? 'สิทธิ์ลูกค้าภายนอก (CLIENT): คุณสามารถเข้าถึงระบบบริการเฉพาะทางและ API ปลายทางที่ได้รับอนุญาตผ่านช่องทางความปลอดภัย WireGuard'
-                      : 'Client Privilege: You have restricted remote access to designated customer endpoints and APIs isolated by Zero-Trust role policies.')}
-              </p>
+              {/* Right Column (Col 8-12): Zero-Trust Context & Support */}
+              <div className="lg:col-span-5 w-full space-y-6">
+                {/* Permitted Resources & Security Posture Card */}
+                <div className={`rounded-3xl border p-6 space-y-4 shadow-xl backdrop-blur-xl transition-colors duration-300 ${
+                  isDark
+                    ? 'border-white/5 bg-[#1e1d1a]/85 text-stone-300 shadow-black/60'
+                    : 'border-stone-200/90 bg-white/95 text-stone-700 shadow-stone-200/40'
+                }`}>
+                  <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                      <h3 className={`text-sm font-bold ${isDark ? 'text-stone-100' : 'text-stone-900'}`}>
+                        {lang === 'th' ? 'สิทธิ์การเข้าถึงเครือข่าย' : 'Permitted Access'}
+                      </h3>
+                    </div>
+                    <span className={`font-mono text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+                      step.session.user.role === 'STAFF'
+                        ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+                        : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                    }`}>
+                      {step.session.user.role}
+                    </span>
+                  </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-xs">
-                <div className={`p-3 rounded-2xl border ${
-                  isDark ? 'border-white/5 bg-[#141311]/60' : 'border-stone-200 bg-stone-50'
-                }`}>
-                  <span className="text-stone-400 block text-[11px] mb-1">
-                    {lang === 'th' ? 'โปรโตคอลความปลอดภัย' : 'Security Protocol'}
-                  </span>
-                  <span className="font-mono font-bold text-stone-200">WireGuard (Curve25519)</span>
+                  <p className="text-xs leading-relaxed text-stone-400">
+                    {step.session.user.role === 'STAFF'
+                      ? (lang === 'th'
+                          ? 'สิทธิ์พนักงาน (STAFF): คุณสามารถเข้าถึงระบบงานภายใน เซิร์ฟเวอร์ Staging และฐานข้อมูลที่ได้รับอนุญาตตามนโยบาย Zero-Trust'
+                          : 'Staff Privilege: Access authorized internal intranet, staging servers, and database clusters enforced by Zero-Trust role policies.')
+                      : (lang === 'th'
+                          ? 'สิทธิ์ลูกค้าภายนอก (CLIENT): คุณสามารถเข้าถึงเฉพาะบริการและ API ปลายทางที่ได้รับอนุญาตผ่าน WireGuard เท่านั้น'
+                          : 'Client Privilege: Restricted remote access to designated customer endpoints and APIs isolated by Zero-Trust role policies.')}
+                  </p>
+
+                  <div className="space-y-2 pt-1 text-xs">
+                    <div className={`p-3 rounded-2xl border flex items-center justify-between ${
+                      isDark ? 'border-white/5 bg-[#141311]/60' : 'border-stone-200 bg-stone-50'
+                    }`}>
+                      <span className="text-stone-400 text-[11px]">
+                        {lang === 'th' ? 'โปรโตคอล' : 'Protocol'}
+                      </span>
+                      <span className="font-mono font-bold text-stone-200">WireGuard (Curve25519)</span>
+                    </div>
+                    <div className={`p-3 rounded-2xl border flex items-center justify-between ${
+                      isDark ? 'border-white/5 bg-[#141311]/60' : 'border-stone-200 bg-stone-50'
+                    }`}>
+                      <span className="text-stone-400 text-[11px]">
+                        {lang === 'th' ? 'การบังคับใช้ไฟร์วอลล์' : 'Firewall'}
+                      </span>
+                      <span className="font-mono font-bold text-emerald-400">Linux nftables</span>
+                    </div>
+                  </div>
                 </div>
-                <div className={`p-3 rounded-2xl border ${
-                  isDark ? 'border-white/5 bg-[#141311]/60' : 'border-stone-200 bg-stone-50'
+
+                {/* IT Support & Quick Troubleshooting Card */}
+                <div className={`rounded-3xl border p-5 space-y-3 shadow-xl backdrop-blur-xl transition-colors duration-300 ${
+                  isDark
+                    ? 'border-white/5 bg-[#1e1d1a]/70 text-stone-300 shadow-black/40'
+                    : 'border-stone-200/90 bg-white/90 text-stone-700 shadow-stone-200/30'
                 }`}>
-                  <span className="text-stone-400 block text-[11px] mb-1">
-                    {lang === 'th' ? 'การบังคับใช้นโยบาย' : 'Policy Enforcement'}
-                  </span>
-                  <span className="font-mono font-bold text-emerald-400">Linux nftables (Daemon)</span>
+                  <h4 className={`text-xs font-bold uppercase tracking-wider ${
+                    isDark ? 'text-amber-400' : 'text-amber-600'
+                  }`}>
+                    {lang === 'th' ? '💡 คำแนะนำการใช้งาน' : '💡 Agent Troubleshooting'}
+                  </h4>
+                  <p className="text-[11px] leading-relaxed text-stone-400">
+                    {lang === 'th'
+                      ? 'โปรดตรวจสอบให้แน่ใจว่าได้เปิดใช้งานโปรแกรม MANGO Windows Agent บนเครื่องคอมพิวเตอร์ของคุณ (พอร์ต 47821) ก่อนกดเชื่อมต่อ VPN'
+                      : 'Ensure MANGO Windows Agent is running locally on port 47821 before initiating a VPN connection.'}
+                  </p>
+                  <p className="text-[10px] text-stone-500 pt-1 border-t border-white/5">
+                    {lang === 'th'
+                      ? 'หากต้องการความช่วยเหลือ กรุณาติดต่อฝ่ายไอที บริษัท แมงโก้ คอนซัลแตนท์ จำกัด'
+                      : 'Need assistance? Contact IT Support at Mango Consultant Co., Ltd.'}
+                  </p>
                 </div>
               </div>
             </div>
