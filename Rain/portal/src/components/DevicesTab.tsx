@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DeviceStatus, type DeviceDto } from '@mango/shared';
+import { X, ChevronDown } from 'lucide-react';
 import type { AuthRefreshContext } from '../api/auth';
 import { fetchDevices, revokeDevice } from '../lib/adminApi';
 import { ConfirmModal } from './ConfirmModal';
@@ -48,18 +49,18 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
   });
 
   return (
-    <section aria-label="Devices" className="space-y-5">
+    <section aria-label="Devices" className="space-y-6">
       {activeError && (
         <div
           role="alert"
-          className="rounded-xl border border-red-500/40 bg-red-950/50 p-3.5 text-xs sm:text-sm text-red-200"
+          className="rounded-2xl border border-red-500/40 bg-red-950/50 p-4 text-xs sm:text-sm text-red-200"
         >
           {activeError instanceof Error ? activeError.message : 'Device request failed'}
         </div>
       )}
 
       {/* Filter and Search Bar matching Reference UI */}
-      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+      <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between">
         <div className="relative flex-1">
           <input
             type="text"
@@ -67,76 +68,99 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="ค้นหาชื่อเครื่องหรือผู้ใช้"
             aria-label="Search devices"
-            className="w-full h-11 rounded-2xl border border-slate-700/80 bg-slate-900/80 px-4 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 focus:outline-none transition-colors"
+            className="w-full h-12 rounded-2xl border border-white/5 bg-[#181614]/75 px-5 pr-10 text-xs sm:text-sm text-stone-100 placeholder-stone-500 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 focus:outline-none transition-colors"
           />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm('')}
+              aria-label="Clear search"
+              className="absolute right-3.5 top-3.5 p-0.5 rounded-full text-stone-400 hover:text-stone-200"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
-        <div className="w-full sm:w-48">
+        <div className="w-full sm:w-52 relative">
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as 'ALL' | DeviceStatus)}
             aria-label="Filter status"
-            className="w-full h-11 rounded-2xl border border-slate-700/80 bg-slate-900/80 px-4 text-xs sm:text-sm text-slate-200 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 focus:outline-none transition-colors"
+            className="w-full h-12 rounded-2xl border border-white/5 bg-[#181614]/75 px-5 pr-10 text-xs sm:text-sm text-stone-200 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 focus:outline-none transition-colors appearance-none cursor-pointer"
           >
             <option value="ALL">ทุกสถานะ</option>
             <option value={DeviceStatus.ACTIVE}>ใช้งานอยู่</option>
             <option value={DeviceStatus.REVOKED}>เพิกถอนแล้ว</option>
           </select>
+          <ChevronDown className="absolute right-4 top-4 h-4 w-4 text-stone-400 pointer-events-none" />
         </div>
       </div>
 
       {listQuery.isLoading ? (
-        <p className="text-sm text-slate-400">Loading devices...</p>
+        <p className="text-sm text-stone-400">Loading devices...</p>
       ) : devices.length === 0 && !listQuery.error ? (
-        <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-8 text-center text-sm text-slate-400">
+        <div className="rounded-3xl border border-white/5 bg-[#181614]/75 p-8 text-center text-sm text-stone-400">
           No devices found.
         </div>
       ) : filteredDevices.length === 0 ? (
-        <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-8 text-center text-sm text-slate-400">
-          ไม่พบอุปกรณ์ที่ตรงกับเงื่อนไขการค้นหา
+        <div className="rounded-3xl border border-white/5 bg-[#181614]/75 p-8 text-center text-sm text-stone-400 space-y-2">
+          <p>ไม่พบอุปกรณ์ที่ตรงกับเงื่อนไขการค้นหา</p>
+          <button
+            type="button"
+            onClick={() => {
+              setSearchTerm('');
+              setStatusFilter('ALL');
+            }}
+            className="text-xs text-amber-400 hover:underline"
+          >
+            ล้างคำค้นหา
+          </button>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-slate-800/80 bg-slate-900/60 shadow-xl backdrop-blur-sm">
-          <table className="w-full text-left text-xs sm:text-sm text-slate-300">
-            <thead className="border-b border-slate-800/80 bg-slate-900/90 text-slate-400 text-xs font-semibold">
+        <div className="overflow-x-auto rounded-3xl border border-white/5 bg-[#181614]/75 shadow-2xl backdrop-blur-xl">
+          <table className="w-full text-left text-xs sm:text-sm text-stone-300">
+            <thead className="border-b border-white/5 text-stone-400 text-xs font-semibold">
               <tr>
-                <th className="px-5 py-3.5">อุปกรณ์</th>
-                <th className="px-5 py-3.5">ผู้ใช้</th>
-                <th className="px-5 py-3.5">สถานะ</th>
-                <th className="px-5 py-3.5 text-right">การทำงาน</th>
+                <th className="px-6 py-4">อุปกรณ์</th>
+                <th className="px-6 py-4">ผู้ใช้</th>
+                <th className="px-6 py-4">สถานะ</th>
+                <th className="px-6 py-4 text-right">การทำงาน</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/50">
+            <tbody className="divide-y divide-white/5">
               {filteredDevices.map((d) => (
-                <tr key={d.id} className="hover:bg-slate-800/30 transition-colors">
-                  <td className="px-5 py-3.5">
-                    <div className="font-bold text-slate-100 text-sm">{d.hostname}</div>
-                    <div className="font-mono text-[11px] text-slate-400 mt-0.5">
-                      {d.fingerprint.length > 16
-                        ? `${d.fingerprint.slice(0, 4)}...${d.fingerprint.slice(-4)}`
-                        : d.fingerprint}
+                <tr key={d.id} className="hover:bg-white/[0.02] transition-colors">
+                  <td className="px-6 py-4">
+                    <div>
+                      <div className="font-bold text-stone-100 text-sm tracking-tight">{d.hostname}</div>
+                      <div className="font-mono text-xs text-stone-400 mt-0.5">
+                        {d.fingerprint.length > 16
+                          ? `${d.fingerprint.slice(0, 4)}...${d.fingerprint.slice(-4)}`
+                          : d.fingerprint}
+                      </div>
                     </div>
                   </td>
-                  <td className="px-5 py-3.5 text-slate-300 font-medium">
+                  <td className="px-6 py-4 text-stone-300 font-medium">
                     {d.username ?? d.userId}
                   </td>
-                  <td className="px-5 py-3.5">
+                  <td className="px-6 py-4">
                     <span
-                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border ${
+                      className={`inline-flex items-center gap-2 rounded-full px-4 py-1 text-xs font-medium border ${
                         d.status === DeviceStatus.ACTIVE
-                          ? 'bg-emerald-950/60 border-emerald-800/60 text-emerald-400'
-                          : 'bg-red-950/60 border-red-800/60 text-red-400'
+                          ? 'bg-[#13271d]/90 border-emerald-900/50 text-emerald-400'
+                          : 'bg-[#2a1719]/90 border-rose-900/50 text-rose-400'
                       }`}
                     >
                       <span
                         className={`h-1.5 w-1.5 rounded-full ${
-                          d.status === DeviceStatus.ACTIVE ? 'bg-emerald-400' : 'bg-red-400'
+                          d.status === DeviceStatus.ACTIVE ? 'bg-emerald-400 shadow-sm shadow-emerald-400/50' : 'bg-rose-400'
                         }`}
                       />
                       <span>{d.status === DeviceStatus.ACTIVE ? 'ใช้งานอยู่' : 'เพิกถอนแล้ว'}</span>
                       <span className="sr-only">{d.status}</span>
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 text-right">
+                  <td className="px-6 py-4 text-right">
                     <button
                       type="button"
                       aria-label="Revoke"
@@ -148,7 +172,7 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
                           fingerprint: d.fingerprint,
                         })
                       }
-                      className="rounded-xl border border-red-900/60 bg-red-950/30 px-4 py-1.5 text-xs font-medium text-red-300 hover:bg-red-900/50 hover:text-red-200 transition-colors disabled:opacity-30 disabled:cursor-not-allowed shadow-sm"
+                      className="rounded-xl border border-rose-900/60 bg-[#3a181c]/80 px-5 py-1.5 text-xs font-medium text-rose-200 hover:bg-rose-900/60 hover:text-rose-100 transition-colors disabled:opacity-35 disabled:cursor-not-allowed shadow-sm"
                     >
                       เพิกถอน
                     </button>

@@ -1,5 +1,16 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { KeyRound, LogOut, AlertCircle, Sun, Moon, Lock, User, Eye, EyeOff } from 'lucide-react';
+import {
+  KeyRound,
+  LogOut,
+  AlertCircle,
+  Sun,
+  Moon,
+  Lock,
+  User,
+  Eye,
+  EyeOff,
+  Power,
+} from 'lucide-react';
 import { z } from 'zod';
 import QRCode from 'qrcode';
 import { RoleName, type AuthTokensResponse, type AuthUserDto, type LoginResponse } from '@mango/shared';
@@ -75,6 +86,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showSetupKey, setShowSetupKey] = useState(false);
+  const [showVpnPanel, setShowVpnPanel] = useState(false);
 
   useEffect(() => {
     try {
@@ -205,76 +217,98 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
           isDark ? 'bg-emerald-500/10' : 'bg-emerald-300/20'
         }`} />
 
-        {/* Top Utility Bar (Language & Theme) - Full Width */}
-        <div className="w-full flex justify-end items-center gap-2 mb-4 relative z-20">
-          <div className={`flex items-center rounded-full p-0.5 text-xs font-semibold shadow-inner border transition-colors ${
-            isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
-          }`}>
-            <button
-              type="button"
-              onClick={() => setLang('th')}
-              className={`px-2.5 py-0.5 rounded-full transition-colors ${
-                lang === 'th'
-                  ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
-                  : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              TH
-            </button>
-            <button
-              type="button"
-              onClick={() => setLang('en')}
-              className={`px-2.5 py-0.5 rounded-full transition-colors ${
-                lang === 'en'
-                  ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
-                  : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              EN
-            </button>
-          </div>
+        {/* Top Utility Bar (Language & Theme) - Only shown outside Admin dashboard or if non-admin */}
+        {!isAdmin && (
+          <div className="w-full flex justify-end items-center gap-2 mb-4 relative z-20">
+            <div className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
+              isDark ? 'bg-black/40 border-stone-800/80' : 'bg-white border-slate-200'
+            }`}>
+              <button
+                type="button"
+                onClick={() => setLang('th')}
+                className={`px-3 py-1 rounded-full transition-colors ${
+                  lang === 'th'
+                    ? 'bg-amber-500 text-stone-950 shadow-sm font-bold'
+                    : isDark ? 'text-stone-400 hover:text-stone-200' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                TH
+              </button>
+              <button
+                type="button"
+                onClick={() => setLang('en')}
+                className={`px-3 py-1 rounded-full transition-colors ${
+                  lang === 'en'
+                    ? 'bg-amber-500 text-stone-950 shadow-sm font-bold'
+                    : isDark ? 'text-stone-400 hover:text-stone-200' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                EN
+              </button>
+            </div>
 
-          <button
-            type="button"
-            onClick={() => setIsDark(!isDark)}
-            aria-label="Toggle theme"
-            className={`flex items-center justify-center h-7 w-7 rounded-full border transition-colors shadow-inner ${
-              isDark
-                ? 'bg-slate-900 border-slate-800 text-amber-400 hover:text-amber-300'
-                : 'bg-white border-slate-200 text-amber-600 hover:text-amber-700'
-            }`}
-          >
-            {isDark ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
-          </button>
-        </div>
+            <div
+              role="group"
+              aria-label="Toggle theme"
+              className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
+                isDark ? 'bg-black/40 border-stone-800/80' : 'bg-white border-slate-200'
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => setIsDark(false)}
+                aria-label="Light mode"
+                className={`p-1.5 rounded-full transition-colors ${
+                  !isDark
+                    ? 'bg-amber-500 text-stone-950 shadow-sm font-bold'
+                    : 'text-stone-400 hover:text-stone-200'
+                }`}
+              >
+                <Sun className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsDark(true)}
+                aria-label="Dark mode"
+                className={`p-1.5 rounded-full transition-colors ${
+                  isDark
+                    ? 'bg-amber-500 text-stone-950 shadow-sm font-bold'
+                    : 'text-stone-400 hover:text-stone-200'
+                }`}
+              >
+                <Moon className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {isAdmin ? (
           /* Admin Modern Full-Screen Dashboard with Floating Sidebar */
           <div className="w-full flex-1 flex flex-col md:flex-row gap-6 relative z-10 items-stretch">
             
             {/* Left Sidebar */}
-            <aside className={`w-full md:w-64 lg:w-72 shrink-0 rounded-3xl border shadow-2xl p-6 flex flex-col justify-between backdrop-blur-md transition-colors min-h-[calc(100vh-6rem)] ${
-              isDark ? 'border-slate-800/80 bg-slate-900/90' : 'border-slate-200/90 bg-white/95'
+            <aside className={`w-full md:w-64 lg:w-72 shrink-0 rounded-3xl border shadow-2xl p-6 flex flex-col justify-between backdrop-blur-xl transition-colors min-h-[calc(100vh-6rem)] ${
+              isDark ? 'border-white/5 bg-[#181614]/80' : 'border-slate-200/90 bg-white/95'
             }`}>
-              <div className="space-y-6">
+              <div className="space-y-7">
                 {/* Brand Header */}
                 <div className="flex items-center gap-2.5">
                   <span className="text-3xl" role="img" aria-label="Mango">🥭</span>
                   <div>
-                    <h1 className={`text-base font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                    <h1 className={`text-base font-bold tracking-tight ${isDark ? 'text-stone-100' : 'text-slate-900'}`}>
                       MANGO VPN
                     </h1>
-                    <p className={`text-[10px] font-medium ${isDark ? 'text-amber-300/80' : 'text-amber-700'}`}>
+                    <p className={`text-[10px] font-medium ${isDark ? 'text-stone-400' : 'text-amber-700'}`}>
                       Mango Consultant Co., Ltd.
                     </p>
                   </div>
                 </div>
 
                 {/* Navigation Groups */}
-                <nav role="tablist" aria-label="Admin Governance" className="space-y-5">
+                <nav role="tablist" aria-label="Admin Governance" className="space-y-6">
                   {/* Group 1: Management (จัดการ) */}
                   <div className="space-y-1">
-                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider px-3 pb-1">
+                    <p className={`text-xs font-semibold px-3 pb-1 tracking-wide ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
                       {lang === 'th' ? 'จัดการ' : 'Management'}
                     </p>
                     {[
@@ -291,12 +325,14 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                           aria-label={item.labelEn}
                           aria-selected={isActive}
                           onClick={() => setActiveTab(item.id as AdminTab)}
-                          className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-medium transition-all text-left ${
+                          className={`w-full flex items-center px-4 py-2.5 rounded-xl text-xs sm:text-sm transition-all text-left ${
                             isActive
-                              ? 'bg-amber-500/25 border border-amber-500/40 text-amber-300 font-bold shadow-sm'
+                              ? isDark
+                                ? 'bg-[#7a4816] text-amber-50 font-semibold shadow-sm'
+                                : 'bg-amber-500 text-slate-950 font-semibold shadow-sm'
                               : isDark
-                                ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                                ? 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40 font-medium'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium'
                           }`}
                         >
                           <span>{lang === 'th' ? item.labelTh : item.labelEn}</span>
@@ -307,7 +343,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
 
                   {/* Group 2: Live Monitoring (ติดตามสด) */}
                   <div className="space-y-1">
-                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider px-3 pb-1">
+                    <p className={`text-xs font-semibold px-3 pb-1 tracking-wide ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
                       {lang === 'th' ? 'ติดตามสด' : 'Live Monitoring'}
                     </p>
                     {[
@@ -322,12 +358,14 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                           aria-label={item.labelEn}
                           aria-selected={isActive}
                           onClick={() => setActiveTab(item.id as AdminTab)}
-                          className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-medium transition-all text-left ${
+                          className={`w-full flex items-center px-4 py-2.5 rounded-xl text-xs sm:text-sm transition-all text-left ${
                             isActive
-                              ? 'bg-amber-500/25 border border-amber-500/40 text-amber-300 font-bold shadow-sm'
+                              ? isDark
+                                ? 'bg-[#7a4816] text-amber-50 font-semibold shadow-sm'
+                                : 'bg-amber-500 text-slate-950 font-semibold shadow-sm'
                               : isDark
-                                ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                                ? 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40 font-medium'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium'
                           }`}
                         >
                           <span>{lang === 'th' ? item.labelTh : item.labelEn}</span>
@@ -338,7 +376,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
 
                   {/* Group 3: Audit & System (ตรวจสอบ) */}
                   <div className="space-y-1">
-                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider px-3 pb-1">
+                    <p className={`text-xs font-semibold px-3 pb-1 tracking-wide ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
                       {lang === 'th' ? 'ตรวจสอบ' : 'Audit & System'}
                     </p>
                     {[
@@ -354,12 +392,14 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                           aria-label={item.labelEn}
                           aria-selected={isActive}
                           onClick={() => setActiveTab(item.id as AdminTab)}
-                          className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-medium transition-all text-left ${
+                          className={`w-full flex items-center px-4 py-2.5 rounded-xl text-xs sm:text-sm transition-all text-left ${
                             isActive
-                              ? 'bg-amber-500/25 border border-amber-500/40 text-amber-300 font-bold shadow-sm'
+                              ? isDark
+                                ? 'bg-[#7a4816] text-amber-50 font-semibold shadow-sm'
+                                : 'bg-amber-500 text-slate-950 font-semibold shadow-sm'
                               : isDark
-                                ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                                ? 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40 font-medium'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium'
                           }`}
                         >
                           <span>{lang === 'th' ? item.labelTh : item.labelEn}</span>
@@ -371,34 +411,32 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
               </div>
 
               {/* Sidebar Footer */}
-              <div className={`pt-6 border-t space-y-3 ${isDark ? 'border-slate-800/60' : 'border-slate-200/80'}`}>
+              <div className={`pt-4 border-t space-y-1.5 ${isDark ? 'border-stone-800/60' : 'border-slate-200/80'}`}>
                 <div className="text-xs">
-                  <span className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                  <span className={`font-semibold ${isDark ? 'text-stone-300' : 'text-slate-800'}`}>
                     {step.session.user.username}
                   </span>
-                  <span className="text-slate-500 mx-1.5">·</span>
+                  <span className="text-stone-500 mx-1.5">·</span>
                   <span className="text-amber-400 font-bold">{step.session.user.role}</span>
                 </div>
                 <button
                   type="button"
                   onClick={handleLogout}
                   aria-label="Log Out"
-                  className="w-full flex items-center gap-2 text-xs font-medium text-slate-400 hover:text-rose-400 transition-colors py-1"
+                  className="w-full flex items-center gap-1.5 text-xs font-medium text-stone-400 hover:text-rose-400 transition-colors pt-1"
                 >
-                  <LogOut className="h-3.5 w-3.5" />
+                  <LogOut className="h-3 w-3" />
                   <span>{lang === 'th' ? 'ออกจากระบบ' : 'Log Out'}</span>
                 </button>
               </div>
             </aside>
 
-            {/* Right Main Content Card */}
-            <section className={`flex-1 w-full rounded-3xl border shadow-2xl p-6 sm:p-8 space-y-6 backdrop-blur-md transition-colors min-h-[calc(100vh-6rem)] ${
-              isDark ? 'border-slate-800/80 bg-slate-900/90' : 'border-slate-200/90 bg-white/95'
-            }`}>
+            {/* Right Main Content Area */}
+            <section className="flex-1 w-full space-y-6 min-h-[calc(100vh-6rem)]">
               {/* Main Content Header */}
-              <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-800/60">
+              <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                  <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                  <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${isDark ? 'text-stone-100' : 'text-slate-900'}`}>
                     {activeTab === 'users' && (lang === 'th' ? 'ผู้ใช้' : 'Users')}
                     {activeTab === 'devices' && (lang === 'th' ? 'อุปกรณ์' : 'Devices')}
                     {activeTab === 'policies' && (lang === 'th' ? 'นโยบาย' : 'Policies')}
@@ -406,14 +444,93 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                     {activeTab === 'audit-logs' && (lang === 'th' ? 'บันทึกการใช้งาน' : 'Audit Logs')}
                     {activeTab === 'agent-versions' && (lang === 'th' ? 'เวอร์ชัน Agent' : 'Agent Versions')}
                   </h2>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Zero-Trust Role-Based WireGuard Network Management
-                  </p>
+                </div>
+
+                {/* Top Right Utility Controls matching Reference Mockup */}
+                <div className="flex items-center gap-3">
+                  {/* Collapsible VPN Toggle Button */}
+                  <button
+                    type="button"
+                    onClick={() => setShowVpnPanel(!showVpnPanel)}
+                    title={lang === 'th' ? 'แผงควบคุม VPN' : 'VPN Control Panel'}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold border transition-all ${
+                      showVpnPanel
+                        ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                        : isDark
+                          ? 'border-stone-800 bg-[#181614]/70 text-stone-400 hover:text-stone-200'
+                          : 'border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    <Power className="h-3 w-3 text-amber-400" />
+                    <span className="hidden sm:inline">{lang === 'th' ? 'VPN' : 'VPN'}</span>
+                  </button>
+
+                  {/* Language Switcher Pills */}
+                  <div className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
+                    isDark ? 'bg-black/40 border-stone-800/80' : 'bg-white border-slate-200'
+                  }`}>
+                    <button
+                      type="button"
+                      onClick={() => setLang('th')}
+                      className={`px-3 py-1 rounded-full transition-colors ${
+                        lang === 'th'
+                          ? 'bg-amber-500 text-stone-950 shadow-sm font-bold'
+                          : isDark ? 'text-stone-400 hover:text-stone-200' : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      TH
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLang('en')}
+                      className={`px-3 py-1 rounded-full transition-colors ${
+                        lang === 'en'
+                          ? 'bg-amber-500 text-stone-950 shadow-sm font-bold'
+                          : isDark ? 'text-stone-400 hover:text-stone-200' : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      EN
+                    </button>
+                  </div>
+
+                  {/* Theme Switcher Capsule (Sun | Moon) */}
+                  <div
+                    role="group"
+                    aria-label="Toggle theme"
+                    className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
+                      isDark ? 'bg-black/40 border-stone-800/80' : 'bg-white border-slate-200'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setIsDark(false)}
+                      aria-label="Light mode"
+                      className={`p-1.5 rounded-full transition-colors ${
+                        !isDark
+                          ? 'bg-amber-500 text-stone-950 shadow-sm font-bold'
+                          : 'text-stone-400 hover:text-stone-200'
+                      }`}
+                    >
+                      <Sun className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsDark(true)}
+                      aria-label="Dark mode"
+                      className={`p-1.5 rounded-full transition-colors ${
+                        isDark
+                          ? 'bg-amber-500 text-stone-950 shadow-sm font-bold'
+                          : 'text-stone-400 hover:text-stone-200'
+                      }`}
+                    >
+                      <Moon className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
               </header>
 
-              {/* VPN Agent Status Card for Admin */}
-              <div className="pb-2">
+              {/* Collapsible VPN Agent Status Card for Admin */}
+              <div className={`transition-all duration-300 ${showVpnPanel ? 'block pb-2' : 'hidden'}`}>
                 <AgentStatusCard
                   accessToken={step.session.accessToken}
                   userRole={step.session.user.role}
@@ -608,16 +725,16 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
 
             <div className="flex items-center gap-2">
               {/* Language Switcher Pills */}
-              <div className={`flex items-center rounded-full p-0.5 text-xs font-semibold shadow-inner border transition-colors ${
-                isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'
+              <div className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
+                isDark ? 'bg-black/40 border-stone-800/80' : 'bg-slate-100 border-slate-200'
               }`}>
                 <button
                   type="button"
                   onClick={() => setLang('th')}
-                  className={`px-2.5 py-0.5 rounded-full transition-colors ${
+                  className={`px-3 py-1 rounded-full transition-colors ${
                     lang === 'th'
-                      ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
-                      : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
+                      ? 'bg-amber-500 text-stone-950 shadow-sm font-bold'
+                      : isDark ? 'text-stone-400 hover:text-stone-200' : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
                   TH
@@ -625,29 +742,49 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                 <button
                   type="button"
                   onClick={() => setLang('en')}
-                  className={`px-2.5 py-0.5 rounded-full transition-colors ${
+                  className={`px-3 py-1 rounded-full transition-colors ${
                     lang === 'en'
-                      ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
-                      : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
+                      ? 'bg-amber-500 text-stone-950 shadow-sm font-bold'
+                      : isDark ? 'text-stone-400 hover:text-stone-200' : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
                   EN
                 </button>
               </div>
 
-              {/* Theme Toggle Button */}
-              <button
-                type="button"
-                onClick={() => setIsDark(!isDark)}
+              {/* Theme Switcher Capsule (Sun | Moon) */}
+              <div
+                role="group"
                 aria-label="Toggle theme"
-                className={`flex items-center justify-center h-7 w-7 rounded-full border transition-colors shadow-inner ${
-                  isDark
-                    ? 'bg-slate-900 border-slate-800 text-amber-400 hover:text-amber-300'
-                    : 'bg-slate-100 border-slate-200 text-amber-600 hover:text-amber-700'
+                className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
+                  isDark ? 'bg-black/40 border-stone-800/80' : 'bg-slate-100 border-slate-200'
                 }`}
               >
-                {isDark ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setIsDark(false)}
+                  aria-label="Light mode"
+                  className={`p-1.5 rounded-full transition-colors ${
+                    !isDark
+                      ? 'bg-amber-500 text-stone-950 shadow-sm font-bold'
+                      : 'text-stone-400 hover:text-stone-200'
+                  }`}
+                >
+                  <Sun className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsDark(true)}
+                  aria-label="Dark mode"
+                  className={`p-1.5 rounded-full transition-colors ${
+                    isDark
+                      ? 'bg-amber-500 text-stone-950 shadow-sm font-bold'
+                      : 'text-stone-400 hover:text-stone-200'
+                  }`}
+                >
+                  <Moon className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
           </div>
 
