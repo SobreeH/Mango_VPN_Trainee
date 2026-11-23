@@ -191,81 +191,238 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
       : undefined;
 
   if (step.kind === 'authenticated') {
+    const isAdmin = step.session.user.role === RoleName.ADMIN;
+
     return (
-      <main className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 lg:p-8">
-        <div className="max-w-6xl mx-auto space-y-6">
-          <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-slate-800/80 bg-slate-900/80 p-4 sm:p-6 backdrop-blur-md shadow-xl">
-            <div className="flex items-center gap-3">
-              <span className="text-3xl" role="img" aria-label="Mango">🥭</span>
-              <div>
-                <h1 className="text-xl font-bold tracking-tight text-slate-100 flex items-center gap-2">
-                  MANGO VPN
-                  <span className="text-xs font-normal text-slate-400">Zero-Trust Portal</span>
-                </h1>
-                <p className="text-xs text-amber-400/90 font-medium">Mango Consultant Co., Ltd.</p>
-              </div>
-            </div>
+      <main className={`min-h-screen p-4 sm:p-6 lg:p-8 relative overflow-hidden transition-colors duration-300 ${
+        isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'
+      }`}>
+        {/* Ambient Glows */}
+        <div className={`absolute -top-32 left-1/3 w-96 h-96 rounded-full blur-3xl pointer-events-none transition-colors duration-500 ${
+          isDark ? 'bg-amber-500/10' : 'bg-amber-300/25'
+        }`} />
+        <div className={`absolute -bottom-32 right-12 w-96 h-96 rounded-full blur-3xl pointer-events-none transition-colors duration-500 ${
+          isDark ? 'bg-emerald-500/10' : 'bg-emerald-300/20'
+        }`} />
 
-            <div className="flex items-center gap-3">
-              <div className="text-right">
-                <div className="flex items-center gap-2 justify-end">
-                  <span className="text-sm font-semibold text-slate-100">{step.session.user.username}</span>
-                  <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-xs font-semibold text-amber-300 border border-amber-500/30">
-                    {step.session.user.role}
-                  </span>
+        {/* Top Utility Bar (Language & Theme) */}
+        <div className="max-w-7xl mx-auto flex justify-end items-center gap-2 mb-4 relative z-20">
+          <div className={`flex items-center rounded-full p-0.5 text-xs font-semibold shadow-inner border transition-colors ${
+            isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+          }`}>
+            <button
+              type="button"
+              onClick={() => setLang('th')}
+              className={`px-2.5 py-0.5 rounded-full transition-colors ${
+                lang === 'th'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
+                  : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              TH
+            </button>
+            <button
+              type="button"
+              onClick={() => setLang('en')}
+              className={`px-2.5 py-0.5 rounded-full transition-colors ${
+                lang === 'en'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm font-bold'
+                  : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              EN
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsDark(!isDark)}
+            aria-label="Toggle theme"
+            className={`flex items-center justify-center h-7 w-7 rounded-full border transition-colors shadow-inner ${
+              isDark
+                ? 'bg-slate-900 border-slate-800 text-amber-400 hover:text-amber-300'
+                : 'bg-white border-slate-200 text-amber-600 hover:text-amber-700'
+            }`}
+          >
+            {isDark ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
+          </button>
+        </div>
+
+        {isAdmin ? (
+          /* Admin Modern Dashboard with Floating Sidebar */
+          <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-6 relative z-10 items-start">
+            
+            {/* Left Sidebar */}
+            <aside className={`w-full md:w-64 lg:w-72 shrink-0 rounded-3xl border shadow-2xl p-6 flex flex-col justify-between backdrop-blur-md transition-colors min-h-[720px] ${
+              isDark ? 'border-slate-800/80 bg-slate-900/90' : 'border-slate-200/90 bg-white/95'
+            }`}>
+              <div className="space-y-6">
+                {/* Brand Header */}
+                <div className="flex items-center gap-2.5">
+                  <span className="text-3xl" role="img" aria-label="Mango">🥭</span>
+                  <div>
+                    <h1 className={`text-base font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                      MANGO VPN
+                    </h1>
+                    <p className={`text-[10px] font-medium ${isDark ? 'text-amber-300/80' : 'text-amber-700'}`}>
+                      Mango Consultant Co., Ltd.
+                    </p>
+                  </div>
                 </div>
-                <p className="text-xs text-slate-400">{step.session.user.email}</p>
+
+                {/* Navigation Groups */}
+                <nav role="tablist" aria-label="Admin Governance" className="space-y-5">
+                  {/* Group 1: Management (จัดการ) */}
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider px-3 pb-1">
+                      {lang === 'th' ? 'จัดการ' : 'Management'}
+                    </p>
+                    {[
+                      { id: 'users', labelTh: 'ผู้ใช้', labelEn: 'Users' },
+                      { id: 'devices', labelTh: 'อุปกรณ์', labelEn: 'Devices' },
+                      { id: 'policies', labelTh: 'นโยบาย', labelEn: 'Policies' },
+                    ].map((item) => {
+                      const isActive = activeTab === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          role="tab"
+                          aria-label={item.labelEn}
+                          aria-selected={isActive}
+                          onClick={() => setActiveTab(item.id as AdminTab)}
+                          className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-medium transition-all text-left ${
+                            isActive
+                              ? 'bg-amber-500/25 border border-amber-500/40 text-amber-300 font-bold shadow-sm'
+                              : isDark
+                                ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span>{lang === 'th' ? item.labelTh : item.labelEn}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Group 2: Live Monitoring (ติดตามสด) */}
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider px-3 pb-1">
+                      {lang === 'th' ? 'ติดตามสด' : 'Live Monitoring'}
+                    </p>
+                    {[
+                      { id: 'sessions', labelTh: 'เซสชัน', labelEn: 'Sessions' },
+                    ].map((item) => {
+                      const isActive = activeTab === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          role="tab"
+                          aria-label={item.labelEn}
+                          aria-selected={isActive}
+                          onClick={() => setActiveTab(item.id as AdminTab)}
+                          className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-medium transition-all text-left ${
+                            isActive
+                              ? 'bg-amber-500/25 border border-amber-500/40 text-amber-300 font-bold shadow-sm'
+                              : isDark
+                                ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span>{lang === 'th' ? item.labelTh : item.labelEn}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Group 3: Audit & System (ตรวจสอบ) */}
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider px-3 pb-1">
+                      {lang === 'th' ? 'ตรวจสอบ' : 'Audit & System'}
+                    </p>
+                    {[
+                      { id: 'audit-logs', labelTh: 'บันทึกการใช้งาน', labelEn: 'Audit Logs' },
+                      { id: 'agent-versions', labelTh: 'เวอร์ชัน Agent', labelEn: 'Agent Versions' },
+                    ].map((item) => {
+                      const isActive = activeTab === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          role="tab"
+                          aria-label={item.labelEn}
+                          aria-selected={isActive}
+                          onClick={() => setActiveTab(item.id as AdminTab)}
+                          className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-medium transition-all text-left ${
+                            isActive
+                              ? 'bg-amber-500/25 border border-amber-500/40 text-amber-300 font-bold shadow-sm'
+                              : isDark
+                                ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span>{lang === 'th' ? item.labelTh : item.labelEn}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </nav>
               </div>
 
-              <button
-                type="button"
-                onClick={handleLogout}
-                aria-label="Log Out"
-                className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800/90 px-3.5 py-2 text-xs font-medium text-slate-200 hover:bg-rose-950/60 hover:text-rose-200 hover:border-rose-700/50 transition-colors shadow-sm"
-              >
-                <LogOut className="h-4 w-4" />
-                <span>Log Out</span>
-              </button>
-            </div>
-          </header>
+              {/* Sidebar Footer */}
+              <div className={`pt-6 border-t space-y-3 ${isDark ? 'border-slate-800/60' : 'border-slate-200/80'}`}>
+                <div className="text-xs">
+                  <span className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                    {step.session.user.username}
+                  </span>
+                  <span className="text-slate-500 mx-1.5">·</span>
+                  <span className="text-amber-400 font-bold">{step.session.user.role}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  aria-label="Log Out"
+                  className="w-full flex items-center gap-2 text-xs font-medium text-slate-400 hover:text-rose-400 transition-colors py-1"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  <span>{lang === 'th' ? 'ออกจากระบบ' : 'Log Out'}</span>
+                </button>
+              </div>
+            </aside>
 
-          <AgentStatusCard
-            accessToken={step.session.accessToken}
-            userRole={step.session.user.role}
-            auth={authContext}
-          />
+            {/* Right Main Content Card */}
+            <section className={`flex-1 w-full rounded-3xl border shadow-2xl p-6 sm:p-8 space-y-6 backdrop-blur-md transition-colors min-h-[720px] ${
+              isDark ? 'border-slate-800/80 bg-slate-900/90' : 'border-slate-200/90 bg-white/95'
+            }`}>
+              {/* Main Content Header */}
+              <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-800/60">
+                <div>
+                  <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                    {activeTab === 'users' && (lang === 'th' ? 'ผู้ใช้' : 'Users')}
+                    {activeTab === 'devices' && (lang === 'th' ? 'อุปกรณ์' : 'Devices')}
+                    {activeTab === 'policies' && (lang === 'th' ? 'นโยบาย' : 'Policies')}
+                    {activeTab === 'sessions' && (lang === 'th' ? 'เซสชัน' : 'Sessions')}
+                    {activeTab === 'audit-logs' && (lang === 'th' ? 'บันทึกการใช้งาน' : 'Audit Logs')}
+                    {activeTab === 'agent-versions' && (lang === 'th' ? 'เวอร์ชัน Agent' : 'Agent Versions')}
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Zero-Trust Role-Based WireGuard Network Management
+                  </p>
+                </div>
+              </header>
 
-          {step.session.user.role === RoleName.ADMIN && (
-            <div className="space-y-4 rounded-2xl border border-slate-800/80 bg-slate-900/80 p-4 sm:p-6 backdrop-blur-md shadow-xl">
-              <div role="tablist" aria-label="Admin Governance" className="flex flex-wrap gap-2 border-b border-slate-800 pb-3">
-                {(
-                  [
-                    ['audit-logs', 'Audit Logs'],
-                    ['agent-versions', 'Agent Versions'],
-                    ['users', 'Users'],
-                    ['devices', 'Devices'],
-                    ['sessions', 'Sessions'],
-                    ['policies', 'Policies'],
-                  ] as const
-                ).map(([tabKey, label]) => (
-                  <button
-                    key={tabKey}
-                    type="button"
-                    role="tab"
-                    aria-selected={activeTab === tabKey}
-                    onClick={() => setActiveTab(tabKey)}
-                    className={`rounded-xl px-4 py-2 text-sm font-medium transition-all ${
-                      activeTab === tabKey
-                        ? 'bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20'
-                        : 'text-slate-300 hover:bg-slate-800 hover:text-slate-100'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
+              {/* VPN Agent Status Card for Admin */}
+              <div className="pb-2">
+                <AgentStatusCard
+                  accessToken={step.session.accessToken}
+                  userRole={step.session.user.role}
+                  auth={authContext}
+                />
               </div>
 
-              <div className="rounded-xl border border-slate-800 bg-slate-950/90 p-4 sm:p-5">
+              {/* Active Tab View */}
+              <div>
                 {activeTab === 'audit-logs' && (
                   <AuditLogsTab
                     apiBaseUrl={apiBaseUrl}
@@ -309,9 +466,53 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                   />
                 )}
               </div>
-            </div>
-          )}
-        </div>
+            </section>
+          </div>
+        ) : (
+          /* Non-Admin User Portal (Staff / Client) */
+          <div className="max-w-2xl mx-auto space-y-6 relative z-10 pt-8">
+            <header className={`rounded-3xl border shadow-xl p-6 flex items-center justify-between backdrop-blur-md ${
+              isDark ? 'border-slate-800/80 bg-slate-900/90' : 'border-slate-200/90 bg-white/95'
+            }`}>
+              <div className="flex items-center gap-3">
+                <span className="text-3xl" role="img" aria-label="Mango">🥭</span>
+                <div>
+                  <h1 className={`text-lg font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                    MANGO VPN
+                  </h1>
+                  <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Zero-Trust Access Portal
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="text-right text-xs">
+                  <span className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                    {step.session.user.username}
+                  </span>
+                  <span className="text-slate-500 mx-1">·</span>
+                  <span className="text-amber-400 font-bold">{step.session.user.role}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  aria-label="Log Out"
+                  className="rounded-xl border border-slate-700 bg-slate-800/80 px-3 py-1.5 text-xs text-slate-300 hover:text-rose-300 hover:border-rose-700/50 transition-colors"
+                >
+                  <LogOut className="h-3.5 w-3.5 inline mr-1" />
+                  <span>{lang === 'th' ? 'ออกจากระบบ' : 'Log Out'}</span>
+                </button>
+              </div>
+            </header>
+
+            <AgentStatusCard
+              accessToken={step.session.accessToken}
+              userRole={step.session.user.role}
+              auth={authContext}
+            />
+          </div>
+        )}
       </main>
     );
   }
@@ -510,10 +711,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                 <label htmlFor="username" className={`block text-xs sm:text-sm font-medium ${
                   isDark ? 'text-slate-300' : 'text-slate-700'
                 }`}>
-                  {lang === 'th' ? 'ชื่อผู้ใช้' : 'Username'}
-                  <span className={`text-[11px] ml-1.5 ${
-                    isDark ? 'text-slate-500' : 'text-slate-400'
-                  }`}>(Username)</span>
+                  {lang === 'th' ? 'ชื่อผู้ใช้' : 'Username'}                 
                 </label>
                 <div className="relative">
                   <User className={`absolute left-3 top-3.5 h-4 w-4 pointer-events-none ${
@@ -541,9 +739,6 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                   isDark ? 'text-slate-300' : 'text-slate-700'
                 }`}>
                   {lang === 'th' ? 'รหัสผ่าน' : 'Password'}
-                  <span className={`text-[11px] ml-1.5 ${
-                    isDark ? 'text-slate-500' : 'text-slate-400'
-                  }`}>(Password)</span>
                 </label>
                 <div className="relative">
                   <Lock className={`absolute left-3 top-3.5 h-4 w-4 pointer-events-none ${
