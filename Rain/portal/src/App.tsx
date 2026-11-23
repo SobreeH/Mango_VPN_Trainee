@@ -205,8 +205,8 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
           isDark ? 'bg-emerald-500/10' : 'bg-emerald-300/20'
         }`} />
 
-        {/* Top Utility Bar (Language & Theme) */}
-        <div className="max-w-7xl mx-auto flex justify-end items-center gap-2 mb-4 relative z-20">
+        {/* Top Utility Bar (Language & Theme) - Full Width */}
+        <div className="w-full flex justify-end items-center gap-2 mb-4 relative z-20">
           <div className={`flex items-center rounded-full p-0.5 text-xs font-semibold shadow-inner border transition-colors ${
             isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
           }`}>
@@ -249,11 +249,11 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
         </div>
 
         {isAdmin ? (
-          /* Admin Modern Dashboard with Floating Sidebar */
-          <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-6 relative z-10 items-start">
+          /* Admin Modern Full-Screen Dashboard with Floating Sidebar */
+          <div className="w-full flex-1 flex flex-col md:flex-row gap-6 relative z-10 items-stretch">
             
             {/* Left Sidebar */}
-            <aside className={`w-full md:w-64 lg:w-72 shrink-0 rounded-3xl border shadow-2xl p-6 flex flex-col justify-between backdrop-blur-md transition-colors min-h-[720px] ${
+            <aside className={`w-full md:w-64 lg:w-72 shrink-0 rounded-3xl border shadow-2xl p-6 flex flex-col justify-between backdrop-blur-md transition-colors min-h-[calc(100vh-6rem)] ${
               isDark ? 'border-slate-800/80 bg-slate-900/90' : 'border-slate-200/90 bg-white/95'
             }`}>
               <div className="space-y-6">
@@ -392,7 +392,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
             </aside>
 
             {/* Right Main Content Card */}
-            <section className={`flex-1 w-full rounded-3xl border shadow-2xl p-6 sm:p-8 space-y-6 backdrop-blur-md transition-colors min-h-[720px] ${
+            <section className={`flex-1 w-full rounded-3xl border shadow-2xl p-6 sm:p-8 space-y-6 backdrop-blur-md transition-colors min-h-[calc(100vh-6rem)] ${
               isDark ? 'border-slate-800/80 bg-slate-900/90' : 'border-slate-200/90 bg-white/95'
             }`}>
               {/* Main Content Header */}
