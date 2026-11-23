@@ -154,16 +154,23 @@ export function AgentStatusCard({ accessToken, userRole, auth }: AgentStatusCard
   }
 
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-950 p-4 space-y-3">
+    <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-6 shadow-2xl backdrop-blur-xl max-w-2xl mx-auto space-y-4">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-          Windows Agent
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
+            Windows Agent
+          </span>
+          {view.kind !== 'checking' && 'health' in view && (
+            <span className="font-mono text-[11px] px-2 py-0.5 rounded-full bg-white/5 text-stone-400 border border-white/5">
+              v{view.health.version}
+            </span>
+          )}
+        </div>
         <button
           type="button"
           onClick={() => void probeAgent(pairingToken)}
           aria-label="Refresh Agent Status"
-          className="inline-flex items-center gap-1 rounded border border-slate-700 px-2 py-1 text-xs text-slate-300 hover:bg-slate-800"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-[#262420]/70 px-3 py-1.5 text-xs text-stone-300 hover:text-stone-100 hover:bg-white/5 transition-colors"
         >
           <RefreshCw className="h-3 w-3" />
           <span>Refresh</span>
@@ -171,45 +178,42 @@ export function AgentStatusCard({ accessToken, userRole, auth }: AgentStatusCard
       </div>
 
       {view.kind === 'checking' && (
-        <p className="text-xs text-slate-400">Checking local Windows Agent...</p>
+        <p className="text-xs text-stone-400">Checking local Windows Agent...</p>
       )}
 
       {view.kind === 'unreachable' && (
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2 text-sm font-medium text-red-300">
+        <div className="space-y-2 rounded-2xl border border-red-500/20 bg-red-950/20 p-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-red-300">
             <WifiOff className="h-4 w-4 text-red-400" />
             <span>Agent Unreachable</span>
           </div>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-stone-400 leading-relaxed">
             Start the local MANGO Windows Agent on 127.0.0.1:47821 ({view.reason}).
           </p>
         </div>
       )}
 
       {view.kind === 'unpaired' && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm font-medium text-amber-300">
-              <Key className="h-4 w-4" />
-              <span>Agent Reachable (Unpaired)</span>
-            </div>
-            <span className="text-xs text-slate-400">v{view.health.version}</span>
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 text-xs font-semibold text-amber-300">
+            <Key className="h-4 w-4" />
+            <span>Agent Reachable (Unpaired)</span>
           </div>
 
           {view.error && (
             <div
               role="alert"
-              className="flex items-start gap-2 rounded border border-red-500/40 bg-red-950/50 p-2 text-xs text-red-200"
+              className="flex items-start gap-2 rounded-2xl border border-red-500/30 bg-red-950/30 p-3 text-xs text-red-200"
             >
               <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-red-400" />
               <span>{view.error}</span>
             </div>
           )}
 
-          <form onSubmit={handlePairSubmit} className="space-y-2" noValidate>
+          <form onSubmit={handlePairSubmit} className="space-y-3" noValidate>
             <label
               htmlFor="agent-pairing-token"
-              className="block text-xs font-medium text-slate-300"
+              className="block text-xs font-medium text-stone-300"
             >
               Agent Pairing Token
             </label>
@@ -220,12 +224,12 @@ export function AgentStatusCard({ accessToken, userRole, auth }: AgentStatusCard
                 value={pairingToken}
                 onChange={(e) => setPairingToken(e.target.value)}
                 placeholder="Paste X-Mango-Agent-Token"
-                className="flex-1 rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-100 focus:border-amber-400 focus:outline-none"
+                className="flex-1 h-11 rounded-xl border border-white/10 bg-[#262420]/70 px-4 text-xs text-stone-100 placeholder-stone-500 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 focus:outline-none transition-colors"
               />
               <button
                 type="submit"
                 disabled={isPairing}
-                className="rounded bg-amber-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-amber-400 disabled:opacity-50"
+                className="h-11 rounded-xl bg-[#f59e0b] hover:bg-[#d97706] px-5 text-xs font-bold text-stone-950 shadow-md shadow-amber-500/20 disabled:opacity-50 transition-colors"
               >
                 {isPairing ? 'Pairing...' : 'Pair Agent'}
               </button>
@@ -235,68 +239,66 @@ export function AgentStatusCard({ accessToken, userRole, auth }: AgentStatusCard
       )}
 
       {view.kind === 'paired' && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm font-medium text-emerald-300">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+            <span className="inline-flex items-center gap-2 rounded-full px-3.5 py-1 text-xs font-medium border bg-[#162a1e]/90 border-emerald-900/40 text-emerald-400">
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
               <span>Agent Paired &amp; Ready</span>
+            </span>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-stone-400">Tunnel:</span>
+              <span
+                className={`font-mono font-semibold ${
+                  view.status.state === 'connected' ? 'text-emerald-400' : 'text-stone-400'
+                }`}
+              >
+                {view.status.state}
+              </span>
             </div>
-            <span className="text-xs text-slate-400">v{view.health.version}</span>
           </div>
 
           {tunnelError && (
             <div
               role="alert"
-              className="flex items-start gap-2 rounded border border-red-500/40 bg-red-950/50 p-2 text-xs text-red-200"
+              className="flex items-start gap-2 rounded-2xl border border-red-500/30 bg-red-950/30 p-3 text-xs text-red-200"
             >
               <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-red-400" />
               <span>{tunnelError}</span>
             </div>
           )}
 
-          <div className="space-y-1.5 text-xs">
-            <div className="flex items-center justify-between text-slate-400">
-              <span>Tunnel State</span>
-              <span
-                className={`font-mono font-semibold ${
-                  view.status.state === 'connected' ? 'text-emerald-300' : 'text-slate-200'
-                }`}
-              >
-                {view.status.state}
-              </span>
-            </div>
-
+          <div className="rounded-2xl border border-white/5 bg-[#141311]/60 p-4 space-y-2 text-xs">
             {view.status.state === 'connected' && userRole && (
-              <div className="flex items-center justify-between text-slate-400">
+              <div className="flex items-center justify-between text-stone-400">
                 <span>Connected Role</span>
-                <span className="rounded bg-amber-500/15 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-amber-300">
+                <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 font-mono text-[11px] font-bold text-amber-300">
                   {userRole}
                 </span>
               </div>
             )}
 
             {view.status.assignedIp && (
-              <div className="flex items-center justify-between text-slate-400">
+              <div className="flex items-center justify-between text-stone-400">
                 <span>Assigned VPN IP</span>
-                <span className="font-mono text-amber-300">{view.status.assignedIp}</span>
+                <span className="font-mono text-amber-300 font-bold">{view.status.assignedIp}</span>
               </div>
             )}
 
             {view.status.serverEndpoint && (
-              <div className="flex items-center justify-between text-slate-400">
+              <div className="flex items-center justify-between text-stone-400">
                 <span>Gateway Endpoint</span>
-                <span className="font-mono text-slate-300">{view.status.serverEndpoint}</span>
+                <span className="font-mono text-stone-300">{view.status.serverEndpoint}</span>
               </div>
             )}
 
             {view.status.allowedIps && view.status.allowedIps.length > 0 && (
-              <div className="flex items-start justify-between gap-2 text-slate-400">
+              <div className="flex items-start justify-between gap-2 text-stone-400">
                 <span>Permitted Networks</span>
                 <div className="flex flex-wrap justify-end gap-1">
                   {view.status.allowedIps.map((cidr) => (
                     <span
                       key={cidr}
-                      className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[11px] text-slate-200"
+                      className="rounded bg-stone-800/80 border border-white/5 px-2 py-0.5 font-mono text-[11px] text-stone-200"
                     >
                       {cidr}
                     </span>
@@ -305,37 +307,40 @@ export function AgentStatusCard({ accessToken, userRole, auth }: AgentStatusCard
               </div>
             )}
 
-            <div className="flex items-center justify-between text-slate-400">
+            <div className="flex items-center justify-between text-stone-400">
               <span>Curve25519 Key</span>
-              <span className="font-mono text-slate-300">
+              <span className="font-mono text-stone-400">
                 {view.status.publicKey.slice(0, 12)}...
               </span>
             </div>
           </div>
 
-          {view.status.state === 'connected' ? (
-            <button
-              type="button"
-              disabled={isTunnelBusy}
-              onClick={() => void handleDisconnectVpn()}
-              className="w-full flex items-center justify-center gap-2 rounded-lg border border-red-500/40 bg-red-950/60 px-3 py-2 text-xs font-semibold text-red-200 hover:bg-red-900/60 disabled:opacity-50"
-            >
-              <Power className="h-3.5 w-3.5" />
-              <span>{isTunnelBusy ? 'Disconnecting...' : 'Disconnect VPN'}</span>
-            </button>
-          ) : (
-            accessToken && (
+          {/* Action Button: Ergonomically bounded & harmonious according to HCI */}
+          <div className="pt-1 flex justify-center">
+            {view.status.state === 'connected' ? (
               <button
                 type="button"
                 disabled={isTunnelBusy}
-                onClick={() => void handleConnectVpn()}
-                className="w-full flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-50"
+                onClick={() => void handleDisconnectVpn()}
+                className="w-full sm:w-auto min-w-[200px] h-11 flex items-center justify-center gap-2 rounded-xl border border-rose-900/50 bg-[#381a1c] px-6 text-xs sm:text-sm font-bold text-rose-200 hover:bg-rose-900/60 hover:text-white transition-all shadow-md disabled:opacity-50 cursor-pointer"
               >
-                <ShieldCheck className="h-3.5 w-3.5" />
-                <span>{isTunnelBusy ? 'Connecting...' : 'Connect VPN'}</span>
+                <Power className="h-4 w-4" />
+                <span>{isTunnelBusy ? 'Disconnecting...' : 'Disconnect VPN'}</span>
               </button>
-            )
-          )}
+            ) : (
+              accessToken && (
+                <button
+                  type="button"
+                  disabled={isTunnelBusy}
+                  onClick={() => void handleConnectVpn()}
+                  className="w-full sm:w-auto min-w-[200px] h-11 flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-6 text-xs sm:text-sm shadow-lg shadow-emerald-950/40 border border-emerald-500/40 transition-all hover:scale-[1.02] disabled:opacity-50 disabled:scale-100 cursor-pointer"
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  <span>{isTunnelBusy ? 'Connecting...' : 'Connect VPN'}</span>
+                </button>
+              )
+            )}
+          </div>
         </div>
       )}
     </div>
