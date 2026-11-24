@@ -4,9 +4,9 @@
 
 ```text
 Rain/portal/
-├── src/App.tsx                   # Full-screen layout with left sidebar, role port detection, & multi-port navigation
+├── src/App.tsx                   # Full-screen layout with left sidebar, clean Navbar, & multi-port navigation
 └── src/components/
-    └── AgentStatusCard.tsx       # Hero Connection Card, 3-Node Tunnel Hop Diagram, 3 Metric Cards, & Security Checklist
+    └── AgentStatusCard.tsx       # Hero Connection Card, 3-Node Tunnel Hop Diagram, Auto-retry polling, & LocalStorage token persistence
 
 Sobree/ (Cross-Boundary Updates)
 ├── api/src/config.ts             # Merge localhost 3000-3002 into CORS allowlist during development
@@ -14,8 +14,11 @@ Sobree/ (Cross-Boundary Updates)
 
 scripts/
 ├── dev-demo.mjs                  # All-in-one live demo launcher (Mock Agent + 3 Role Portals)
-├── start-all-portals.mjs         # Multi-port concurrent portal launcher
-└── mock-agent.js                 # Extended PNA/CORS allowlist & isolated per-port device fingerprint
+├── start-all-portals.mjs         # Multi-port concurrent portal launcher with integrated Mock Agent
+└── mock-agent.js                 # Extended PNA/CORS allowlist, .env token fallback, & isolated per-port device fingerprint
+
+docs/
+└── PROGRESS.th.md                # Complete Thai translation of project progress & remaining work tracker
 ```
 
 ```mermaid
@@ -35,10 +38,12 @@ flowchart TD
 ### Key Changes
 1. **Full-Screen Sidebar Dashboard for Staff & Client:** Redesigned non-admin view from a centered card into a responsive full-screen sidebar dashboard matching enterprise Zero-Trust portals.
 2. **Visual Telemetry & Tunnel Hop Diagram:** Added live 3-node visual hop diagram (`User Device` ➔ `VPN Gateway` ➔ `Corporate Subnet`), 3 telemetry metric cards (Assigned IP, Connected Role, Uptime/State), and 2 info cards (Permitted Subnets + Curve25519 Key toggle, Account Security Checklist).
-3. **Official Mango Theme (HCI Compliant):** Unified colors around Warm Obsidian (`#141311`), Golden Amber (`#f59e0b`), and Emerald Leaf Green (`#10b981`). Eliminated unharmonized blues.
-4. **Multi-Port Role Isolation for Concurrent Demos:** Added `PORT` environment and `--port` CLI support (`npm run dev:portal:admin` on `:3000`, `npm run dev:portal:staff` on `:3001`, `npm run dev:portal:client` on `:3002`, and all-in-one launcher `npm run dev:demo`).
-5. **Cross-Boundary Allowlist Alignment:** Expanded CORS in `Sobree/api/src/config.ts` and PNA Origin allowlist in `Sobree/agent-windows/main.go` and `scripts/mock-agent.js` to accept ports 3000, 3001, and 3002.
-6. **Per-Port Mock Device Fingerprint Isolation:** Configured `scripts/mock-agent.js` to scope device fingerprint by origin port during local multi-tenant testing, preventing `Device fingerprint belongs to another user` collisions when switching between Admin, Staff, and Client accounts on a single development machine.
+3. **Official Mango Theme (HCI Compliant) & Cleaned Navbar:** Unified colors around Warm Obsidian (`#141311`), Golden Amber (`#f59e0b`), and Emerald Leaf Green (`#10b981`). Cleaned Navbar by removing redundant port switcher and badge clutter.
+4. **Agent Auto-Retry Polling & Token Persistence:** Added 4-second auto-retry polling when the Windows Agent is unreachable and persisted `X-Mango-Agent-Token` in `localStorage` so pairing is retained across page reloads.
+5. **Multi-Port Role Isolation for Concurrent Demos:** Added `PORT` environment and `--port` CLI support (`npm run dev:portal:admin` on `:3000`, `npm run dev:portal:staff` on `:3001`, `npm run dev:portal:client` on `:3002`, and auto-launching Mock Agent in `npm run dev:portal:all` and `npm run dev:demo`).
+6. **Cross-Boundary Allowlist Alignment:** Expanded CORS in `Sobree/api/src/config.ts` and PNA Origin allowlist in `Sobree/agent-windows/main.go` and `scripts/mock-agent.js` to accept ports 3000, 3001, and 3002.
+7. **Per-Port Mock Device Fingerprint Isolation:** Configured `scripts/mock-agent.js` to scope device fingerprint by origin port during local multi-tenant testing, preventing `Device fingerprint belongs to another user` collisions when switching between Admin, Staff, and Client accounts on a single development machine.
+8. **Thai Documentation:** Added comprehensive Thai translation of project progress in `PROGRESS.th.md`.
 
 ---
 
