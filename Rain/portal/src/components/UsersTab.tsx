@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { RoleName, type UserDto } from '@mango/shared';
 import type { AuthRefreshContext } from '../api/auth';
 import { createUser, fetchUsers, updateUserStatus } from '../lib/adminApi';
+import { useToast } from './Toast';
 import { ConfirmModal } from './ConfirmModal';
 
 interface UsersTabProps {
@@ -13,6 +14,7 @@ interface UsersTabProps {
 
 export function UsersTab({ apiBaseUrl, accessToken, auth }: UsersTabProps) {
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -43,21 +45,45 @@ export function UsersTab({ apiBaseUrl, accessToken, auth }: UsersTabProps) {
         },
         auth,
       ),
-    onSuccess: () => {
+    onSuccess: (newUser) => {
+      showToast({
+        type: 'success',
+        title: 'User Created',
+        message: `User ${newUser.username} (${newUser.role}) was provisioned successfully.`,
+      });
       setUsername('');
       setEmail('');
       setPassword('');
       setRole(RoleName.CLIENT);
       void queryClient.invalidateQueries({ queryKey: ['admin-users', apiBaseUrl] });
     },
+    onError: (err) => {
+      showToast({
+        type: 'error',
+        title: 'Creation Failed',
+        message: err instanceof Error ? err.message : 'Failed to create user',
+      });
+    },
   });
 
   const statusMutation = useMutation({
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
       updateUserStatus(apiBaseUrl, accessToken, id, { isActive }, auth),
-    onSuccess: () => {
+    onSuccess: (updated) => {
+      showToast({
+        type: updated.isActive ? 'success' : 'warning',
+        title: 'User Status Updated',
+        message: `Account for ${updated.username} is now ${updated.isActive ? 'Active' : 'Disabled'}.`,
+      });
       void queryClient.invalidateQueries({ queryKey: ['admin-users', apiBaseUrl] });
       void queryClient.invalidateQueries({ queryKey: ['admin-sessions', apiBaseUrl] });
+    },
+    onError: (err) => {
+      showToast({
+        type: 'error',
+        title: 'Status Update Failed',
+        message: err instanceof Error ? err.message : 'Failed to update user status',
+      });
     },
   });
 

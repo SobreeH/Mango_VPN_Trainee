@@ -23,6 +23,7 @@ import { RoleName, type AuthTokensResponse, type AuthUserDto, type LoginResponse
 import { loginUser, logoutUser, verifyOtpCode, type AuthRefreshContext } from './api/auth';
 import { AgentStatusCard } from './components/AgentStatusCard';
 import { DEFAULT_API_URL, fetchUsers, fetchDevices, fetchSessions } from './lib/adminApi';
+import { ToastProvider } from './components/Toast';
 import { AuditLogsTab } from './components/AuditLogsTab';
 import { AgentVersionsTab } from './components/AgentVersionsTab';
 import { UsersTab } from './components/UsersTab';
@@ -90,7 +91,7 @@ function saveStoredSession(session: AuthTokensResponse | null): void {
   }
 }
 
-export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppProps) {
+function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppProps) {
   const [step, setStep] = useState<AuthStep>(() => {
     if (initialSession) {
       return {
@@ -1574,6 +1575,14 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
         </div>
       </section>
     </main>
+  );
+}
+
+export function App(props: AppProps) {
+  return (
+    <ToastProvider>
+      <AppPortal {...props} />
+    </ToastProvider>
   );
 }
 

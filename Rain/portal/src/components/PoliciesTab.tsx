@@ -9,6 +9,7 @@ import {
 } from '@mango/shared';
 import type { AuthRefreshContext } from '../api/auth';
 import { createPolicy, deletePolicy, fetchPolicies } from '../lib/adminApi';
+import { useToast } from './Toast';
 import { ConfirmModal } from './ConfirmModal';
 
 interface PoliciesTabProps {
@@ -19,6 +20,7 @@ interface PoliciesTabProps {
 
 export function PoliciesTab({ apiBaseUrl, accessToken, auth }: PoliciesTabProps) {
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [name, setName] = useState('');
   const [role, setRole] = useState<RoleName>(RoleName.STAFF);
   const [targetCidr, setTargetCidr] = useState('');
@@ -51,20 +53,44 @@ export function PoliciesTab({ apiBaseUrl, accessToken, auth }: PoliciesTabProps)
         auth,
       );
     },
-    onSuccess: () => {
+    onSuccess: (newPolicy) => {
+      showToast({
+        type: 'success',
+        title: 'Policy Created',
+        message: `Zero-Trust policy "${newPolicy.name}" (${newPolicy.role} ${newPolicy.action}) added.`,
+      });
       setName('');
       setTargetCidr('');
       setPortRange('');
       setPriority('100');
       void queryClient.invalidateQueries({ queryKey: ['policies', apiBaseUrl] });
     },
+    onError: (err) => {
+      showToast({
+        type: 'error',
+        title: 'Creation Failed',
+        message: err instanceof Error ? err.message : 'Failed to create policy',
+      });
+    },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deletePolicy(apiBaseUrl, accessToken, id, auth),
     onSuccess: () => {
+      showToast({
+        type: 'warning',
+        title: 'Policy Deleted',
+        message: `Policy "${pendingDeletePolicy?.name ?? ''}" has been removed from firewall.`,
+      });
       setPendingDeletePolicy(null);
       void queryClient.invalidateQueries({ queryKey: ['policies', apiBaseUrl] });
+    },
+    onError: (err) => {
+      showToast({
+        type: 'error',
+        title: 'Delete Failed',
+        message: err instanceof Error ? err.message : 'Failed to delete policy',
+      });
     },
   });
 

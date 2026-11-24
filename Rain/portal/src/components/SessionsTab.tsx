@@ -4,6 +4,7 @@ import { Activity, Download, ShieldAlert, Wifi } from 'lucide-react';
 import { SessionStatus, type VpnSessionDto } from '@mango/shared';
 import type { AuthRefreshContext } from '../api/auth';
 import { disconnectSession, fetchSessions } from '../lib/adminApi';
+import { useToast } from './Toast';
 import { ConfirmModal } from './ConfirmModal';
 
 interface SessionsTabProps {
@@ -52,6 +53,7 @@ function exportSessionsToCsv(sessionsToExport: VpnSessionDto[]) {
 
 export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps) {
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [sessionToDisconnect, setSessionToDisconnect] = useState<{
     id: string;
     username: string;
@@ -66,7 +68,19 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps)
   const disconnectMutation = useMutation({
     mutationFn: (id: string) => disconnectSession(apiBaseUrl, accessToken, id, auth),
     onSuccess: () => {
+      showToast({
+        type: 'warning',
+        title: 'Session Disconnected',
+        message: `Terminated VPN connection for ${sessionToDisconnect?.username ?? 'peer'}.`,
+      });
       void queryClient.invalidateQueries({ queryKey: ['admin-sessions', apiBaseUrl] });
+    },
+    onError: (err) => {
+      showToast({
+        type: 'error',
+        title: 'Disconnect Failed',
+        message: err instanceof Error ? err.message : 'Failed to disconnect session',
+      });
     },
   });
 
@@ -88,7 +102,14 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps)
         </div>
         <button
           type="button"
-          onClick={() => exportSessionsToCsv(sessions)}
+          onClick={() => {
+            exportSessionsToCsv(sessions);
+            showToast({
+              type: 'success',
+              title: 'Report Downloaded',
+              message: `Exported ${sessions.length} VPN session records to CSV.`,
+            });
+          }}
           disabled={sessions.length === 0}
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 px-4 py-2 text-xs font-semibold shadow-sm transition-all disabled:opacity-40"
         >

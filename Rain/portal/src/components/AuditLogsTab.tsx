@@ -4,6 +4,7 @@ import { Download, FileText, ShieldAlert, X } from 'lucide-react';
 import type { AuditLogDto } from '@mango/shared';
 import type { AuthRefreshContext } from '../api/auth';
 import { fetchAuditLogs } from '../lib/adminApi';
+import { useToast } from './Toast';
 
 interface AuditLogsTabProps {
   apiBaseUrl: string;
@@ -50,6 +51,7 @@ function exportAuditLogsToCsv(logsToExport: AuditLogDto[]) {
 }
 
 export function AuditLogsTab({ apiBaseUrl, accessToken, auth }: AuditLogsTabProps) {
+  const { showToast } = useToast();
   const [page, setPage] = useState(1);
   const [actionFilter, setActionFilter] = useState('');
   const [targetTypeFilter, setTargetTypeFilter] = useState('');
@@ -92,7 +94,14 @@ export function AuditLogsTab({ apiBaseUrl, accessToken, auth }: AuditLogsTabProp
           </div>
           <button
             type="button"
-            onClick={() => exportAuditLogsToCsv(logs)}
+            onClick={() => {
+              exportAuditLogsToCsv(logs);
+              showToast({
+                type: 'success',
+                title: 'Audit Trail Exported',
+                message: `Exported ${logs.length} audit records to CSV successfully.`,
+              });
+            }}
             disabled={logs.length === 0}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 px-4 py-2 text-xs font-semibold shadow-sm transition-all disabled:opacity-40"
           >
