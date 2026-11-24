@@ -481,6 +481,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                 <AgentStatusCard
                   accessToken={step.session.accessToken}
                   userRole={step.session.user.role}
+                  username={step.session.user.username}
                   auth={authContext}
                 />
               </div>
@@ -656,6 +657,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
               <AgentStatusCard
                 accessToken={step.session.accessToken}
                 userRole={step.session.user.role}
+                username={step.session.user.username}
                 auth={authContext}
               />
             </div>
@@ -826,6 +828,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                   <AgentStatusCard
                     accessToken={step.session.accessToken}
                     userRole={step.session.user.role}
+                    username={step.session.user.username}
                     auth={authContext}
                   />
                 </div>

@@ -20,6 +20,7 @@ type AgentViewState =
 export interface AgentStatusCardProps {
   accessToken?: string;
   userRole?: RoleName;
+  username?: string;
   auth?: AuthRefreshContext;
 }
 
@@ -50,7 +51,7 @@ function savePairingToken(token: string): void {
   }
 }
 
-export function AgentStatusCard({ accessToken, userRole, auth }: AgentStatusCardProps) {
+export function AgentStatusCard({ accessToken, userRole, username, auth }: AgentStatusCardProps) {
   const [view, setView] = useState<AgentViewState>({ kind: 'checking' });
   const [pairingToken, setPairingToken] = useState<string>(() => getSavedPairingToken());
   const [isPairing, setIsPairing] = useState(false);
@@ -78,7 +79,8 @@ export function AgentStatusCard({ accessToken, userRole, auth }: AgentStatusCard
     }
 
     try {
-      const status = await fetchAgentStatus(activeToken);
+      const userHint = (username || userRole || '').toLowerCase();
+      const status = await fetchAgentStatus(activeToken, userHint);
       savePairingToken(activeToken);
       setView({ kind: 'paired', health, status });
     } catch (err) {
@@ -93,7 +95,7 @@ export function AgentStatusCard({ accessToken, userRole, auth }: AgentStatusCard
             : 'Failed to pair with local agent';
       setView({ kind: 'unpaired', health, error: message });
     }
-  }, []);
+  }, [username, userRole]);
 
   useEffect(() => {
     const saved = getSavedPairingToken();
@@ -131,7 +133,8 @@ export function AgentStatusCard({ accessToken, userRole, auth }: AgentStatusCard
     try {
       if (view.kind === 'unpaired') {
         try {
-          const status = await fetchAgentStatus(trimmed);
+          const userHint = (username || userRole || '').toLowerCase();
+          const status = await fetchAgentStatus(trimmed, userHint);
           savePairingToken(trimmed);
           setView({ kind: 'paired', health: view.health, status });
         } catch (err) {
@@ -161,7 +164,8 @@ export function AgentStatusCard({ accessToken, userRole, auth }: AgentStatusCard
     setIsTunnelBusy(true);
     try {
       const { ticket } = await requestConnectTicket(accessToken, auth);
-      const res = await connectAgent(pairingToken.trim(), ticket, userRole?.toLowerCase());
+      const userHint = (username || userRole || '').toLowerCase();
+      const res = await connectAgent(pairingToken.trim(), ticket, userHint);
       setView({
         ...view,
         status: {
@@ -189,7 +193,8 @@ export function AgentStatusCard({ accessToken, userRole, auth }: AgentStatusCard
     setDisconnectMessage(null);
     setIsTunnelBusy(true);
     try {
-      const res = await disconnectAgent(pairingToken.trim());
+      const userHint = (username || userRole || '').toLowerCase();
+      const res = await disconnectAgent(pairingToken.trim(), userHint);
       setDisconnectMessage('ตัดการเชื่อมต่อ VPN เรียบร้อยแล้ว (Disconnected safely)');
       setView({
         ...view,
