@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ShieldCheck, ShieldAlert, Plus } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, Plus, Search, X, Filter } from 'lucide-react';
 import {
   PolicyAction,
   PolicyProtocol,
@@ -29,6 +29,11 @@ export function PoliciesTab({ apiBaseUrl, accessToken, auth }: PoliciesTabProps)
   const [action, setAction] = useState<PolicyAction>(PolicyAction.ALLOW);
   const [priority, setPriority] = useState('100');
   const [pendingDeletePolicy, setPendingDeletePolicy] = useState<VpnPolicyDto | null>(null);
+
+  // Quick Search & Filter state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState<'ALL' | RoleName>('ALL');
+  const [actionFilter, setActionFilter] = useState<'ALL' | PolicyAction>('ALL');
 
   const listQuery = useQuery({
     queryKey: ['policies', apiBaseUrl],
@@ -100,6 +105,20 @@ export function PoliciesTab({ apiBaseUrl, accessToken, auth }: PoliciesTabProps)
   };
 
   const policies: VpnPolicyDto[] = listQuery.data?.items ?? [];
+  const filteredPolicies = policies.filter((pol) => {
+    const term = searchTerm.toLowerCase().trim();
+    const matchesSearch =
+      term === '' ||
+      pol.name.toLowerCase().includes(term) ||
+      pol.targetCidr.toLowerCase().includes(term) ||
+      (pol.portRange && pol.portRange.toLowerCase().includes(term)) ||
+      pol.protocol.toLowerCase().includes(term);
+
+    const matchesRole = roleFilter === 'ALL' || pol.role === roleFilter;
+    const matchesAction = actionFilter === 'ALL' || pol.action === actionFilter;
+
+    return matchesSearch && matchesRole && matchesAction;
+  });
   const activeError = listQuery.error ?? createMutation.error ?? deleteMutation.error ?? null;
 
   return (
@@ -248,6 +267,74 @@ export function PoliciesTab({ apiBaseUrl, accessToken, auth }: PoliciesTabProps)
         </div>
       )}
 
+      {/* Quick Search & Filter Bar */}
+      {policies.length > 0 && (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-4 sm:p-5 shadow-xl backdrop-blur-xl">
+          <div className="flex-1 flex items-center gap-3">
+            <div className="relative flex-1 sm:max-w-xs">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-stone-500" />
+              <input
+                type="text"
+                aria-label="Search policies"
+                placeholder="Search by name, CIDR, port..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full h-10 rounded-xl border border-white/10 bg-[#262420]/70 pl-9 pr-8 text-xs text-stone-100 placeholder-stone-500 focus:border-amber-400 focus:outline-none transition-colors"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  aria-label="Clear search"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-300"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+            <span className="text-[11px] font-mono text-stone-400 bg-white/5 px-2.5 py-1.5 rounded-lg border border-white/5 whitespace-nowrap">
+              {filteredPolicies.length} / {policies.length} Policies
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <label htmlFor="filter-policy-role" className="text-xs text-stone-400 flex items-center gap-1">
+                <Filter className="h-3 w-3 text-stone-500" />
+                Role:
+              </label>
+              <select
+                id="filter-policy-role"
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value as 'ALL' | RoleName)}
+                className="h-10 rounded-xl border border-white/10 bg-[#262420]/70 px-3 text-xs text-stone-100 focus:border-amber-400 focus:outline-none cursor-pointer"
+              >
+                <option value="ALL">All Roles</option>
+                <option value={RoleName.ADMIN}>ADMIN</option>
+                <option value={RoleName.STAFF}>STAFF</option>
+                <option value={RoleName.CLIENT}>CLIENT</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <label htmlFor="filter-policy-action" className="text-xs text-stone-400">
+                Action:
+              </label>
+              <select
+                id="filter-policy-action"
+                value={actionFilter}
+                onChange={(e) => setActionFilter(e.target.value as 'ALL' | PolicyAction)}
+                className="h-10 rounded-xl border border-white/10 bg-[#262420]/70 px-3 text-xs text-stone-100 focus:border-amber-400 focus:outline-none cursor-pointer"
+              >
+                <option value="ALL">All Actions</option>
+                <option value={PolicyAction.ALLOW}>ALLOW</option>
+                <option value={PolicyAction.DENY}>DENY</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
+
       {listQuery.isLoading ? (
         <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-8 text-center text-xs text-stone-400 shadow-xl">
           Loading policies...
@@ -258,9 +345,25 @@ export function PoliciesTab({ apiBaseUrl, accessToken, auth }: PoliciesTabProps)
           <p className="text-stone-300 font-medium">No policies configured.</p>
           <p className="text-[11px] text-stone-500">Zero-Trust subnet routing policies will be displayed here.</p>
         </div>
-      ) : policies.length > 0 ? (
+      ) : policies.length > 0 && filteredPolicies.length === 0 ? (
+        <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-8 text-center text-xs text-stone-400 shadow-xl space-y-3">
+          <ShieldAlert className="h-7 w-7 text-stone-500 mx-auto" />
+          <p className="text-stone-300 font-medium">No policies match your search or filters.</p>
+          <button
+            type="button"
+            onClick={() => {
+              setSearchTerm('');
+              setRoleFilter('ALL');
+              setActionFilter('ALL');
+            }}
+            className="rounded-xl border border-white/10 bg-[#262420] px-4 py-2 text-xs font-semibold text-amber-400 hover:bg-[#2e2a24] transition-colors"
+          >
+            Clear Filters
+          </button>
+        </div>
+      ) : filteredPolicies.length > 0 ? (
         <div className="space-y-3">
-          {policies.map((pol) => (
+          {filteredPolicies.map((pol) => (
             <div
               key={pol.id}
               className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-5 shadow-xl hover:border-amber-500/20 transition-all backdrop-blur-xl"
