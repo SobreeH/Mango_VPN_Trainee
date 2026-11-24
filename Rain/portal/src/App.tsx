@@ -202,7 +202,14 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
           refreshToken: step.session.refreshToken,
           apiBaseUrl,
           onSessionUpdate: (newSession) => setStep({ kind: 'authenticated', session: newSession }),
-          onAuthExpired: (message) => clearLocalSession(message),
+          onAuthExpired: (message) => {
+            clearLocalSession(
+              message ||
+                (lang === 'th'
+                  ? 'เซสชันของคุณหมดอายุ กรุณาเข้าสู่ระบบใหม่อีกครั้ง'
+                  : 'Session expired. Please sign in again.'),
+            );
+          },
         }
       : undefined;
 
@@ -979,14 +986,16 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
             </p>
           </div>
 
-          {/* Error Banner */}
+          {/* Error / Notification Banner */}
           {errorMessage && (
             <div
               role="alert"
-              className={`rounded-2xl border p-3.5 text-xs text-red-200 space-y-1 shadow-inner ${
-                step.kind === 'mfa'
-                  ? 'border-red-900/60 bg-red-950/60 text-center'
-                  : 'flex items-start gap-2 border-red-500/40 bg-red-950/50'
+              className={`rounded-2xl border p-3.5 text-xs shadow-inner ${
+                errorMessage.includes('เซสชัน') || errorMessage.toLowerCase().includes('session')
+                  ? 'border-amber-500/30 bg-amber-950/30 text-amber-200 flex items-start gap-2.5'
+                  : step.kind === 'mfa'
+                    ? 'border-red-900/60 bg-red-950/60 text-center text-red-200 space-y-1'
+                    : 'flex items-start gap-2 border-red-500/40 bg-red-950/50 text-red-200'
               }`}
             >
               {step.kind === 'mfa' ? (
@@ -1007,7 +1016,11 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                 </>
               ) : (
                 <>
-                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-red-400" />
+                  <AlertCircle className={`h-4 w-4 mt-0.5 shrink-0 ${
+                    errorMessage.includes('เซสชัน') || errorMessage.toLowerCase().includes('session')
+                      ? 'text-amber-400'
+                      : 'text-red-400'
+                  }`} />
                   <span>{errorMessage}</span>
                 </>
               )}
