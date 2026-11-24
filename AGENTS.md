@@ -30,15 +30,15 @@ MANGO VPN is a **Zero-Trust Role-Based WireGuard Remote Access & Policy Manageme
 | [`packages/shared/`](packages/shared/) (`@mango/shared`) | Shared (Both) | TypeScript | Single source of truth for all API contracts, DTOs, and enums ([`contracts.ts`](packages/shared/src/contracts.ts)) |
 | [`Sobree/api/`](Sobree/api/) (`@mango/api`) | Sobree ⚡ | Node.js, Fastify, Prisma, PostgreSQL 16 | Control Plane API (`:4000`), Prisma/PostgreSQL schema, password + TOTP MFA auth, rotating JWT sessions, one-time connect tickets, VPN IPAM (`10.13.13.0/24`), mounts `@mango/rain-admin` under `/api` |
 | [`Rain/admin/`](Rain/admin/) (`@mango/rain-admin`) | Rain 🌧️ | TypeScript, Fastify plugin, Prisma | Admin CRUD endpoints (`/api/users`, `/api/devices`, `/api/sessions`, `/api/policies`, `/api/audit-logs`, `/api/agent-versions`) & DB seeder ([`seed.ts`](Rain/admin/src/seed.ts)) |
-| [`Rain/portal/`](Rain/portal/) (`@mango/portal`) | Rain 🌧️ | React 18, Vite, Tailwind CSS, TanStack Query, Zod | Dark-mode Web Portal (`:3000`): MFA Login, Role-Based Dashboards (`ADMIN`, `STAFF`, `CLIENT`), VPN Connect UI, Admin Management Console |
-| [`Sobree/agent-windows/`](Sobree/agent-windows/) | Sobree ⚡ | Go (`golang.org/x/sys/windows/svc`) | Local Windows Service listening on `127.0.0.1:47821` with Chromium Private Network Access (PNA), in-memory Curve25519 keygen, WireGuard tunnel activation |
+| [`Rain/portal/`](Rain/portal/) (`@mango/portal`) | Rain 🌧️ | React 18, Vite, Tailwind CSS, TanStack Query, Zod | Dark-mode Web Portal (`:3000` / `:3001` / `:3002` via `npm run dev:portal:all`): MFA Login, Role-Based Dashboards (`ADMIN`, `STAFF`, `CLIENT`), VPN Connect UI, Admin Management Console |
+| [`Sobree/agent-windows/`](Sobree/agent-windows/) | Sobree ⚡ | Go (`golang.org/x/sys/windows/svc`, console on Linux) | Cross-platform Agent: Windows Service via `wireguard.exe` (`windows-x64`) or Linux console via `wg-quick` (`linux-x64`); listens on `127.0.0.1:47821` with Chromium Private Network Access (PNA), in-memory Curve25519 keygen, WireGuard tunnel activation |
 | [`Sobree/vpn-daemon/`](Sobree/vpn-daemon/) | Sobree ⚡ | Go (Linux daemon) | Linux WireGuard (`wg set`) & `nftables` role-policy enforcement daemon, bearer-authenticated HTTP API on `:50051` |
-| [`scripts/mock-agent.js`](scripts/mock-agent.js) | Shared (Dev Tool) | Node.js | Local loopback simulator (`127.0.0.1:47821`) mirroring `Sobree/agent-windows` for frontend testing without Windows Service / kernel WireGuard |
+| [`scripts/mock-agent.js`](scripts/mock-agent.js) | Shared (Dev Tool) | Node.js | Local loopback simulator (`127.0.0.1:47821`) mirroring `Sobree/agent-windows` for frontend testing without Windows Service / kernel WireGuard; allows `localhost:3000-3002` for `npm run dev:portal:all` |
 | [`scripts/mock-daemon.js`](scripts/mock-daemon.js) | Shared (Dev Tool) | Node.js | Dev-only loopback simulator (`127.0.0.1:50051`) mirroring `Sobree/vpn-daemon` without WireGuard / nftables enforcement |
 
 ### What Is In-Scope vs. Out-of-Scope
 - **IN-SCOPE**:
-  - The v2 connection lifecycle: password login -> TOTP MFA enrollment/verification -> rotating JWT access + refresh session -> one-time Connect Ticket -> Windows Agent loopback connect (`127.0.0.1:47821`, Origin allowlist + PNA) -> API IPAM & authenticated daemon peer/`nftables` role-policy registration -> Admin CRUD and real-time revocation. No SMS or stdout OTP codes.
+  - The v2 connection lifecycle: password login -> TOTP MFA enrollment/verification -> rotating JWT access + refresh session -> one-time Connect Ticket -> Agent loopback connect (`127.0.0.1:47821`, Origin allowlist + PNA) on Windows (`wireguard.exe`) or Linux (`wg-quick`); agent auto-detects `windows-x64` / `linux-x64` platform -> API IPAM & authenticated daemon peer/`nftables` role-policy registration -> Admin CRUD and real-time revocation. No SMS or stdout OTP codes.
   - Role-Based Access Control (`ADMIN`, `STAFF`, `CLIENT`) enforced both in the API/Daemon and reflected accurately in the Portal UI.
   - Admin management of Users, Devices (including revocation), Zero-Trust Policies (`ALLOW`/`DENY`), Active/Historical Sessions (including disconnect), Audit Logs, and Agent Versions.
   - Security & quality remediation tracked as GitHub Issues (see [Agent skills](#agent-skills)).
@@ -164,8 +164,16 @@ An AI assistant must **never** declare a task complete until it has run and pass
    *(Must compile `@mango/shared`, `@mango/rain-admin`, `@mango/api`, and `@mango/portal` with 0 errors).*
 2. **Go Compile & Vet Check** *(if any `.go` file was touched)*:
    ```powershell
-   cd Sobree/agent-windows && go vet ./... && go build ./...
-   cd ../../Sobree/vpn-daemon && go vet ./... && go build ./...
+   # Windows (PowerShell)
+   Push-Location Sobree\agent-windows; go vet ./...; go build ./...; Pop-Location
+   Push-Location Sobree\vpn-daemon;   go vet ./...; go build ./...; Pop-Location
+
+   # Linux / macOS (Bash)
+   (cd Sobree/agent-windows && go vet ./... && go build ./...)
+   (cd Sobree/vpn-daemon   && go vet ./... && go build ./...)
+
+   # Cross-compile check on Linux (verify Windows target builds cleanly)
+   (cd Sobree/agent-windows && GOOS=windows go vet ./...)
    ```
 3. **Truthfulness & Secret Audit**:
    - Confirm no hardcoded secrets/passwords or ungated `MOCK_*` fallbacks were introduced.

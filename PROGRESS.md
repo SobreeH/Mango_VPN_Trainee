@@ -93,6 +93,7 @@ The full monorepo builds cleanly, passes all 70 Vitest tests on both `mangovpn_v
 
 ## 5. Verification Commands Cheat Sheet
 
+### Windows (PowerShell)
 ```powershell
 # 1. Security & anti-mock guardrails
 node scripts/check-guardrails.mjs
@@ -106,8 +107,26 @@ npm test
 Remove-Item Env:DATABASE_URL
 
 # 4. Go modules verification
-cd Sobree/agent-windows; go vet ./...; go test ./...; cd ../..
-cd Sobree/vpn-daemon; go vet ./...; go test ./...; cd ../..
+cd Sobree\agent-windows; go vet ./...; go test ./...; go build ./...; cd ..\..
+cd Sobree\vpn-daemon; go vet ./...; go test ./...; go build ./...; cd ..\..
+```
+
+### Linux / macOS (Bash)
+```bash
+# 1. Security & anti-mock guardrails
+node scripts/check-guardrails.mjs
+
+# 2. Full monorepo TypeScript build (@mango/shared first)
+npm run build
+
+# 3. Monorepo tests (requires a PostgreSQL DB migrated to v2 schema)
+export DATABASE_URL="postgresql://mango:mangosecret@localhost:15432/mangovpn_v2_test?schema=public"
+npm test
+unset DATABASE_URL
+
+# 4. Go modules verification
+(cd Sobree/agent-windows && go vet ./... && go test ./... && go build ./...)
+(cd Sobree/vpn-daemon && go vet ./... && go test ./... && go build ./...)
 ```
 
 ---
@@ -118,7 +137,7 @@ cd Sobree/vpn-daemon; go vet ./...; go test ./...; cd ../..
 
 ### Verified Architecture Notes
 
-- **Agent platform string is `windows-x64`.** `Sobree/api/src/modules/vpn/vpn.routes.ts` calls `assertAgentVersionAllowed(prisma, agentVersion, 'windows-x64')`. Register agent versions with `platform: windows-x64`, not `windows-amd64`, or the version gate will not apply to real connects.
+- **Agent platform string auto-detects host OS.** `Sobree/agent-windows/main.go` and `scripts/mock-agent.js` auto-detect the host OS at startup: `windows-x64` on Windows amd64, `linux-x64` on Linux amd64 (also `darwin-arm64` on macOS Apple Silicon). When `AGENT_PLATFORM`/`MANGO_AGENT_PLATFORM` is omitted, `Sobree/api/src/modules/vpn/vpn.routes.ts` defaults to `windows-x64` only, so always register `windows-x64` or `linux-x64` in **Agent Versions** to match your client OS, or supply the env var explicitly.
 - **Agent version gate behavior.** `Rain/admin/src/agent-versions.ts` rejects invalid semver (`400 AGENT_VERSION_INVALID`), deactivated versions (`426 AGENT_VERSION_INACTIVE`), and versions below the highest active mandatory version (`426 AGENT_VERSION_OUTDATED`). If no mandatory version is registered for the platform, the check passes.
 - **VPN daemon reachability.** `/api/vpn/connect` calls `vpnDaemon.addPeer` before returning, and marks the session disconnected (`502`) on failure. Revoke, disconnect, and deactivate call the daemon first and leave the database unchanged on failure. `docker-compose.yml` binds `127.0.0.1:50051:50051` so host-run `npm run dev:api` reaches `http://127.0.0.1:50051`, while the `api` container uses `http://vpn-gateway:50051`.
 - **Seed from the host, not inside the API container.** The runtime stage of `Sobree/api/Dockerfile` copies `Rain/admin/dist`, not `Rain/admin/src`. Run `npm run db:seed` from the host; `seed.ts` automatically loads root `.env`.
@@ -147,9 +166,15 @@ cd Sobree/vpn-daemon; go vet ./...; go test ./...; cd ../..
    ```
 3. **Create `.env` from `.env.example` and populate strong secrets:**
    ```powershell
-   copy .env.example .env
-   openssl rand -base64 32   # distinct values for JWT_SECRET, REFRESH_SECRET, DAEMON_SHARED_SECRET
-   openssl rand -hex 32      # 64 hex chars for TOTP_ENCRYPTION_KEY
+   # Option A — automatic (cross-platform; generates strong secrets and a WireGuard X25519 keypair):
+   npm run env:init
+
+   # Option B — manual:
+   copy .env.example .env        # Linux/macOS: cp .env.example .env
+   openssl rand -base64 32       # distinct values for JWT_SECRET, REFRESH_SECRET, DAEMON_SHARED_SECRET
+   openssl rand -hex 32          # 64 hex chars for TOTP_ENCRYPTION_KEY
+   # WireGuard keypair: wg genkey | tee private.key | wg pubkey > public.key  (Linux)
+   # Or generate X25519 via Node.js: node -e "console.log(require('crypto').generateKeyPairSync('x25519').publicKey.export({format:'jwk'}).x)"
    ```
    Set `POSTGRES_PASSWORD`, `DATABASE_URL`, and a WireGuard keypair (`WG_PRIVATE_KEY` and `WG_SERVER_PUBLIC_KEY`).
 
@@ -162,6 +187,7 @@ cd Sobree/vpn-daemon; go vet ./...; go test ./...; cd ../..
    docker compose up -d postgres
    docker compose ps postgres
    ```
+   *(Linux/macOS: same `docker compose` commands in Bash.)*
 2. **Apply migrations (or reset a stale v1 DB):**
    ```powershell
    npm run db:generate
@@ -176,11 +202,19 @@ cd Sobree/vpn-daemon; go vet ./...; go test ./...; cd ../..
    npm run db:seed
    Remove-Item Env:SEED_ADMIN_PASSWORD
    ```
+   *(Linux/macOS Bash equivalent:)*
+   ```bash
+   export SEED_ADMIN_USERNAME="admin"
+   export SEED_ADMIN_PASSWORD="<at-least-12-characters>"
+   npm run db:seed
+   unset SEED_ADMIN_PASSWORD
+   ```
 
 ---
 
 ### 6.3 Automated Tests & Guardrails
 
+#### Windows (PowerShell)
 ```powershell
 # 1. Security & anti-mock guardrails (0 violations)
 node scripts/check-guardrails.mjs
@@ -195,8 +229,27 @@ npm test
 Remove-Item Env:DATABASE_URL
 
 # 4. Go vet, test & build
-cd Sobree/agent-windows; go vet ./...; go test ./...; go build ./...; cd ../..
-cd Sobree/vpn-daemon; go vet ./...; go test ./...; go build ./...; cd ../..
+Push-Location Sobree\agent-windows; go vet ./...; go test ./...; go build ./...; Pop-Location
+Push-Location Sobree\vpn-daemon; go vet ./...; go test ./...; go build ./...; Pop-Location
+```
+
+#### Linux / macOS (Bash)
+```bash
+# 1. Security & anti-mock guardrails (0 violations)
+node scripts/check-guardrails.mjs
+
+# 2. Full monorepo TypeScript build (@mango/shared first)
+npm run build
+
+# 3. Vitest suite (70 tests: 3 admin, 27 portal, 40 api)
+export DATABASE_URL="postgresql://mango:<password>@localhost:15432/mangovpn_v2_test?schema=public"
+npx prisma migrate deploy --schema=Sobree/api/prisma/schema.prisma
+npm test
+unset DATABASE_URL
+
+# 4. Go vet, test & build
+(cd Sobree/agent-windows && go vet ./... && go test ./... && go build ./...)
+(cd Sobree/vpn-daemon && go vet ./... && go test ./... && go build ./...)
 ```
 
 ---
@@ -207,11 +260,13 @@ cd Sobree/vpn-daemon; go vet ./...; go test ./...; go build ./...; cd ../..
 
 *(Stop any running Docker `api`/`portal` containers with `docker compose stop api portal` if ports `3000`/`4000` are in use.)*
 
-1. **Terminal 1 — Local Windows Agent Simulator (`127.0.0.1:47821`):** `npm run mock:agent` (copy the printed `PairingToken`).
+1. **Terminal 1 — Local Agent Simulator (`127.0.0.1:47821`):** `npm run mock:agent` (copy the printed `PairingToken`).
 2. **Terminal 2 — Control Plane API (`:4000`):** `npm run dev:api` (auto-loads root `.env`; optionally keep `docker compose up -d vpn-gateway` running so `/api/vpn/connect` reaches `127.0.0.1:50051`).
-3. **Terminal 3 — Web Portal (`:3000`):** `npm run dev:portal` (pinned to `:3000` in `Rain/portal/vite.config.ts`).
+3. **Terminal 3 — Web Portal (`:3000` / `:3001` / `:3002`):**
+   - Admin only: `npm run dev:portal` (pinned to `:3000` in `Rain/portal/vite.config.ts`).
+   - All three roles concurrently: `npm run dev:portal:all` (starts Admin on `:3000`, Staff on `:3001`, Client on `:3002` — `agent` allows `localhost:3000-3002` by default).
 
-#### Workflow B: Full Systems Dev with Go Windows Agent & Linux Gateway (Sobree)
+#### Workflow B: Full Systems Dev with Go Agent & Linux Gateway (Sobree)
 
 ```powershell
 # 1. Database and gateway containers (exposes 127.0.0.1:50051 for host API)
@@ -221,12 +276,33 @@ docker compose up -d postgres vpn-gateway
 npm run dev:api
 
 # 3. Windows Agent (in an Administrator PowerShell with WireGuard for Windows installed)
-cd Sobree/agent-windows
+cd Sobree\agent-windows
 $env:AGENT_LISTEN_ADDR="127.0.0.1:47821"
-$env:AGENT_ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:3000"
+$env:AGENT_ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:3002,http://127.0.0.1:3002"
 $env:AGENT_PAIRING_TOKEN="<your-chosen-local-pairing-token>"
 $env:API_URL="http://localhost:4000"
 go run .
+```
+
+*(Linux/macOS Bash equivalent for the agent — run with `sudo -E` for WireGuard / `nftables` access:)*
+```bash
+# 1. Database and gateway containers (exposes 127.0.0.1:50051 for host API)
+docker compose up -d postgres vpn-gateway
+
+# 2. Host Control Plane API (:4000)
+npm run dev:api
+
+# 3. Linux Agent (with sudo -E for wg/nft access; console mode, no Windows Service)
+cd Sobree/agent-windows
+export AGENT_LISTEN_ADDR="127.0.0.1:47821"
+export AGENT_ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:3002,http://127.0.0.1:3002"
+export AGENT_PAIRING_TOKEN="<your-chosen-local-pairing-token>"
+export API_URL="http://localhost:4000"
+sudo -E go run .
+
+# VPN Daemon (Linux only, also needs root for wg/nft)
+cd ../vpn-daemon
+sudo -E go run .
 ```
 
 ---
@@ -246,4 +322,7 @@ All four services (`mango-postgres`, `mango-vpn-gateway`, `mango-api`, `mango-po
 
 1. **Hardening follow-ups (`#19`, `#20`):** Land atomic refresh-token reuse detection, authenticated `/api/vpn/disconnect`, auth audit logging, `applyNftables` serialization, and Go concurrency tests.
 2. **Provision remote AWS EC2 Linux host (Profile B, `#21`):** Open UDP `51820` and HTTPS `443` via reverse proxy/ALB (`vpn.example.com` -> `:3000`, `api.vpn.example.com` -> `:4000`); block `15432` externally; set production `.env` secrets and `WG_SERVER_ENDPOINT`.
-3. **Build, register & roll out Windows Service Agent (`#21`):** Build `mango-agent-windows.exe`, record `Get-FileHash -Algorithm SHA256`, register `windows-x64` release in Admin **Agent Versions**, and verify live `mango0` tunnel activation/revocation with `wg show` and `nft list table inet mango_vpn`.
+3. **Build, register & roll out cross-platform Agent binaries (`#21`):**
+   - Windows Service: `cd Sobree/agent-windows && GOOS=windows GOARCH=amd64 go build -o mango-agent-windows.exe .`
+   - Linux console: `cd Sobree/agent-windows && GOOS=linux GOARCH=amd64 go build -o mango-agent-linux .`
+   - Record `Get-FileHash -Algorithm SHA256` (Windows) or `sha256sum` (Linux), then register both `windows-x64` and `linux-x64` releases in Admin **Agent Versions**, and verify live `mango0` tunnel activation/revocation with `wg show` and `nft list table inet mango_vpn`.

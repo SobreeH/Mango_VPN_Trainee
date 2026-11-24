@@ -105,6 +105,20 @@ go version
 
 All backend and gateway settings come from a single `.env` file at the repository root. The template is [`.env.example`](.env.example).
 
+### One-command setup (cross-platform)
+
+```powershell
+npm run env:init
+```
+
+```bash
+npm run env:init
+```
+
+`npm run env:init` runs `scripts/init-env.mjs`, which works identically on Windows, Linux, and macOS. It creates `.env` from `.env.example` with fresh random secrets (`POSTGRES_PASSWORD`, `JWT_SECRET`, `REFRESH_SECRET`, `DAEMON_SHARED_SECRET`, `TOTP_ENCRYPTION_KEY`) and a matching X25519 WireGuard server keypair (`WG_PRIVATE_KEY`, `WG_SERVER_PUBLIC_KEY`), written as UTF-8 without a BOM. It leaves an existing `.env` that already has its WireGuard keys populated unchanged unless you pass `npm run env:init -- --force`; `npm run env:init -- --wg-only` refreshes only the WireGuard keypair. It prints the generated server public key and reminds you never to commit the file.
+
+### Manual setup
+
 ```powershell
 copy .env.example .env
 ```
@@ -156,7 +170,9 @@ Do not put a default password in source or in `.env.example`.
 
 | Port | Protocol | Component | Notes |
 | :--- | :--- | :--- | :--- |
-| **3000** | TCP (HTTP) | Web Portal | Docker portal container and Vite dev server (`Rain/portal/vite.config.ts` pins port `3000`). |
+| **3000** | TCP (HTTP) | Web Portal (Admin, default) | Docker portal container and Vite dev server (`Rain/portal/vite.config.ts` pins port `3000`). `npm run dev:portal` and `npm run dev:portal:admin` serve the Admin portal here. |
+| **3001** | TCP (HTTP) | Web Portal (Staff) | Started by `npm run dev:portal:staff` or by `npm run dev:portal:all`. |
+| **3002** | TCP (HTTP) | Web Portal (Client) | Started by `npm run dev:portal:client` or by `npm run dev:portal:all`. |
 | **4000** | TCP (HTTP) | Control Plane API (Fastify) | `PORT` |
 | **15432** / **5432** | TCP (PostgreSQL) | PostgreSQL 16 on `127.0.0.1:15432` | Started by `npm run db:start` (embedded, Docker-free), or by the Docker `postgres` container (container port `5432`, host port `POSTGRES_PORT`, default `15432`). |
 | **47821** | TCP (HTTP, loopback) | Client agent (`Sobree/agent-windows`) or `mock-agent.js` | Binds `127.0.0.1` only. |
@@ -186,11 +202,11 @@ npm install
 # 2. Build shared contracts first, then every workspace that has a build script
 npm run build
 
-# 3. Create .env from the template and fill in secrets (see section 4)
-copy .env.example .env
+# 3. Create .env with fresh secrets and WireGuard keys (see section 4)
+npm run env:init
 ```
 
-On Linux or macOS (Bash), run the same steps with `cp .env.example .env` in place of `copy`.
+On Linux or macOS (Bash), run the same steps unchanged. `npm run env:init` works on every platform; if you prefer the manual path, use `copy .env.example .env` on Windows or `cp .env.example .env` on Linux/macOS and fill in the placeholders yourself.
 
 ### Rain workflow (portal and admin, Docker-free)
 
@@ -214,13 +230,17 @@ npm run mock:agent
 # Terminal 4: API on :4000
 npm run dev:api
 
-# Terminal 5: portal dev server on :3000
-npm run dev:portal
+# Terminal 5: portal dev server. Pick one of the following:
+npm run dev:portal                   # Admin UI on :3000 (default)
+npm run dev:portal:all               # Admin :3000, Staff :3001, and Client :3002 together
+npm run dev:portal:admin             # Admin UI on :3000
+npm run dev:portal:staff             # Staff UI on :3001
+npm run dev:portal:client            # Client UI on :3002
 ```
 
 These commands are plain `npm run` calls, so they work unchanged in Bash on Linux and macOS.
 
-The API's default `CORS_ORIGIN` and the agent's default allowed origin are `http://localhost:3000`, and `Rain/portal/vite.config.ts` pins Vite to port `3000` automatically so `npm run dev:portal` works directly without extra flags. `npm run dev:api` and `npm run db:seed` also automatically fall back to loading the monorepo root `.env`.
+The API's default `CORS_ORIGIN` and the agent's default allowed origin are `http://localhost:3000`, and `Rain/portal/vite.config.ts` pins Vite to port `3000` automatically so `npm run dev:portal` works directly without extra flags. In dev, `Sobree/api` also accepts `http://localhost:3000`–`http://localhost:3002` (and the `127.0.0.1` equivalents) so the Staff and Client portals can call the API without extra CORS configuration. `scripts/mock-agent.js` appends the browser origin port to the device fingerprint and hostname it reports (for example `mock-<hash>-3001`), so opening all three portals against the same mock agent creates three distinct devices instead of colliding on one fingerprint. `npm run dev:api` and `npm run db:seed` also automatically fall back to loading the monorepo root `.env`.
 
 Paste the PairingToken printed by the mock agent into the portal's pairing-token field. The portal sends it as the `X-Mango-Agent-Token` header.
 
@@ -369,9 +389,9 @@ cd Sobree/vpn-daemon; go vet ./...; go test ./...; cd ../..
 | :--- | :--- | :--- |
 | API refuses to start | Missing or short secret in `.env` (`Sobree/api/src/config.ts`) | Ensure `JWT_SECRET`, `REFRESH_SECRET`, `DAEMON_SHARED_SECRET` are `>= 32` chars and `TOTP_ENCRYPTION_KEY` is `64` hex chars. |
 | `RoleName` or `connect_tickets` does not exist | Local `mangovpn` DB still has v1 schema/migrations | Run `npx prisma migrate reset --force --schema=Sobree/api/prisma/schema.prisma` and `npm run db:seed`. |
-| `403 FORBIDDEN_ORIGIN` from agent | Portal running on an unexpected origin outside `AGENT_ALLOWED_ORIGINS` | Run `npm run dev:portal` (pinned to `:3000`) or add the origin to `AGENT_ALLOWED_ORIGINS` and `CORS_ORIGIN`. |
+| `403 FORBIDDEN_ORIGIN` from agent | Portal running on an unexpected origin outside `AGENT_ALLOWED_ORIGINS` (default `http://localhost:3000`–`http://localhost:3002`) | Run `npm run dev:portal` (Admin `:3000`) or `npm run dev:portal:all` (Admin `:3000`, Staff `:3001`, Client `:3002`), or add the origin to `AGENT_ALLOWED_ORIGINS` and `CORS_ORIGIN`. |
 | `401 Unauthorized` from agent | Missing/mismatched `X-Mango-Agent-Token` | Paste `PairingToken` from `npm run mock:agent`, or set `$env:AGENT_PAIRING_TOKEN` (PowerShell) / `export AGENT_PAIRING_TOKEN=...` (Bash) explicitly before `go run .` (Go agent does not print ephemeral tokens). |
-| `426` (`AGENT_VERSION_OUTDATED` / `INACTIVE`) | `windows-x64` agent version blocked or outdated in `agent_versions` | Activate or update version `2.0.0` for `windows-x64` in the Portal's **Agent Versions** tab. |
+| `426` (`AGENT_VERSION_OUTDATED` / `INACTIVE`) | Agent version blocked or outdated for its platform in `agent_versions` | Activate or update version `2.0.0` for the platform the running agent reports: `windows-x64` on Windows or `linux-x64` on Linux (see `AGENT_PLATFORM`) in the Portal's **Agent Versions** tab. |
 | `502` on Connect / Policy Sync / Revoke | `api` cannot reach `vpn-gateway` or `DAEMON_SHARED_SECRET` mismatch | Docker-free (Track A): confirm `npm run mock:daemon` is running on `127.0.0.1:50051` and `DAEMON_SHARED_SECRET` is at least 32 characters. Docker: check `docker compose ps vpn-gateway`, `docker compose logs vpn-gateway`, and `VPN_DAEMON_URL`. |
 
 **Quick live diagnostics** (PowerShell; Bash equivalents follow):

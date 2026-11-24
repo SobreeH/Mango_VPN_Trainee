@@ -30,15 +30,15 @@ MANGO VPN คือระบบ **Zero-Trust Role-Based WireGuard Remote Access 
 | [`packages/shared/`](packages/shared/) (`@mango/shared`) | ร่วมกัน (ทั้งสองฝ่าย) | TypeScript | แหล่งอ้างอิงความจริงแห่งเดียว (Single Source of Truth) สำหรับ API Contracts, DTOs และ Enums ทั้งหมด ([`contracts.ts`](packages/shared/src/contracts.ts)) |
 | [`Sobree/api/`](Sobree/api/) (`@mango/api`) | Sobree ⚡ | Node.js, Fastify, Prisma, PostgreSQL 16 | Control Plane API (พอร์ต `:4000`), Prisma/PostgreSQL schema, ระบบ Auth ด้วยรหัสผ่าน + TOTP MFA, หมุนเวียน JWT Session, ตั๋วเชื่อมต่อแบบใช้ครั้งเดียว (Connect Ticket), VPN IPAM แจก IP (`10.13.13.0/24`), นำ `@mango/rain-admin` มา Mount ไว้ใต้ `/api` |
 | [`Rain/admin/`](Rain/admin/) (`@mango/rain-admin`) | Rain 🌧️ | TypeScript, Fastify plugin, Prisma | Endpoints จัดการ CRUD ฝั่งแอดมิน (`/api/users`, `/api/devices`, `/api/sessions`, `/api/policies`, `/api/audit-logs`, `/api/agent-versions`) และตัว Seeder ข้อมูลลงฐานข้อมูล ([`seed.ts`](Rain/admin/src/seed.ts)) |
-| [`Rain/portal/`](Rain/portal/) (`@mango/portal`) | Rain 🌧️ | React 18, Vite, Tailwind CSS, TanStack Query, Zod | หน้าเว็บ Dark-mode Web Portal (พอร์ต `:3000`): หน้า Login พร้อม MFA, แดชบอร์ดตามบทบาทผู้ใช้ (`ADMIN`, `STAFF`, `CLIENT`), UI สั่งต่อ VPN, คอนโซลจัดการสำหรับแอดมิน |
-| [`Sobree/agent-windows/`](Sobree/agent-windows/) | Sobree ⚡ | Go (`golang.org/x/sys/windows/svc`) | Windows Service รันในเครื่อง Client ดักฟังที่ `127.0.0.1:47821` รองรับ Chromium Private Network Access (PNA), สร้างกุญแจ Curve25519 ในแรม, และสั่งเปิดใช้งานอุโมงค์ WireGuard |
+| [`Rain/portal/`](Rain/portal/) (`@mango/portal`) | Rain 🌧️ | React 18, Vite, Tailwind CSS, TanStack Query, Zod | หน้าเว็บ Dark-mode Web Portal (พอร์ต `:3000` / `:3001` / `:3002` ผ่าน `npm run dev:portal:all`): หน้า Login พร้อม MFA, แดชบอร์ดตามบทบาทผู้ใช้ (`ADMIN`, `STAFF`, `CLIENT`), UI สั่งต่อ VPN, คอนโซลจัดการสำหรับแอดมิน |
+| [`Sobree/agent-windows/`](Sobree/agent-windows/) | Sobree ⚡ | Go (`golang.org/x/sys/windows/svc`, คอนโซลบน Linux) | Agent ข้ามแพลตฟอร์ม: Windows Service ผ่าน `wireguard.exe` (`windows-x64`) หรือ Linux console ผ่าน `wg-quick` (`linux-x64`); ดักฟังที่ `127.0.0.1:47821` รองรับ Chromium Private Network Access (PNA), สร้างกุญแจ Curve25519 ในแรม, และสั่งเปิดใช้งานอุโมงค์ WireGuard |
 | [`Sobree/vpn-daemon/`](Sobree/vpn-daemon/) | Sobree ⚡ | Go (Linux daemon) | รันบน Linux ทำหน้าที่จัดการ WireGuard (`wg set`) และคุมนโยบายสิทธิ์เครือข่ายด้วย `nftables` ตาม Role, มี HTTP API ที่ยืนยันตัวตนด้วย Bearer บนพอร์ต `:50051` |
-| [`scripts/mock-agent.js`](scripts/mock-agent.js) | ร่วมกัน (เครื่องมือ Dev) | Node.js | สคริปต์จำลอง Agent บน Loopback (`127.0.0.1:47821`) เลียนแบบ `Sobree/agent-windows` เพื่อให้ทดสอบ Frontend ได้โดยไม่ต้องรัน Windows Service หรือมีเคอร์เนล WireGuard จริง |
+| [`scripts/mock-agent.js`](scripts/mock-agent.js) | ร่วมกัน (เครื่องมือ Dev) | Node.js | สคริปต์จำลอง Agent บน Loopback (`127.0.0.1:47821`) เลียนแบบ `Sobree/agent-windows` เพื่อให้ทดสอบ Frontend ได้โดยไม่ต้องรัน Windows Service หรือมีเคอร์เนล WireGuard จริง; อนุญาต `localhost:3000-3002` สำหรับ `npm run dev:portal:all` |
 | [`scripts/mock-daemon.js`](scripts/mock-daemon.js) | ร่วมกัน (เครื่องมือ Dev) | Node.js | สคริปต์จำลอง Daemon สำหรับ Dev แบบ Loopback (`127.0.0.1:50051`) เลียนแบบ `Sobree/vpn-daemon` โดยไม่บังคับใช้ WireGuard / nftables |
 
 ### ขอบเขตสิ่งที่อยู่ในระบบ (In-Scope) เทียบกับ นอกระบบ (Out-of-Scope)
 - **อยู่ในขอบเขต (IN-SCOPE)**:
-  - วงจรการเชื่อมต่อเวอร์ชัน 2: ล็อกอินด้วยรหัสผ่าน -> ลงทะเบียน/ยืนยันรหัส TOTP MFA -> เซสชัน JWT แบบหมุนเวียน Access + Refresh -> รับตั๋วเชื่อมต่อแบบใช้ครั้งเดียว (Connect Ticket) -> ส่งต่อตั๋วให้ Windows Agent ทาง Loopback (`127.0.0.1:47821`, พร้อม Origin allowlist + PNA) -> API ตรวจสอบ แจก IPAM และลงทะเบียน Peer กับนโยบาย `nftables` บน Linux Daemon -> แอดมินสามารถจัดการ CRUD และสั่งเพิกถอนสิทธิ์ได้ทันที (Real-time Revocation) *ไม่มีการส่งรหัส OTP ทาง SMS หรือพิมพ์ออกมาทาง stdout*
+  - วงจรการเชื่อมต่อเวอร์ชัน 2: ล็อกอินด้วยรหัสผ่าน -> ลงทะเบียน/ยืนยันรหัส TOTP MFA -> เซสชัน JWT แบบหมุนเวียน Access + Refresh -> รับตั๋วเชื่อมต่อแบบใช้ครั้งเดียว (Connect Ticket) -> ส่งต่อตั๋วให้ Agent ทาง Loopback (`127.0.0.1:47821`, พร้อม Origin allowlist + PNA) บน Windows (`wireguard.exe`) หรือ Linux (`wg-quick`); Agent ตรวจจับแพลตฟอร์ม `windows-x64` / `linux-x64` อัตโนมัติ -> API ตรวจสอบ แจก IPAM และลงทะเบียน Peer กับนโยบาย `nftables` บน Linux Daemon -> แอดมินสามารถจัดการ CRUD และสั่งเพิกถอนสิทธิ์ได้ทันที (Real-time Revocation) *ไม่มีการส่งรหัส OTP ทาง SMS หรือพิมพ์ออกมาทาง stdout*
   - การควบคุมการเข้าถึงตามบทบาท (Role-Based Access Control: `ADMIN`, `STAFF`, `CLIENT`) บังคับใช้ทั้งระดับ API/Daemon และสะท้อนบนหน้าเว็บอย่างถูกต้อง
   - การจัดการสำหรับแอดมิน: จัดการ Users, Devices (รวมถึงการเพิกถอน Revoke), Zero-Trust Policies (`ALLOW`/`DENY`), เซสชันที่เปิดใช้งานอยู่/ประวัติการเชื่อมต่อ (รวมถึงการสั่งเตะ Disconnect), Audit Logs และ Agent Versions
   - การปรับปรุงคุณภาพและความปลอดภัยที่ถูกบันทึกไว้ใน GitHub Issues
@@ -164,8 +164,16 @@ AI ผู้ช่วยจะต้อง **ไม่สรุปว่าต�
    *(ต้องคอมไพล์ `@mango/shared`, `@mango/rain-admin`, `@mango/api`, และ `@mango/portal` ผ่านทั้งหมดโดยไม่มี Error เลยแม้แต่ตัวเดียว)*
 2. **ตรวจสอบการคอมไพล์ภาษา Go (`go vet` & `go build`)** *(กรณีมีการแตะต้องไฟล์ `.go`)*:
    ```powershell
-   cd Sobree/agent-windows && go vet ./... && go build ./...
-   cd ../../Sobree/vpn-daemon && go vet ./... && go build ./...
+   # Windows (PowerShell)
+   Push-Location Sobree\agent-windows; go vet ./...; go build ./...; Pop-Location
+   Push-Location Sobree\vpn-daemon;   go vet ./...; go build ./...; Pop-Location
+
+   # Linux / macOS (Bash)
+   (cd Sobree/agent-windows && go vet ./... && go build ./...)
+   (cd Sobree/vpn-daemon   && go vet ./... && go build ./...)
+
+   # ตรวจสอบ Cross-compile บน Linux (ยืนยันว่า target Windows build ผ่าน)
+   (cd Sobree/agent-windows && GOOS=windows go vet ./...)
    ```
 3. **ตรวจสอบความสัตย์จริงและตรวจทาน Secret**:
    - ยืนยันว่าไม่มีการใส่รหัสผ่าน/Secret แบบ Hardcode และไม่มีการใส่ `MOCK_*` Fallback แอบแฝง

@@ -86,8 +86,10 @@ Mango_VPN_Trainee/
 │       └── src/contracts.ts           # DTOs and enums shared by the portal, admin, API, and agent
 │
 ├── scripts/
-│   ├── mock-agent.js                  # 🧪 Node loopback simulator of the client agent (127.0.0.1:47821)
+│   ├── init-env.mjs                   # Cross-platform .env + X25519 WireGuard keypair generator (npm run env:init)
+│   ├── mock-agent.js                  # 🧪 Node loopback simulator of the client agent (127.0.0.1:47821); in dev it suffixes device fingerprints per origin port
 │   ├── mock-daemon.js                 # 🧪 Dev-only simulator of the VPN gateway daemon API (127.0.0.1:50051, no wg/nftables enforcement)
+│   ├── start-all-portals.mjs          # Launches Admin :3000, Staff :3001, and Client :3002 Vite dev servers together (npm run dev:portal:all)
 │   ├── dev-db.mjs                     # Docker-free embedded PostgreSQL 16 runner (npm run db:start / db:reset-local; data in .local/postgres)
 │   ├── check-guardrails.mjs           # Scanner for hardcoded secret fallbacks, MOCK_* data, wildcard agent CORS, SYS_MODULE
 │   ├── check-environment.mjs          # Tool readiness check for Linux, macOS, and Windows (npm run check:env; use -- --role Rain for Docker-free Rain)
@@ -120,11 +122,14 @@ Mango_VPN_Trainee/
 
 ## 3. Workflow for Rain
 
-Rain works inside `Rain/` and only reads Sobree's API. **Rain's workflow needs no Docker**: Node.js and Git are enough. `npm run db:start` runs embedded PostgreSQL 16 (data in `.local/postgres`), `npm run mock:daemon` simulates the gateway daemon, and `npm run mock:agent` simulates the client agent. The `.env` file still needs its `POSTGRES_*`, `DATABASE_URL`, and secret values (see [QUICKSTART.md](QUICKSTART.md)).
+Rain works inside `Rain/` and only reads Sobree's API. **Rain's workflow needs no Docker**: Node.js and Git are enough. `npm run env:init` writes `.env` and its secrets and WireGuard keys, `npm run db:start` runs embedded PostgreSQL 16 (data in `.local/postgres`), `npm run mock:daemon` simulates the gateway daemon, and `npm run mock:agent` simulates the client agent. The `.env` file still needs its `POSTGRES_*`, `DATABASE_URL`, and secret values (see [QUICKSTART.md](QUICKSTART.md)).
 
 The commands below are shown for PowerShell. They are plain `npm run` commands, so they work unchanged in Bash on Linux and macOS.
 
 ```powershell
+# 0. Create .env with fresh secrets and an X25519 WireGuard keypair (cross-platform, terminal 0)
+npm run env:init
+
 # 1. Embedded PostgreSQL 16 on 127.0.0.1:15432 (terminal 1). Ctrl+C stops it cleanly.
 npm run db:start
 
@@ -142,12 +147,19 @@ npm run mock:agent
 # 5. Management API (terminal 4)
 npm run dev:api
 
-# 6. Portal UI (terminal 5)
-npm run dev:portal
+# 6. Portal UI (terminal 5). Pick one of the following:
+npm run dev:portal                   # Admin UI on http://localhost:3000 (default)
+npm run dev:portal:all               # All three role portals at once (see below)
+npm run dev:portal:admin             # Admin UI on :3000
+npm run dev:portal:staff             # Staff UI on :3001
+npm run dev:portal:client            # Client UI on :3002
 ```
 
+- **Cross-platform `.env` setup**: `npm run env:init` (`scripts/init-env.mjs`) generates `POSTGRES_PASSWORD`, `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `DAEMON_SHARED_SECRET`, `TOTP_ENCRYPTION_KEY`, and an X25519 `WG_PRIVATE_KEY` / `WG_SERVER_PUBLIC_KEY` pair. It runs identically on Windows, Linux, and macOS, writes UTF-8 without a BOM, and leaves an existing populated `.env` unchanged unless you pass `-- --force` (or `-- --wg-only` to refresh just the WireGuard keys). The manual `copy`/`cp` + `openssl` path still works.
 - **Docker is not required** for this workflow. `npm run mock:daemon` avoids `502 Bad Gateway` on connect, policy, and revocation calls without Docker, but it does not program WireGuard or `nftables`. Use Docker Compose only for the full stack (Sobree / Track B and C).
-- **Portal UI**: Vite is configured in `Rain/portal/vite.config.ts` to run on `http://localhost:3000`, matching `CORS_ORIGIN` and `AGENT_ALLOWED_ORIGINS`.
+- **Multi-role portal dev**: `npm run dev:portal:all` (`scripts/start-all-portals.mjs`) starts the Admin portal on `:3000`, the Staff portal on `:3001`, and the Client portal on `:3002` at the same time with color-coded prefixed logs. `npm run dev:portal:admin`, `npm run dev:portal:staff`, and `npm run dev:portal:client` start a single role on its port. `npm run dev:portal` keeps the default Admin `:3000`.
+- **Portal UI**: Vite is configured in `Rain/portal/vite.config.ts` to run on `http://localhost:3000`, matching `CORS_ORIGIN` and `AGENT_ALLOWED_ORIGINS`. In dev, `Sobree/api` allows `http://localhost:3000`–`http://localhost:3002` (and the `127.0.0.1` equivalents) so the Staff and Client portals can call the API without extra CORS configuration.
+- **Per-port fingerprint isolation**: In dev, `scripts/mock-agent.js` appends the browser origin port to the device fingerprint and hostname it reports (for example `mock-<hash>-3001`). Opening the Admin, Staff, and Client portals against the same mock agent therefore creates three distinct devices instead of colliding on one fingerprint.
 - **Root `.env` auto-loading**: `npm run dev:api` and `npm run db:seed` automatically load `.env` from the monorepo root when present (without overriding shell environment variables).
 - **Agent pairing**: Paste the mock agent's PairingToken into the portal's "Paste X-Mango-Agent-Token" field.
 - **Admin CRUD**: Edit the modules in `Rain/admin/src/` (`index.ts` mounts them).
@@ -239,7 +251,12 @@ Run `go vet ./...` and `go test ./...` in each Go module before you push.
 | `npm install` | Installs all workspaces (npm only) |
 | `npm run build` | Builds `@mango/shared` first, then every workspace that has a `build` script |
 | `npm test` | Runs the test script in every workspace (Vitest) |
-| `npm run dev:portal` | Starts the Vite dev server for `@mango/portal` |
+| `npm run env:init` | Runs `scripts/init-env.mjs`: creates/updates root `.env` from `.env.example` with fresh secrets and an X25519 WireGuard keypair (cross-platform; `-- --force`, `-- --wg-only`, `-- --output <path>`) |
+| `npm run dev:portal` | Starts the Vite dev server for `@mango/portal` (Admin UI on `:3000`) |
+| `npm run dev:portal:admin` | Starts the Admin portal Vite dev server on `:3000` |
+| `npm run dev:portal:staff` | Starts the Staff portal Vite dev server on `:3001` |
+| `npm run dev:portal:client` | Starts the Client portal Vite dev server on `:3002` |
+| `npm run dev:portal:all` | Runs `scripts/start-all-portals.mjs`: launches Admin `:3000`, Staff `:3001`, and Client `:3002` together with prefixed logs |
 | `npm run dev:api` | Starts the Fastify API in watch mode (`@mango/api`, which mounts `@mango/rain-admin`) |
 | `npm run mock:agent` | Runs the zero-dependency client agent simulator (mirrors `Sobree/agent-windows`) on `http://127.0.0.1:47821` |
 | `npm run mock:daemon` | Runs the dev-only gateway daemon simulator (`scripts/mock-daemon.js`) on `http://127.0.0.1:50051`. Prints `[DEV MOCK DAEMON – no wg/nftables enforcement]`; it does not program WireGuard or `nftables` |
@@ -251,9 +268,9 @@ Run `go vet ./...` and `go test ./...` in each Go module before you push.
 | `npm run check:env` | Runs `scripts/check-environment.mjs` (Linux, macOS, and Windows; `--role All` is the default) |
 | `npm run check:env -- --role Rain` | Rain's Docker-free readiness check. Marks Docker, Docker Compose, and Go as `OPTIONAL` |
 | `npm run check:env -- --role Sobree` | Full Sobree readiness. Exits `1` when Docker, Docker Compose, or Go is missing |
+| `npm run docker:up` / `docker:down` / `docker:logs` | Starts, stops, or tails the Docker Compose stack (`postgres`, `vpn-gateway`, `api`, `portal`) |
 
 Under `--role All`, missing Sobree tools only print `[PARTIAL]` and still exit `0`, so Rain-only machines and CI pass. Add `--strict` to fail in that case too. On Windows, `scripts/check-environment.ps1 -Role Rain` runs the same checker. Run `npm run check:env -- --help` for all options.
-| `npm run docker:up` / `docker:down` / `docker:logs` | Starts, stops, or tails the Docker Compose stack (`postgres`, `vpn-gateway`, `api`, `portal`) |
 
 The guardrail scanner is not an npm script. Run it with `node scripts/check-guardrails.mjs`. CI runs it first.
 
@@ -277,7 +294,16 @@ The guardrail scanner is not an npm script. Run it with `node scripts/check-guar
     npm run check:env                  # identical on Linux, macOS, and Windows
     npm run check:env -- --role Rain   # Docker-free Rain check
     ```
-2. Copy `.env.example` to `.env` at the repository root and replace every placeholder secret:
+2. Create `.env` at the repository root. The cross-platform one-command path generates every secret and the WireGuard X25519 keypair:
+   ```powershell
+   npm run env:init
+   ```
+   ```bash
+   npm run env:init                  # identical on Linux, macOS, and Windows
+   ```
+   `scripts/init-env.mjs` writes `.env` from `.env.example` with `POSTGRES_PASSWORD`, `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `DAEMON_SHARED_SECRET`, `TOTP_ENCRYPTION_KEY`, `WG_PRIVATE_KEY`, and `WG_SERVER_PUBLIC_KEY`, as UTF-8 without a BOM. It leaves an existing populated `.env` untouched unless you pass `npm run env:init -- --force`; `npm run env:init -- --wg-only` refreshes only the WireGuard keys.
+
+   Prefer to do it by hand? Copy the template and replace every placeholder secret:
    ```powershell
    copy .env.example .env
    openssl rand -base64 32   # distinct values for JWT_SECRET, REFRESH_SECRET, DAEMON_SHARED_SECRET
@@ -410,9 +436,9 @@ npm test
 | :--- | :--- | :--- |
 | **API fails immediately on startup** | `Sobree/api/src/config.ts` validates required env vars at boot | Ensure `DATABASE_URL` is set, `JWT_SECRET`, `REFRESH_SECRET`, and `DAEMON_SHARED_SECRET` are `>= 32` chars, and `TOTP_ENCRYPTION_KEY` is `64` hex chars. |
 | **Prisma errors (`type "public.RoleName" does not exist` or `table "public.connect_tickets" does not exist`)** | Target database still has legacy v1 tables/migrations | Run `npx prisma migrate reset --force --schema=Sobree/api/prisma/schema.prisma` and `npm run db:seed`. |
-| **`403 FORBIDDEN_ORIGIN` from Windows Agent / mock-agent** | Portal origin is outside `AGENT_ALLOWED_ORIGINS` (`http://localhost:3000`) | Run `npm run dev:portal` (pinned to `:3000`) or add the origin to `AGENT_ALLOWED_ORIGINS` and `CORS_ORIGIN`. |
+| **`403 FORBIDDEN_ORIGIN` from Windows Agent / mock-agent** | Portal origin is outside `AGENT_ALLOWED_ORIGINS` (default `http://localhost:3000`–`http://localhost:3002`) | Run `npm run dev:portal` (Admin `:3000`) or `npm run dev:portal:all` (Admin `:3000`, Staff `:3001`, Client `:3002`), or add the origin to `AGENT_ALLOWED_ORIGINS` and `CORS_ORIGIN`. |
 | **`401 Unauthorized` from `/status`, `/connect`, `/disconnect`** | Missing or mismatched `X-Mango-Agent-Token` header | Copy the `PairingToken` printed by `npm run mock:agent`, or set `$env:AGENT_PAIRING_TOKEN` (PowerShell) / `export AGENT_PAIRING_TOKEN=...` (Bash) explicitly before starting `Sobree/agent-windows`. |
-| **`426` (`AGENT_VERSION_OUTDATED` / `AGENT_VERSION_INACTIVE`)** | `agent_versions` table blocks or requires a newer version for `windows-x64` | Check or activate version `2.0.0` for platform `windows-x64` in the Portal's **Agent Versions** tab. |
+| **`426` (`AGENT_VERSION_OUTDATED` / `AGENT_VERSION_INACTIVE`)** | `agent_versions` table blocks or requires a newer version for the agent's platform | Check or activate version `2.0.0` for the platform the running agent reports: `windows-x64` on Windows or `linux-x64` on Linux (see `AGENT_PLATFORM`) in the Portal's **Agent Versions** tab. |
 | **`502 Bad Gateway` on Connect, Policy Sync, or Revocation** | `Sobree/api` cannot reach the gateway daemon at `VPN_DAEMON_URL`, or `DAEMON_SHARED_SECRET` mismatches | Docker-free: confirm `npm run mock:daemon` is running on `http://127.0.0.1:50051`. Docker: verify `vpn-gateway` is healthy (`docker compose ps vpn-gateway`), reachable at `http://vpn-gateway:50051` (inside Docker) or `http://127.0.0.1:50051` (host). In both cases `DAEMON_SHARED_SECRET` must match. |
 
 **Useful live inspection commands**:

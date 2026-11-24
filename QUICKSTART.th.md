@@ -17,13 +17,13 @@
 | **Node.js** | **ทั้งสองคน** (Rain & Sobree) | `18.0.0` | `20 LTS` หรือ `22 LTS` | รัน Control Plane API, หน้าเว็บ Web Portal (React 18 + Vite), Shared Contracts, TypeScript Compiler | [nodejs.org](https://nodejs.org/) |
 | **npm** | **ทั้งสองคน** (Rain & Sobree) | `9.0.0` | `10.x` | จัดการ Monorepo Workspaces (`Rain/*`, `Sobree/*`, `packages/*`) *ใช้ npm เท่านั้น ไม่มี pnpm* | ติดตั้งมาพร้อมกับ Node.js |
 | **Git** | **ทั้งสองคน** (Rain & Sobree) | `2.30.0` | ล่าสุด | ระบบควบคุมเวอร์ชันและการจัดการกิ่ง (Branching) | [git-scm.com](https://git-scm.com/) |
-| **Docker Desktop** | **Sobree** (และ Rain สำหรับรัน Full-stack) | `24.0.0` | ล่าสุด | รันคอนเทนเนอร์ PostgreSQL 16 และ Linux WireGuard Gateway (`NET_ADMIN`) | [docker.com](https://www.docker.com/products/docker-desktop/) |
-| **Go Toolchain** | **Sobree** | `1.22.0` (daemon) / `1.26.0` (agent) | ล่าสุด | คอมไพล์ Windows Agent (`Sobree/agent-windows/go.mod` ต้องการ `go 1.26.0`) และ Linux VPN daemon (`Sobree/vpn-daemon/go.mod` ต้องการ `go 1.22`) | [go.dev](https://go.dev/dl/) |
-| **WireGuard for Windows** | **Sobree** | ล่าสุด | ล่าสุด | ตัวโปรแกรม Agent ต้องสั่งรัน `wireguard.exe /installtunnelservice` เพื่อสร้างอินเทอร์เฟซ `mango0` | [wireguard.com](https://www.wireguard.com/install/) |
+| **Docker Desktop / Docker Engine** | **Sobree** (และ Rain สำหรับรัน Full-stack) | `24.0.0` | ล่าสุด | รันคอนเทนเนอร์ PostgreSQL 16 และ Linux WireGuard Gateway (`NET_ADMIN`) บน Windows ใช้ Docker Desktop ส่วนบน Linux ใช้ Docker Engine | [docker.com](https://www.docker.com/products/docker-desktop/) |
+| **Go Toolchain** | **Sobree** | `1.22.0` (daemon) / `1.26.0` (agent) | ล่าสุด | คอมไพล์ Client Agent (`Sobree/agent-windows/go.mod` ต้องการ `go 1.26.0` และรันได้ทั้งบน Windows และ Linux) และ Linux VPN daemon (`Sobree/vpn-daemon/go.mod` ต้องการ `go 1.22`) | [go.dev](https://go.dev/dl/) |
+| **WireGuard** | **Sobree** (เฉพาะเมื่อเปิดอุโมงค์จริง) | ล่าสุด | ล่าสุด | บน Windows: **WireGuard for Windows** ซึ่ง Agent จะสั่งรัน `wireguard.exe /installtunnelservice` บน Linux: `wireguard-tools` (`wg`, `wg-quick`), `iproute2` (`ip`) และ `nftables` (`nft`) ซึ่ง Agent ใช้เปิดอินเทอร์เฟซ `mango0` | [wireguard.com](https://www.wireguard.com/install/) |
 | **VS Code** *(ทางเลือก)* | **ทั้งสองคน** | ล่าสุด | ล่าสุด | โปรแกรมเขียนโค้ด (Editor) | [code.visualstudio.com](https://code.visualstudio.com/) |
 
 > [!NOTE]
-> **สำหรับ Rain (Web Portal และ Admin, ไม่ใช้ Docker)**: คุณต้องการเพียงแค่ **Node.js และ Git** โดย**ไม่ต้องใช้ Docker, Go หรือ WireGuard** ก็รัน Web Portal, API และระบบ Admin CRUD ได้ ขั้นตอนนี้ใช้เครื่องมือในเครื่องสามตัว: `npm run db:start` รัน PostgreSQL 16 แบบฝังตัว (ข้อมูลอยู่ที่ `.local/postgres`), `npm run mock:daemon` จำลอง Gateway Daemon พอร์ต `:50051` (`[DEV MOCK DAEMON – no wg/nftables enforcement]` ใช้สำหรับการพัฒนาเท่านั้น) และ `npm run mock:agent` จำลอง Windows Agent พอร์ต `:47821` (`scripts/mock-agent.js`) หากต้องการรันระบบเต็มรูปแบบด้วย Docker ก็ยังใช้ Docker Desktop ได้
+> **สำหรับ Rain (Web Portal และ Admin, ไม่ใช้ Docker)**: คุณต้องการเพียงแค่ **Node.js และ Git** โดย**ไม่ต้องใช้ Docker, Go หรือ WireGuard** ก็รัน Web Portal, API และระบบ Admin CRUD ได้ ขั้นตอนนี้ใช้เครื่องมือในเครื่องสามตัว: `npm run db:start` รัน PostgreSQL 16 แบบฝังตัว (ข้อมูลอยู่ที่ `.local/postgres`), `npm run mock:daemon` จำลอง Gateway Daemon พอร์ต `:50051` (`[DEV MOCK DAEMON – no wg/nftables enforcement]` ใช้สำหรับการพัฒนาเท่านั้น) และ `npm run mock:agent` จำลอง Client Agent พอร์ต `:47821` (`scripts/mock-agent.js` ซึ่งจำลองการทำงานของ `Sobree/agent-windows`) หากต้องการรันระบบเต็มรูปแบบด้วย Docker ก็ยังใช้ Docker Desktop ได้
 
 ---
 
@@ -33,13 +33,23 @@
 npm run check:env
 ```
 
-คำสั่งนี้จะรันสคริปต์ `scripts/check-environment.ps1` ซึ่งจะรายงานว่า Node.js, npm, Git, Docker, Docker Compose และ Go ได้รับการติดตั้งในเครื่องแล้วหรือไม่ และมีเวอร์ชันตรงตามเกณฑ์ขั้นต่ำหรือไม่
+```bash
+npm run check:env
+```
 
-สำหรับการตั้งค่าของ Rain ที่ไม่ใช้ Docker ให้รันการตรวจสอบตามบทบาทแทน สคริปต์จะกำหนดให้ Docker, Docker Compose, Docker Desktop และ Go เป็น `OPTIONAL`:
+คำสั่งนี้จะรันสคริปต์ `scripts/check-environment.mjs` (ใช้เฉพาะ Node.js ไม่มี Dependencies) ทำงานเหมือนกันบน Linux, macOS และ Windows โดยจะตรวจว่ามีเครื่องมืออยู่ใน `PATH` หรือไม่ พิมพ์เวอร์ชันที่ตรวจพบเทียบกับเกณฑ์ขั้นต่ำ (Node.js, npm, Git, Docker, Docker Compose และ Go) ตรวจสถานะ Docker daemon ด้วย `docker info` และรายงานเครื่องมือ WireGuard กับ Gateway ของระบบปฏิบัติการที่ใช้ (`wireguard.exe` บน Windows; `wg`, `wg-quick`, `ip` และ `nft` บน Linux)
+
+สำหรับการตั้งค่าของ Rain ที่ไม่ใช้ Docker ให้รันการตรวจสอบตามบทบาทแทน สคริปต์จะกำหนดให้ Docker, Docker Compose และ Go เป็น `OPTIONAL`:
 
 ```powershell
-npm run check:env -- -Role Rain
+npm run check:env -- --role Rain
 ```
+
+```bash
+npm run check:env -- --role Rain
+```
+
+ตัวเลือกที่ใช้ได้: `--role All|Rain|Sobree` (ไม่สนตัวพิมพ์เล็ก-ใหญ่ ค่าเริ่มต้น `All`), `--strict` (ภายใต้ `All` จะถือว่าล้มเหลวหากขาดเครื่องมือฝั่ง Sobree ด้วย) และ `--help` โดยรหัสออก (Exit Code) จะเป็น `0` เมื่อเครื่องมือที่บทบาทนั้นต้องการพร้อมใช้งาน (`READY`), `1` เมื่อขาดอย่างน้อยหนึ่งตัว และ `2` เมื่ออาร์กิวเมนต์ไม่ถูกต้อง ภายใต้ `All` หากขาดเครื่องมือฝั่ง Sobree จะแสดงเพียง `[PARTIAL]` และยัง exit `0` บน Windows สามารถใช้ `scripts/check-environment.ps1 -Role Rain` ซึ่งเรียกตัวตรวจเดียวกัน
 
 ---
 
@@ -66,11 +76,24 @@ docker info
 ```
 หากคำสั่ง `docker info` แจ้งเตือนว่า `error during connect` ให้เปิดโปรแกรม **Docker Desktop** ขึ้นมาแล้วรอจนกระทั่ง Engine เริ่มทำงานสมบูรณ์
 
+บน Linux ให้เริ่ม Docker Engine ด้วย `sudo systemctl start docker` หากต้องการรัน `docker` โดยไม่ต้องใช้ `sudo` ให้เพิ่มผู้ใช้ของคุณเข้าในกลุ่ม `docker` (`sudo usermod -aG docker $USER`) แล้วออกจากระบบและเข้าใหม่
+
+```bash
+docker -v
+docker compose version
+docker info
+```
+
 ### ตรวจสอบ Go Toolchain (สำหรับ Sobree)
 ```powershell
 go version
 ```
-- **หากยังไม่มี**: ให้ดาวน์โหลดตัวติดตั้ง `.msi` บน Windows จาก [go.dev/dl](https://go.dev/dl/) ทั้งนี้โมดูล Agent จำเป็นต้องใช้ Go 1.26 ขึ้นไป โปรดตรวจสอบบรรทัด `go` ใน `Sobree/agent-windows/go.mod` ก่อนทำการติดตั้ง
+- **หากยังไม่มี (Windows)**: ให้ดาวน์โหลดตัวติดตั้ง `.msi` จาก [go.dev/dl](https://go.dev/dl/) ทั้งนี้โมดูล Agent จำเป็นต้องใช้ Go 1.26 ขึ้นไป โปรดตรวจสอบบรรทัด `go` ใน `Sobree/agent-windows/go.mod` ก่อนทำการติดตั้ง
+- **หากยังไม่มี (Linux)**: ให้ติดตั้ง Go 1.26 ขึ้นไปจากไฟล์ tarball ที่ [go.dev/dl](https://go.dev/dl/) หรือจากแพ็กเกจของดิสทริบิวชันหากเวอร์ชันใหม่พอ แล้วยืนยันด้วย `go version`
+
+```bash
+go version
+```
 
 ---
 
@@ -78,8 +101,26 @@ go version
 
 การตั้งค่าระบบ Backend และ Gateway ทั้งหมดจะรวมอยู่ที่ไฟล์ `.env` เพียงไฟล์เดียว ณ Root ของโปรเจกต์ โดยมีไฟล์แม่แบบคือ [`.env.example`](.env.example)
 
+### สร้างอัตโนมัติด้วยคำสั่งเดียว (ข้ามแพลตฟอร์ม)
+
+```powershell
+npm run env:init
+```
+
+```bash
+npm run env:init
+```
+
+`npm run env:init` จะรัน `scripts/init-env.mjs` ซึ่งทำงานเหมือนกันบน Windows, Linux และ macOS โดยสร้าง `.env` จาก `.env.example` พร้อมค่า Secret แบบสุ่มใหม่ (`POSTGRES_PASSWORD`, `JWT_SECRET`, `REFRESH_SECRET`, `DAEMON_SHARED_SECRET`, `TOTP_ENCRYPTION_KEY`) และคู่กุญแจ X25519 ของ WireGuard (`WG_PRIVATE_KEY`, `WG_SERVER_PUBLIC_KEY`) เขียนเป็น UTF-8 ไม่มี BOM หากมี `.env` ที่มีกุญแจ WireGuard อยู่แล้ว ระบบจะไม่แก้ไข เว้นแต่สั่ง `npm run env:init -- --force` (หรือ `npm run env:init -- --wg-only` เพื่อสร้างเฉพาะกุญแจ WireGuard ใหม่) พร้อมพิมพ์ Server Public Key ที่สร้างขึ้นและเตือนไม่ให้ Commit ไฟล์นี้
+
+### สร้างด้วยตนเอง
+
 ```powershell
 copy .env.example .env
+```
+
+```bash
+cp .env.example .env
 ```
 
 จากนั้นให้เปลี่ยนค่า Placeholder ทั้งหมดก่อนที่จะเริ่มรันระบบ:
@@ -125,16 +166,23 @@ openssl rand -hex 32      # สำหรับ TOTP_ENCRYPTION_KEY (จะได
 
 | พอร์ต | โปรโตคอล | คอมโพเนนต์ | หมายเหตุ |
 | :--- | :--- | :--- | :--- |
-| **3000** | TCP (HTTP) | Web Portal | คอนเทนเนอร์ของ Portal หรือเมื่อรัน Vite dev ในเครื่อง ให้ระบุ `--port 3000` |
+| **3000** | TCP (HTTP) | Web Portal (Admin, ค่าเริ่มต้น) | คอนเทนเนอร์ของ Portal หรือ Vite dev server (`Rain/portal/vite.config.ts` ล็อกพอร์ต `3000`) ทั้ง `npm run dev:portal` และ `npm run dev:portal:admin` ให้บริการ Admin Portal ที่พอร์ตนี้ |
+| **3001** | TCP (HTTP) | Web Portal (Staff) | เริ่มด้วย `npm run dev:portal:staff` หรือ `npm run dev:portal:all` |
+| **3002** | TCP (HTTP) | Web Portal (Client) | เริ่มด้วย `npm run dev:portal:client` หรือ `npm run dev:portal:all` |
 | **4000** | TCP (HTTP) | Control Plane API (Fastify) | ควบคุมโดยตัวแปร `PORT` |
 | **15432** / **5432** | TCP (PostgreSQL) | PostgreSQL 16 บน `127.0.0.1:15432` | เริ่มด้วย `npm run db:start` (แบบฝังตัว ไม่ใช้ Docker) หรือคอนเทนเนอร์ Docker `postgres` (พอร์ตในคอนเทนเนอร์ `5432` พอร์ตบนเครื่อง Host คือ `POSTGRES_PORT` ค่าเริ่มต้น `15432`) |
-| **47821** | TCP (HTTP, loopback) | Windows Agent หรือ `mock-agent.js` | ผูกติดกับที่อยู่ `127.0.0.1` เท่านั้น |
+| **47821** | TCP (HTTP, loopback) | Client Agent (`Sobree/agent-windows`) หรือ `mock-agent.js` | ผูกติดกับที่อยู่ `127.0.0.1` เท่านั้น |
 | **51820** | UDP (WireGuard) | VPN gateway | ควบคุมโดยตัวแปร `WG_LISTEN_PORT` |
 | **50051** | TCP (HTTP) | VPN gateway daemon API | HTTP ยืนยันตัวตนด้วย Bearer Token ทำงานที่ `127.0.0.1:50051` เริ่มโดย `npm run mock:daemon` (ตัวจำลองสำหรับการพัฒนาเท่านั้น ไม่บังคับใช้ `wg`/`nftables`) หรือ Docker `vpn-gateway` |
 
 วิธีตรวจสอบว่าพอร์ตนั้นๆ กำลังถูกใช้งานอยู่หรือไม่บน Windows:
 ```powershell
 Get-NetTCPConnection -LocalPort 4000 -ErrorAction SilentlyContinue
+```
+
+บน Linux:
+```bash
+ss -tlnp | grep 4000
 ```
 
 ---
@@ -150,9 +198,11 @@ npm install
 # 2. คอมไพล์ Shared Contracts ก่อน แล้วจึงคอมไพล์ทุก Workspace ที่มีสคริปต์ build
 npm run build
 
-# 3. สร้างไฟล์ .env จากไฟล์แม่แบบ แล้วกรอกค่า Secret ให้ครบถ้วน (ดูหัวข้อที่ 4)
-copy .env.example .env
+# 3. สร้างไฟล์ .env พร้อมค่า Secret และกุญแจ WireGuard ใหม่ (ดูหัวข้อที่ 4)
+npm run env:init
 ```
+
+บน Linux หรือ macOS (Bash) รันขั้นตอนเดิมได้เลย `npm run env:init` ใช้ได้ทุกแพลตฟอร์ม หากต้องการสร้างเองด้วยมือ ให้ใช้ `copy .env.example .env` บน Windows หรือ `cp .env.example .env` บน Linux/macOS แล้วกรอกค่า Placeholder เอง
 
 ### ขั้นตอนการทำงานสำหรับ Rain (Portal และ Admin, ไม่ใช้ Docker)
 
@@ -176,11 +226,17 @@ npm run mock:agent
 # Terminal 4: API บนพอร์ต :4000
 npm run dev:api
 
-# Terminal 5: เซิร์ฟเวอร์ Dev ของ Portal บนพอร์ต :3000
-npm run dev:portal
+# Terminal 5: เซิร์ฟเวอร์ Dev ของ Portal เลือกได้ดังนี้:
+npm run dev:portal                   # Admin UI บน :3000 (ค่าเริ่มต้น)
+npm run dev:portal:all               # เปิด Admin :3000, Staff :3001 และ Client :3002 พร้อมกัน
+npm run dev:portal:admin             # Admin UI บน :3000
+npm run dev:portal:staff             # Staff UI บน :3001
+npm run dev:portal:client            # Client UI บน :3002
 ```
 
-ค่าเริ่มต้น `CORS_ORIGIN` ของ API และ Allowed Origin ของ Agent ตั้งไว้ที่ `http://localhost:3000` และ `Rain/portal/vite.config.ts` ล็อกพอร์ตของ Vite ไว้ที่ `3000` ให้โดยอัตโนมัติ ดังนั้น `npm run dev:portal` ใช้งานได้ทันทีโดยไม่ต้องใส่ Flag เพิ่ม
+คำสั่งเหล่านี้เป็น `npm run` ธรรมดา จึงใช้ได้เหมือนกันใน Bash บน Linux และ macOS
+
+ค่าเริ่มต้น `CORS_ORIGIN` ของ API และ Allowed Origin ของ Agent ตั้งไว้ที่ `http://localhost:3000` และ `Rain/portal/vite.config.ts` ล็อกพอร์ตของ Vite ไว้ที่ `3000` ให้โดยอัตโนมัติ ดังนั้น `npm run dev:portal` ใช้งานได้ทันทีโดยไม่ต้องใส่ Flag เพิ่ม ในโหมด dev `Sobree/api` ยังยอมรับ `http://localhost:3000`–`http://localhost:3002` (และ `127.0.0.1` ที่เทียบเท่า) เพื่อให้ Staff และ Client Portal เรียก API ได้โดยไม่ต้องตั้งค่า CORS เพิ่ม และ `scripts/mock-agent.js` จะเติมพอร์ตของ Origin ต่อท้าย device fingerprint และ hostname ที่รายงาน (เช่น `mock-<hash>-3001`) การเปิดทั้ง 3 พอร์ทัลพร้อมกันจึงได้อุปกรณ์ 3 รายการแยกกัน ไม่ชน fingerprint กัน
 
 นำค่า PairingToken ที่แสดงบน Terminal ของ Mock Agent ไปวางในช่อง "Paste X-Mango-Agent-Token" บนหน้าเว็บ เพื่อให้หน้าเว็บส่ง Header `X-Mango-Agent-Token` ไปยัง Agent ได้อย่างถูกต้อง
 
@@ -192,7 +248,7 @@ npm run db:generate
 npm run db:migrate
 npm run dev:api
 
-# รัน Windows Agent (โหมด Console เว้นแต่จะเริ่มผ่าน Service Control Manager)
+# รัน Client Agent บน Windows (โหมด Console เว้นแต่จะเริ่มผ่าน Service Control Manager)
 cd Sobree/agent-windows
 go run .
 
@@ -200,35 +256,172 @@ go run .
 docker compose up -d vpn-gateway
 ```
 
+```bash
+docker compose up -d postgres
+npm run db:generate
+npm run db:migrate
+npm run dev:api
+
+# รัน Client Agent บน Linux (ต้องใช้ root หรือ CAP_NET_ADMIN และมี wg-quick)
+cd Sobree/agent-windows
+sudo -E go run .
+
+# รัน Gateway daemon บน Linux แบบ Native (ต้องใช้ root หรือ NET_ADMIN พร้อม ip, wg และ nft)
+cd Sobree/vpn-daemon
+sudo -E go run .
+```
+
 เซอร์วิส `vpn-gateway` จำเป็นต้องใช้สิทธิ์ `NET_ADMIN` และคำสั่ง `wg`/`nft` บน Linux เท่านั้น สำหรับการรัน Daemon แบบ Native จะทำได้เฉพาะบนเครื่อง Linux จริง
 
 ### การรัน Docker Stack ครบชุด
 
+[`Rain/portal/nginx.conf`](Rain/portal/nginx.conf) ให้บริการ SPA บนพอร์ต `3000` พร้อม `Cache-Control: no-store` ที่ `/env-config.js` ให้ Build และเริ่ม Stack ครบชุด ตรวจ Healthcheck ของคอนเทนเนอร์ และ Seed บัญชี `ADMIN` คนแรก:
+
 ```powershell
-npm run docker:up        # รัน postgres, vpn-gateway, api, portal
-npm run docker:logs      # ดู Log
-npm run docker:down      # สั่งปิดระบบ
+docker compose up -d --build   # rebuild & เริ่ม postgres, vpn-gateway, api, portal
+docker compose ps              # ตรวจว่าทั้ง 4 เซอร์วิส healthy
+npm run docker:logs
+
+# Seed ฐานข้อมูล (อ่าน DATABASE_URL จาก .env ที่ Root ให้อัตโนมัติ)
+$env:SEED_ADMIN_USERNAME="admin"
+$env:SEED_ADMIN_PASSWORD="<at-least-12-characters>"
+npm run db:seed
+Remove-Item Env:SEED_ADMIN_PASSWORD
+
+npm run docker:down
 ```
+
+```bash
+export SEED_ADMIN_USERNAME="admin"
+export SEED_ADMIN_PASSWORD="<at-least-12-characters>"
+npm run db:seed
+unset SEED_ADMIN_PASSWORD
+
+npm run docker:down
+```
+
+> [!NOTE]
+> `docker-compose.yml` เปิด `vpn-gateway` UDP `51820` ออกภายนอก และผูก daemon HTTP `:50051` กับ Host loopback `127.0.0.1:50051` (`VPN_DAEMON_URL=http://vpn-gateway:50051` ภายใน `mango-net` และ `http://127.0.0.1:50051` สำหรับ `npm run dev:api` ที่รันบน Host)
 
 ---
 
 ## 7. การตรวจสอบความเรียบร้อยของระบบ (Verify the Setup)
 
 ```powershell
-npm run build
+# 1. ตรวจ Guardrail ด้านความปลอดภัยและการห้ามใช้ Mock (ต้องรายงาน 0 violations)
 node scripts/check-guardrails.mjs
 
-# ทดสอบแบบไม่ใช้ Docker: ต้องรัน npm run db:start ค้างไว้ก่อน แล้ว Migrate ฐานข้อมูลทดสอบ
+# 2. คอมไพล์ TypeScript ทั้ง Monorepo (@mango/shared ก่อน)
+npm run build
+
+# 3. ชุดทดสอบ Vitest (ต้องมี DATABASE_URL ชี้ไปยังฐานข้อมูล PostgreSQL ที่ Migrate v2 แล้ว)
+#    แบบไม่ใช้ Docker: รัน `npm run db:start` ค้างไว้ก่อน แล้ว Migrate ฐานข้อมูลทดสอบและรันชุดทดสอบ
 $env:DATABASE_URL="postgresql://mango:<password>@127.0.0.1:15432/mangovpn_v2_test?schema=public"
 npx prisma migrate deploy --schema=Sobree/api/prisma/schema.prisma
 npm test
-Remove-Item Env:DATABASE_URL
+Remove-Item Env:DATABASE_URL         # เว้นค่าไว้ไม่ให้ตั้ง เพื่อให้ `npm run dev:api` ใช้ฐานข้อมูล mangovpn จาก .env
+```
+
+```bash
+export DATABASE_URL="postgresql://mango:<password>@127.0.0.1:15432/mangovpn_v2_test?schema=public"
+npx prisma migrate deploy --schema=Sobree/api/prisma/schema.prisma
+npm test
+unset DATABASE_URL                   # เว้นค่าไว้ไม่ให้ตั้ง เพื่อให้ `npm run dev:api` ใช้ฐานข้อมูล mangovpn จาก .env
 ```
 
 แทนค่า `<password>` ด้วย `POSTGRES_PASSWORD` จาก `.env` และให้เว้น `DATABASE_URL` ไว้ว่างในเทอร์มินัลที่รัน `npm run dev:api` เพื่อให้ API ใช้ฐานข้อมูล `mangovpn` จาก `.env`
 
+หากฐานข้อมูล `mangovpn` ในเครื่องยังคงมีตาราง/ไมเกรชัน v1 เก่าอยู่ และการทดสอบล้มเหลวเพราะหา v2 type หรือตารางไม่เจอ (เช่น `type "public.RoleName" does not exist` หรือ `table "public.connect_tickets" does not exist`) ให้รีเซ็ตกลับเป็นสคีมา v2 แล้ว Seed ใหม่:
+
+```powershell
+npx prisma migrate reset --force --schema=Sobree/api/prisma/schema.prisma
+npm run db:seed
+```
+
 หากมีการแก้ไขโค้ดภาษา Go ให้รัน Vet และ Test ในแต่ละโมดูล:
 ```powershell
-cd Sobree/agent-windows; go vet ./...; go test ./...
-cd ../vpn-daemon; go vet ./...; go test ./...
+cd Sobree/agent-windows; go vet ./...; go test ./...; cd ../..
+cd Sobree/vpn-daemon; go vet ./...; go test ./...; cd ../..
 ```
+
+```bash
+(cd Sobree/agent-windows && go vet ./... && go test ./... && GOOS=windows go vet ./... && cd ../..)
+(cd Sobree/vpn-daemon && go vet ./... && go test ./... && cd ../..)
+```
+
+---
+
+## 8. ทดลองใช้งานแบบทีละขั้น (Login -> TOTP -> Connect -> Admin -> Revoke)
+
+1. **เริ่ม Services ในเครื่อง**:
+   - **โหมด UI/Admin (ไม่ใช้ Docker)**: รัน `npm run db:start` (เปิดค้างไว้), `npm run mock:daemon`, `npm run mock:agent` (คัดลอก `PairingToken` ที่พิมพ์ออกมา), `npm run dev:api` และ `npm run dev:portal` (หรือ `npm run dev:portal:all` เพื่อเปิดทั้ง 3 บทบาท)
+   - **โหมดอุโมงค์จริงบน Windows**: รัน `docker compose up -d postgres vpn-gateway api` จากนั้นใน **Administrator** PowerShell ให้รัน `Sobree/agent-windows` โดยติดตั้ง **WireGuard for Windows** ไว้แล้ว:
+     ```powershell
+     $env:AGENT_LISTEN_ADDR="127.0.0.1:47821"
+     $env:AGENT_ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:3000"
+     $env:AGENT_PAIRING_TOKEN="<your-chosen-local-pairing-token>"
+     $env:API_URL="http://localhost:4000"
+     cd Sobree/agent-windows; go run .
+     ```
+   - **โหมดอุโมงค์จริงบน Linux (Bash)**: รัน Agent ด้วยสิทธิ์ root (หรือ `CAP_NET_ADMIN`) โดย Agent จะเขียนไฟล์ `/tmp/mango-vpn/mango0.conf` แล้วสั่ง `wg-quick up` กับไฟล์นั้น ใช้ค่า `AGENT_*` และ `API_URL` ชุดเดียวกัน:
+     ```bash
+     export AGENT_LISTEN_ADDR="127.0.0.1:47821"
+     export AGENT_ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:3000"
+     export AGENT_PAIRING_TOKEN="<your-chosen-local-pairing-token>"
+     export API_URL="http://localhost:4000"
+     cd Sobree/agent-windows && sudo -E go run .
+     ```
+2. **เข้าสู่ระบบ (`http://localhost:3000`)**: ใส่ Username/Password ของ `ADMIN` ที่ Seed ไว้ (`POST /api/auth/login`)
+3. **ยืนยันตัวตนด้วย TOTP MFA**: ในการล็อกอินครั้งแรก (`MFA_SETUP_REQUIRED`) ให้สแกน QR Code (`otpauthUri`) ด้วยแอป Authenticator แล้วกรอกรหัส 6 หลัก (`POST /api/auth/verify-otp`)
+4. **จับคู่ Agent ในเครื่อง**: วางค่า `PairingToken` ในช่อง pairing-token ของ Portal (`X-Mango-Agent-Token`)
+5. **เชื่อมต่อ VPN**: กด **Connect VPN** -> Portal ขอตั๋วใช้ครั้งเดียว 60 วินาที (`POST /api/vpn/ticket`) -> Agent สร้างคู่กุญแจ Curve25519 ในหน่วยความจำ -> `POST /api/vpn/connect` จัดสรรหมายเลข IP ในช่วง `10.13.13.0/24` และตั้งค่า `wg0` + `nftables` -> การ์ด `AgentStatusCard` แสดงสถานะ **Connected** *(หมายเหตุ: `POST /api/vpn/connect` ต้องเข้าถึง `vpn-gateway` ได้ที่ `VPN_DAEMON_URL` มิฉะนั้นจะทำเครื่องหมายเซสชันเป็นตัดการเชื่อมต่อและคืนค่า `502`)*
+6. **ทดสอบ Admin Console และการเพิกถอนแบบเรียลไทม์**: ลองใช้งาน **Users**, **Devices**, **Sessions**, **Policies**, **Audit Logs** และ **Agent Versions** จากนั้นกด **Revoke Device** หรือ **Disconnect Session** และยืนยันว่า Peer ถูกถอดออกทันที
+
+---
+
+## 9. คู่มือแก้ไขปัญหาและดีบัก (Debugging & Troubleshooting Cheat Sheet)
+
+| อาการ | สาเหตุ | วิธีแก้ / คำสั่ง |
+| :--- | :--- | :--- |
+| API เริ่มทำงานไม่ได้ | ค่า Secret ใน `.env` หายหรือสั้นเกินไป (`Sobree/api/src/config.ts`) | ตรวจสอบให้ `JWT_SECRET`, `REFRESH_SECRET`, `DAEMON_SHARED_SECRET` ยาว `>= 32` ตัวอักษร และ `TOTP_ENCRYPTION_KEY` เป็นเลข hex 64 ตัวอักษร |
+| `RoleName` หรือ `connect_tickets` ไม่มีอยู่ | ฐานข้อมูล `mangovpn` ในเครื่องยังเป็นสคีมา/ไมเกรชัน v1 | รัน `npx prisma migrate reset --force --schema=Sobree/api/prisma/schema.prisma` แล้ว `npm run db:seed` |
+| `403 FORBIDDEN_ORIGIN` จาก Agent | Portal ทำงานบน Origin ที่ไม่อยู่ใน `AGENT_ALLOWED_ORIGINS` (ค่าเริ่มต้น `http://localhost:3000`–`http://localhost:3002`) | รัน `npm run dev:portal` (Admin `:3000`) หรือ `npm run dev:portal:all` (Admin `:3000`, Staff `:3001`, Client `:3002`) หรือเพิ่ม Origin นั้นเข้าใน `AGENT_ALLOWED_ORIGINS` และ `CORS_ORIGIN` |
+| `401 Unauthorized` จาก Agent | `X-Mango-Agent-Token` หายหรือไม่ตรงกัน | วาง `PairingToken` จาก `npm run mock:agent` หรือกำหนด `$env:AGENT_PAIRING_TOKEN` (PowerShell) / `export AGENT_PAIRING_TOKEN=...` (Bash) ให้ชัดเจนก่อนรัน `go run .` (Go Agent จะไม่พิมพ์ Token ชั่วคราวออกมา) |
+| `426` (`AGENT_VERSION_OUTDATED` / `INACTIVE`) | เวอร์ชัน Agent สำหรับแพลตฟอร์มนั้นถูกบล็อกหรือล้าสมัยใน `agent_versions` | เปิดใช้งานหรืออัปเดตเวอร์ชัน `2.0.0` สำหรับแพลตฟอร์มที่ Agent รายงาน: `windows-x64` บน Windows หรือ `linux-x64` บน Linux (ดู `AGENT_PLATFORM`) ในแท็บ **Agent Versions** ของ Portal |
+| `502` ตอน Connect / Policy Sync / Revoke | `api` เข้าถึง `vpn-gateway` ไม่ได้ หรือ `DAEMON_SHARED_SECRET` ไม่ตรงกัน | แบบไม่ใช้ Docker (Track A): ยืนยันว่า `npm run mock:daemon` ทำงานที่ `127.0.0.1:50051` และ `DAEMON_SHARED_SECRET` ยาวอย่างน้อย 32 ตัวอักษร แบบ Docker: ตรวจ `docker compose ps vpn-gateway`, `docker compose logs vpn-gateway` และ `VPN_DAEMON_URL` |
+
+**การตรวจสอบแบบสด (PowerShell; มีคำสั่งเทียบเท่าแบบ Bash ด้านล่าง)**:
+```powershell
+# ตรวจ Peer ของ WireGuard และ Chain นโยบาย nftables ภายใน vpn-gateway
+docker exec mango-vpn-gateway wg show
+docker exec mango-vpn-gateway nft list table inet mango_vpn
+
+# ตรวจ Endpoint ของ Client Agent / mock-agent บน Loopback
+Invoke-RestMethod http://127.0.0.1:47821/health
+Invoke-RestMethod http://127.0.0.1:47821/status -Headers @{ "X-Mango-Agent-Token" = "<your-token>" }
+Get-Content "$env:TEMP\mango-vpn\mango0.conf"
+```
+
+```bash
+# การตรวจสอบเดียวกันบน Linux
+ss -tlnp | grep 4000
+docker exec mango-vpn-gateway wg show
+docker exec mango-vpn-gateway nft list table inet mango_vpn
+curl -s http://127.0.0.1:47821/health
+curl -s -H "X-Mango-Agent-Token: <your-token>" http://127.0.0.1:47821/status
+cat /tmp/mango-vpn/mango0.conf
+```
+
+---
+
+## 10. เช็กลิสต์ก่อนปล่อยงาน & การติดตั้งบน Cloud (Pre-Ship & Cloud Deployment Checklist)
+
+1. **ความพร้อมของ Repo ก่อนปล่อยงาน**:
+   - อุปสรรคใน Local dev/Docker/CI (`Rain/portal/nginx.conf`, `docker-entrypoint.sh` แบบ LF, Go `1.26` + `prisma migrate deploy` + `windows-agent-tests` ใน `.github/workflows/ci.yml` และ Alias env `AGENT_*` / `MANGO_AGENT_*`) ได้รับการแก้ไขแล้ว ส่วนงาน Hardening/Rollout ที่เหลือติดตามใน GitHub Issues `#19`, `#20` และ `#21`
+2. **ติดตั้ง Linux Gateway & Control Plane (AWS EC2 — Profile B ใน `.env.example`)**:
+   - เปิด **UDP `51820`** (WireGuard) และ **HTTPS `443`** (Reverse proxy/ALB -> Portal `:3000` และ API `:4000`); ปิดพอร์ต `15432` ใน EC2 Security Group (`:50051` ผูกกับ `127.0.0.1` บน Host และอยู่ภายใน `mango-net`)
+   - ตั้งค่า `NODE_ENV=production`, Secrets ที่แข็งแรง, `WG_SERVER_ENDPOINT=<AWS_PUBLIC_IP_OR_DNS>:51820`, `CORS_ORIGIN=https://vpn.example.com` และ `VITE_API_URL=https://api.vpn.example.com` แล้วรัน `docker compose up -d --build` และ `npm run db:seed`
+3. **Build & แจกจ่าย Client Agent (`Sobree/agent-windows`, Windows หรือ Linux)**:
+   - Build Binary (`$env:GOOS="windows"; $env:GOARCH="amd64"; go build -trimpath -ldflags="-s -w" -o mango-agent-windows.exe .`) และบันทึกค่า SHA-256 (`Get-FileHash`)
+   - Linux / macOS (Bash): `GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o mango-agent-linux-x64 .` และ `GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o mango-agent-windows-x64.exe .` แล้วใช้ `sha256sum` กับแต่ละไฟล์
+   - ลงทะเบียนแต่ละ Release ใน Admin **Agent Versions** (`platform`: `windows-x64` หรือ `linux-x64`) และตั้งค่า Env ฝั่ง Client (`AGENT_LISTEN_ADDR`, `AGENT_ALLOWED_ORIGINS`, `AGENT_PAIRING_TOKEN`, `API_URL`)
