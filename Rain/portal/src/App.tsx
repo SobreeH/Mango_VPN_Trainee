@@ -93,14 +93,6 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
   const [showVpnPanel, setShowVpnPanel] = useState(false);
 
   const currentPort = typeof window !== 'undefined' ? window.location.port : '';
-  const portRole =
-    currentPort === '3000'
-      ? { label: 'Admin Portal (:3000)', role: 'ADMIN', badge: '🛡️ Admin' }
-      : currentPort === '3001'
-        ? { label: 'Staff Portal (:3001)', role: 'STAFF', badge: '💼 Staff' }
-        : currentPort === '3002'
-          ? { label: 'Client Portal (:3002)', role: 'CLIENT', badge: '🌐 Client' }
-          : null;
 
   useEffect(() => {
     try {
@@ -884,20 +876,11 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
 
           {/* Center Greeting & Tagline */}
           <div className="my-8 md:my-0 space-y-3 relative z-10">
-            <div className="space-y-1">
-              <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight leading-snug ${
-                isDark ? 'text-stone-100' : 'text-stone-900'
-              }`}>
-                {lang === 'th' ? 'ยินดีต้อนรับกลับมา' : 'Welcome back'}
-              </h2>
-              {portRole && (
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border bg-amber-500/10 border-amber-500/30 text-amber-300">
-                  <span>{portRole.badge} Portal</span>
-                  <span className="text-stone-500 font-normal">|</span>
-                  <span className="font-mono text-[10px]">:{currentPort}</span>
-                </div>
-              )}
-            </div>
+            <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight leading-snug ${
+              isDark ? 'text-stone-100' : 'text-stone-900'
+            }`}>
+              {lang === 'th' ? 'ยินดีต้อนรับกลับมา' : 'Welcome back'}
+            </h2>
             <p className={`text-xs sm:text-sm leading-relaxed ${
               isDark ? 'text-stone-300/90' : 'text-stone-600'
             }`}>
@@ -905,40 +888,6 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                 ? 'เข้าสู่ระบบเพื่อใช้งานเครือข่ายองค์กรของคุณ'
                 : 'Sign in to access your company network'}
             </p>
-
-            {/* Role Port Switcher Pills */}
-            <div className="pt-2 space-y-1.5">
-              <span className="text-[10px] text-stone-400 font-medium block">
-                {lang === 'th' ? 'สลับพอร์ตตามบทบาท:' : 'Switch Role Port:'}
-              </span>
-              <div className="flex flex-wrap items-center gap-1.5">
-                {[
-                  { port: '3000', label: 'Admin :3000', icon: '🛡️' },
-                  { port: '3001', label: 'Staff :3001', icon: '💼' },
-                  { port: '3002', label: 'Client :3002', icon: '🌐' },
-                ].map((p) => {
-                  const isCurrent = currentPort === p.port;
-                  return (
-                    <a
-                      key={p.port}
-                      href={`http://localhost:${p.port}`}
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-semibold transition-all border ${
-                        isCurrent
-                          ? isDark
-                            ? 'bg-[#7a4918] text-amber-200 border-amber-500/40 shadow-sm'
-                            : 'bg-[#f59e0b] text-stone-950 border-amber-600/40 shadow-sm'
-                          : isDark
-                            ? 'border-white/5 bg-[#141311]/60 text-stone-400 hover:text-stone-200 hover:bg-[#262420]'
-                            : 'border-stone-200 bg-stone-50 text-stone-600 hover:text-stone-900 hover:bg-stone-100'
-                      }`}
-                    >
-                      <span>{p.icon}</span>
-                      <span>{p.label}</span>
-                    </a>
-                  );
-                })}
-              </div>
-            </div>
           </div>
 
           {/* Bottom Copyright Footer */}
