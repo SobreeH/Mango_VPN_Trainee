@@ -23,9 +23,36 @@ export interface AgentStatusCardProps {
   auth?: AuthRefreshContext;
 }
 
+const LOCAL_STORAGE_TOKEN_KEY = 'mango_agent_pairing_token';
+
+function getSavedPairingToken(): string {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return localStorage.getItem(LOCAL_STORAGE_TOKEN_KEY) || '';
+    }
+  } catch {
+    // ignore
+  }
+  return '';
+}
+
+function savePairingToken(token: string): void {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      if (token) {
+        localStorage.setItem(LOCAL_STORAGE_TOKEN_KEY, token);
+      } else {
+        localStorage.removeItem(LOCAL_STORAGE_TOKEN_KEY);
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
 export function AgentStatusCard({ accessToken, userRole, auth }: AgentStatusCardProps) {
   const [view, setView] = useState<AgentViewState>({ kind: 'checking' });
-  const [pairingToken, setPairingToken] = useState('');
+  const [pairingToken, setPairingToken] = useState<string>(() => getSavedPairingToken());
   const [isPairing, setIsPairing] = useState(false);
   const [isTunnelBusy, setIsTunnelBusy] = useState(false);
   const [tunnelError, setTunnelError] = useState<string | null>(null);
@@ -52,8 +79,12 @@ export function AgentStatusCard({ accessToken, userRole, auth }: AgentStatusCard
 
     try {
       const status = await fetchAgentStatus(activeToken);
+      savePairingToken(activeToken);
       setView({ kind: 'paired', health, status });
     } catch (err) {
+      if (err instanceof AgentHttpError && err.statusCode === 401) {
+        savePairingToken('');
+      }
       const message =
         err instanceof AgentHttpError
           ? err.message
@@ -65,8 +96,27 @@ export function AgentStatusCard({ accessToken, userRole, auth }: AgentStatusCard
   }, []);
 
   useEffect(() => {
-    void probeAgent();
+    const saved = getSavedPairingToken();
+    void probeAgent(saved || undefined);
   }, [probeAgent]);
+
+  // Auto-retry polling when Agent is unreachable
+  useEffect(() => {
+    if (view.kind !== 'unreachable') return;
+
+    const timer = setInterval(() => {
+      void checkAgentHealth()
+        .then(() => {
+          const token = pairingToken.trim() || getSavedPairingToken();
+          void probeAgent(token || undefined);
+        })
+        .catch(() => {
+          // Still unreachable, wait for next tick
+        });
+    }, 4000);
+
+    return () => clearInterval(timer);
+  }, [view.kind, pairingToken, probeAgent]);
 
   async function handlePairSubmit(e: FormEvent) {
     e.preventDefault();
@@ -82,8 +132,12 @@ export function AgentStatusCard({ accessToken, userRole, auth }: AgentStatusCard
       if (view.kind === 'unpaired') {
         try {
           const status = await fetchAgentStatus(trimmed);
+          savePairingToken(trimmed);
           setView({ kind: 'paired', health: view.health, status });
         } catch (err) {
+          if (err instanceof AgentHttpError && err.statusCode === 401) {
+            savePairingToken('');
+          }
           const message =
             err instanceof AgentHttpError
               ? err.message
@@ -168,23 +222,50 @@ export function AgentStatusCard({ accessToken, userRole, auth }: AgentStatusCard
       )}
 
       {view.kind === 'unreachable' && (
-        <div className="rounded-3xl border border-red-500/30 bg-red-950/20 p-6 space-y-3">
-          <div className="flex items-center gap-2 text-base font-bold text-red-300">
-            <WifiOff className="h-5 w-5 text-red-400" />
-            <span>Agent Unreachable</span>
+        <div className="rounded-3xl border border-red-500/30 bg-red-950/20 p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-base font-bold text-red-300">
+              <WifiOff className="h-5 w-5 text-red-400" />
+              <span>Agent Unreachable</span>
+            </div>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-red-500/10 text-red-400 border border-red-500/20">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+              </span>
+              Auto-reconnecting...
+            </span>
           </div>
-          <p className="text-xs sm:text-sm text-stone-400 leading-relaxed">
-            Start the local MANGO Windows Agent on 127.0.0.1:47821 ({view.reason}).
-          </p>
-          <div className="pt-2">
+
+          <div className="space-y-1">
+            <p className="text-xs sm:text-sm text-stone-300 font-medium">
+              ไม่สามารถเชื่อมต่อไปยัง Windows Agent (127.0.0.1:47821) ได้
+            </p>
+            <p className="text-xs text-stone-400 leading-relaxed font-mono">
+              Start the local MANGO Windows Agent on 127.0.0.1:47821 ({view.reason}).
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-white/5 bg-[#141311]/80 p-3.5 space-y-2">
+            <span className="text-[11px] font-semibold text-amber-300 block">
+              💡 วิธีเปิดใช้งาน Agent สำหรับทดสอบ:
+            </span>
+            <div className="flex items-center justify-between gap-2 bg-black/40 rounded-xl px-3 py-2 border border-white/5 font-mono text-xs text-stone-200">
+              <code>npm run mock:agent</code>
+              <span className="text-[10px] text-stone-400 font-sans">(รันใน Terminal เพื่อเปิด Agent)</span>
+            </div>
+          </div>
+
+          <div className="pt-1 flex flex-wrap items-center gap-3">
             <button
               type="button"
-              onClick={() => void probeAgent(pairingToken)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-[#262420] px-4 py-2 text-xs text-stone-200 hover:text-white"
+              onClick={() => void probeAgent(pairingToken || getSavedPairingToken())}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-[#262420] px-4 py-2 text-xs font-semibold text-stone-200 hover:text-white hover:bg-[#322f2a] transition-colors"
             >
               <RefreshCw className="h-3.5 w-3.5" />
               <span>Retry Connection</span>
             </button>
+            <span className="text-[11px] text-stone-400">ระบบจะลองเชื่อมต่อใหม่อัตโนมัติทุกๆ 4 วินาที</span>
           </div>
         </div>
       )}

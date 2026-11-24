@@ -92,8 +92,6 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
   const [showSetupKey, setShowSetupKey] = useState(false);
   const [showVpnPanel, setShowVpnPanel] = useState(false);
 
-  const currentPort = typeof window !== 'undefined' ? window.location.port : '';
-
   useEffect(() => {
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
@@ -389,16 +387,6 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
 
                 {/* Top Right Utility Controls matching Reference Mockup */}
                 <div className="flex items-center gap-3">
-                  {/* Current Port Badge */}
-                  {currentPort && (
-                    <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono font-bold border transition-colors ${
-                      isDark ? 'bg-[#1e1d1a]/85 border-white/5 text-amber-400' : 'bg-white border-stone-200 text-amber-600'
-                    }`}>
-                      <span className="text-[10px] text-stone-400 font-normal">PORT:</span>
-                      <span>{currentPort}</span>
-                    </div>
-                  )}
-
                   {/* Collapsible VPN Toggle Button */}
                   <button
                     type="button"
@@ -632,16 +620,6 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
 
                 {/* Top Right Controls: Language & Theme Capsules */}
                 <div className="flex items-center gap-3">
-                  {/* Current Port Badge */}
-                  {currentPort && (
-                    <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono font-bold border transition-colors ${
-                      isDark ? 'bg-[#1e1d1a]/85 border-white/5 text-amber-400' : 'bg-white border-stone-200 text-amber-600'
-                    }`}>
-                      <span className="text-[10px] text-stone-400 font-normal">PORT:</span>
-                      <span>{currentPort}</span>
-                    </div>
-                  )}
-
                   {/* Language Switcher */}
                   <div className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
                     isDark ? 'bg-[#1e1d1a]/85 border-white/5' : 'bg-white border-stone-200'

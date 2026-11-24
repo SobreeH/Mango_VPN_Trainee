@@ -16,6 +16,35 @@
 const http = require('http');
 const crypto = require('crypto');
 const os = require('os');
+const fs = require('fs');
+const path = require('path');
+
+function loadDotenvFallback() {
+  try {
+    const envPath = path.resolve(__dirname, '../.env');
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, 'utf8');
+      for (const line of content.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const eqIdx = trimmed.indexOf('=');
+        if (eqIdx > 0) {
+          const k = trimmed.slice(0, eqIdx).trim();
+          let v = trimmed.slice(eqIdx + 1).trim();
+          if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+            v = v.slice(1, -1);
+          }
+          if (!process.env[k]) {
+            process.env[k] = v;
+          }
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+loadDotenvFallback();
 
 function getenvFirst(...keys) {
   for (const key of keys) {
