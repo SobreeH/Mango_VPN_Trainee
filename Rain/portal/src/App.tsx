@@ -215,6 +215,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
 
   if (step.kind === 'authenticated') {
     const isAdmin = step.session.user.role === RoleName.ADMIN;
+    const isClient = step.session.user.role === RoleName.CLIENT;
 
     return (
       <main className={`min-h-screen p-4 sm:p-6 lg:p-8 relative overflow-hidden transition-colors duration-300 ${
@@ -531,8 +532,136 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
               </div>
             </section>
           </div>
+        ) : isClient ? (
+          /* Client Focused Clean Portal - Simple, 1-Click VPN Access without Clutter */
+          <div className="max-w-5xl mx-auto w-full space-y-6 relative z-10 py-2 sm:py-4">
+            {/* Top Navbar */}
+            <header className={`rounded-3xl border shadow-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 backdrop-blur-xl transition-colors ${
+              isDark ? 'border-white/5 bg-[#1e1d1a]/85 shadow-black/80' : 'border-stone-200/90 bg-white/95 shadow-stone-200/60'
+            }`}>
+              {/* Brand & User Role */}
+              <div className="flex items-center gap-3">
+                <span className="text-3xl" role="img" aria-label="Mango">🥭</span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h1 className={`text-base font-bold tracking-tight ${isDark ? 'text-stone-100' : 'text-slate-900'}`}>
+                      MANGO VPN
+                    </h1>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border bg-emerald-500/10 border-emerald-500/30 text-emerald-400">
+                      CLIENT PORTAL
+                    </span>
+                  </div>
+                  <p className={`text-[10px] font-medium ${isDark ? 'text-stone-400' : 'text-amber-700'}`}>
+                    Mango Consultant Co., Ltd.
+                  </p>
+                </div>
+              </div>
+
+              {/* Utility Controls & Logout */}
+              <div className="flex items-center gap-3 flex-wrap">
+                {/* Language Switcher */}
+                <div className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
+                  isDark ? 'bg-[#141311] border-white/5' : 'bg-white border-stone-200'
+                }`}>
+                  <button
+                    type="button"
+                    onClick={() => setLang('th')}
+                    className={`px-3 py-1 rounded-full transition-colors ${
+                      lang === 'th'
+                        ? 'bg-[#f59e0b] text-stone-950 shadow-sm font-bold'
+                        : isDark ? 'text-stone-400 hover:text-stone-200' : 'text-stone-500 hover:text-stone-800'
+                    }`}
+                  >
+                    TH
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLang('en')}
+                    className={`px-3 py-1 rounded-full transition-colors ${
+                      lang === 'en'
+                        ? 'bg-[#f59e0b] text-stone-950 shadow-sm font-bold'
+                        : isDark ? 'text-stone-400 hover:text-stone-200' : 'text-stone-500 hover:text-stone-800'
+                    }`}
+                  >
+                    EN
+                  </button>
+                </div>
+
+                {/* Theme Switcher */}
+                <div
+                  role="group"
+                  aria-label="Toggle theme"
+                  className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
+                    isDark ? 'bg-[#141311] border-white/5' : 'bg-white border-stone-200'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setIsDark(false)}
+                    aria-label="Light mode"
+                    className={`p-1.5 rounded-full transition-colors ${
+                      !isDark
+                        ? 'bg-[#f59e0b] text-stone-950 shadow-sm font-bold'
+                        : 'text-stone-400 hover:text-stone-200'
+                    }`}
+                  >
+                    <Sun className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsDark(true)}
+                    aria-label="Dark mode"
+                    className={`p-1.5 rounded-full transition-colors ${
+                      isDark
+                        ? 'bg-[#f59e0b] text-stone-950 shadow-sm font-bold'
+                        : 'text-stone-400 hover:text-stone-200'
+                    }`}
+                  >
+                    <Moon className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                {/* User Info & Logout Button */}
+                <div className="flex items-center gap-2 pl-2 border-l border-white/10">
+                  <span className={`text-xs font-semibold hidden md:inline ${isDark ? 'text-stone-200' : 'text-slate-800'}`}>
+                    {step.session.user.username}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    aria-label="Log Out"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border border-white/10 bg-[#262420] text-stone-300 hover:bg-rose-950/60 hover:text-rose-200 hover:border-rose-900/50 transition-colors shadow-sm"
+                  >
+                    <LogOut className="h-3.5 w-3.5 text-rose-400" />
+                    <span>{lang === 'th' ? 'ออกจากระบบ' : 'Log Out'}</span>
+                  </button>
+                </div>
+              </div>
+            </header>
+
+            {/* Client Greeting Header */}
+            <div>
+              <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${isDark ? 'text-stone-100' : 'text-slate-900'}`}>
+                {lang === 'th' ? `ยินดีต้อนรับ, ${step.session.user.username}` : `Welcome, ${step.session.user.username}`}
+              </h2>
+              <p className={`text-xs font-medium mt-1 ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
+                {lang === 'th'
+                  ? 'ระบบเครือข่ายระยะไกลความปลอดภัยสูง (สิทธิ์การเข้าถึงสำหรับลูกค้า)'
+                  : 'Zero-Trust Secure Remote Access (Client Access Privilege)'}
+              </p>
+            </div>
+
+            {/* Direct VPN Connection Card - 100% Focused */}
+            <div className="w-full">
+              <AgentStatusCard
+                accessToken={step.session.accessToken}
+                userRole={step.session.user.role}
+                auth={authContext}
+              />
+            </div>
+          </div>
         ) : (
-          /* Non-Admin User Portal (Staff / Client) - Full-Screen Sidebar Dashboard matching Mockup */
+          /* Staff User Portal - Full-Screen Sidebar Dashboard matching Mockup */
           <div className="w-full flex-1 flex flex-col md:flex-row gap-6 relative z-10 items-stretch">
             {/* Left Sidebar */}
             <aside className={`w-full md:w-64 lg:w-72 shrink-0 rounded-3xl border shadow-2xl p-6 flex flex-col justify-between backdrop-blur-xl transition-colors min-h-[calc(100vh-6rem)] ${
