@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { SessionStatus, type VpnSessionDto } from '@mango/shared';
+import { SessionStatus, VpnProviderType, type VpnSessionDto } from '@mango/shared';
 import type { AuthRefreshContext } from '../api/auth';
 import { disconnectSession, fetchSessions } from '../lib/adminApi';
 import { ConfirmModal } from './ConfirmModal';
@@ -57,19 +57,36 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps)
             <thead className="bg-slate-900 text-slate-400">
               <tr>
                 <th className="px-3 py-2">User / Device</th>
+                <th className="px-3 py-2">Provider / Gateway</th>
                 <th className="px-3 py-2">Assigned IP</th>
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
-              {sessions.map((s) => (
-                <tr key={s.id}>
-                  <td className="px-3 py-2">
-                    <div className="font-medium text-slate-100">{s.username ?? s.userId}</div>
-                    <div className="text-slate-400">{s.hostname ?? s.deviceId}</div>
-                  </td>
-                  <td className="px-3 py-2 font-mono">{s.assignedIp}</td>
+              {sessions.map((s) => {
+                const provider = s.providerType ?? VpnProviderType.WIREGUARD;
+                const providerBadgeClass =
+                  provider === VpnProviderType.FORTINET
+                    ? 'bg-rose-500/15 text-rose-300'
+                    : provider === VpnProviderType.CISCO
+                      ? 'bg-sky-500/15 text-sky-300'
+                      : 'bg-emerald-500/15 text-emerald-300';
+                return (
+                  <tr key={s.id}>
+                    <td className="px-3 py-2">
+                      <div className="font-medium text-slate-100">{s.username ?? s.userId}</div>
+                      <div className="text-slate-400">{s.hostname ?? s.deviceId}</div>
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className={`rounded px-2 py-0.5 text-[11px] font-semibold ${providerBadgeClass}`}>
+                        {provider}
+                      </span>
+                      {s.gatewayName && (
+                        <div className="text-[11px] text-slate-400 mt-0.5">{s.gatewayName}</div>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 font-mono">{s.assignedIp}</td>
                   <td className="px-3 py-2">
                     <span
                       className={`rounded px-2 py-0.5 text-[11px] font-semibold ${
@@ -96,9 +113,10 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps)
                     >
                       Disconnect
                     </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -118,7 +136,7 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps)
               Assigned IP: {sessionToDisconnect?.assignedIp}
             </p>
             <p className="text-xs text-amber-400 font-medium pt-1">
-              ⚠️ The WireGuard peer will be immediately removed from the gateway daemon, terminating
+              ⚠️ The VPN peer/session will be immediately removed from the gateway daemon, terminating
               active network access.
             </p>
           </div>

@@ -26,6 +26,7 @@ import { UsersTab } from './components/UsersTab';
 import { DevicesTab } from './components/DevicesTab';
 import { SessionsTab } from './components/SessionsTab';
 import { PoliciesTab } from './components/PoliciesTab';
+import { GatewaysTab } from './components/GatewaysTab';
 
 export interface PortalSession {
   accessToken: string;
@@ -38,7 +39,14 @@ export interface AppProps {
   apiBaseUrl?: string;
 }
 
-type AdminTab = 'audit-logs' | 'agent-versions' | 'users' | 'devices' | 'sessions' | 'policies';
+type AdminTab =
+  | 'audit-logs'
+  | 'agent-versions'
+  | 'users'
+  | 'devices'
+  | 'sessions'
+  | 'policies'
+  | 'gateways';
 
 const loginSchema = z.object({
   username: z.string().trim().min(1, 'Username is required'),
@@ -264,6 +272,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                       { id: 'users', labelTh: 'ผู้ใช้', labelEn: 'Users' },
                       { id: 'devices', labelTh: 'อุปกรณ์', labelEn: 'Devices' },
                       { id: 'policies', labelTh: 'นโยบาย', labelEn: 'Policies' },
+                      { id: 'gateways', labelTh: 'เกตเวย์', labelEn: 'Gateways' },
                     ].map((item) => {
                       const isActive = activeTab === item.id;
                       return (
@@ -389,6 +398,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                     {activeTab === 'users' && (lang === 'th' ? 'ผู้ใช้' : 'Users')}
                     {activeTab === 'devices' && (lang === 'th' ? 'อุปกรณ์' : 'Devices')}
                     {activeTab === 'policies' && (lang === 'th' ? 'นโยบาย' : 'Policies')}
+                    {activeTab === 'gateways' && (lang === 'th' ? 'เกตเวย์' : 'Gateways')}
                     {activeTab === 'sessions' && (lang === 'th' ? 'เซสชัน' : 'Sessions')}
                     {activeTab === 'audit-logs' && (lang === 'th' ? 'บันทึกการใช้งาน' : 'Audit Logs')}
                     {activeTab === 'agent-versions' && (lang === 'th' ? 'เวอร์ชัน Agent' : 'Agent Versions')}
@@ -536,6 +546,13 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                 )}
                 {activeTab === 'policies' && (
                   <PoliciesTab
+                    apiBaseUrl={apiBaseUrl}
+                    accessToken={step.session.accessToken}
+                    auth={authContext}
+                  />
+                )}
+                {activeTab === 'gateways' && (
+                  <GatewaysTab
                     apiBaseUrl={apiBaseUrl}
                     accessToken={step.session.accessToken}
                     auth={authContext}
