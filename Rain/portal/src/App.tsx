@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   KeyRound,
   LogOut,
@@ -7,6 +8,8 @@ import {
   Moon,
   Lock,
   User,
+  Users,
+  Laptop,
   Eye,
   EyeOff,
   Power,
@@ -19,7 +22,7 @@ import QRCode from 'qrcode';
 import { RoleName, type AuthTokensResponse, type AuthUserDto, type LoginResponse } from '@mango/shared';
 import { loginUser, logoutUser, verifyOtpCode, type AuthRefreshContext } from './api/auth';
 import { AgentStatusCard } from './components/AgentStatusCard';
-import { DEFAULT_API_URL } from './lib/adminApi';
+import { DEFAULT_API_URL, fetchUsers, fetchDevices, fetchSessions } from './lib/adminApi';
 import { AuditLogsTab } from './components/AuditLogsTab';
 import { AgentVersionsTab } from './components/AgentVersionsTab';
 import { UsersTab } from './components/UsersTab';
@@ -256,8 +259,35 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
         }
       : undefined;
 
+  const isAdmin = step.kind === 'authenticated' && step.session.user.role === RoleName.ADMIN;
+  const currentToken = step.kind === 'authenticated' ? step.session.accessToken : '';
+
+  const kpiUsersQuery = useQuery({
+    queryKey: ['admin-kpi-users', apiBaseUrl],
+    queryFn: () => fetchUsers(apiBaseUrl, currentToken, authContext),
+    enabled: isAdmin && Boolean(currentToken),
+    staleTime: 30000,
+  });
+
+  const kpiDevicesQuery = useQuery({
+    queryKey: ['admin-kpi-devices', apiBaseUrl],
+    queryFn: () => fetchDevices(apiBaseUrl, currentToken, authContext),
+    enabled: isAdmin && Boolean(currentToken),
+    staleTime: 30000,
+  });
+
+  const kpiSessionsQuery = useQuery({
+    queryKey: ['admin-kpi-sessions', apiBaseUrl],
+    queryFn: () => fetchSessions(apiBaseUrl, currentToken, authContext),
+    enabled: isAdmin && Boolean(currentToken),
+    staleTime: 15000,
+  });
+
+  const totalUsers = kpiUsersQuery.data?.items?.length ?? 0;
+  const totalDevices = kpiDevicesQuery.data?.items?.length ?? 0;
+  const activeSessions = kpiSessionsQuery.data?.items?.filter((s) => s.status === 'ACTIVE').length ?? 0;
+
   if (step.kind === 'authenticated') {
-    const isAdmin = step.session.user.role === RoleName.ADMIN;
     const isClient = step.session.user.role === RoleName.CLIENT;
 
     return (
@@ -518,6 +548,101 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                   </div>
                 </div>
               </header>
+
+              {/* Admin Overview KPI Summary Cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+                {/* Total Users */}
+                <div className={`p-4 rounded-3xl border transition-all ${
+                  isDark
+                    ? 'bg-[#1e1d1a]/85 border-white/5 shadow-xl hover:border-amber-500/20'
+                    : 'bg-white border-stone-200 shadow-md'
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-semibold tracking-wider uppercase text-stone-400">
+                      {lang === 'th' ? 'ผู้ใช้งานทั้งหมด' : 'Total Users'}
+                    </span>
+                    <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
+                      <Users className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-black text-stone-100">
+                    {kpiUsersQuery.isLoading ? '...' : totalUsers}
+                  </div>
+                  <p className="text-[11px] text-stone-500 mt-1">
+                    {lang === 'th' ? 'บัญชีในระบบ' : 'Registered accounts'}
+                  </p>
+                </div>
+
+                {/* Registered Devices */}
+                <div className={`p-4 rounded-3xl border transition-all ${
+                  isDark
+                    ? 'bg-[#1e1d1a]/85 border-white/5 shadow-xl hover:border-amber-500/20'
+                    : 'bg-white border-stone-200 shadow-md'
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-semibold tracking-wider uppercase text-stone-400">
+                      {lang === 'th' ? 'อุปกรณ์ที่ลงทะเบียน' : 'Devices'}
+                    </span>
+                    <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
+                      <Laptop className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-black text-stone-100">
+                    {kpiDevicesQuery.isLoading ? '...' : totalDevices}
+                  </div>
+                  <p className="text-[11px] text-stone-500 mt-1">
+                    {lang === 'th' ? 'ผูกสิทธิ์ Zero-Trust' : 'Trusted endpoints'}
+                  </p>
+                </div>
+
+                {/* Active Sessions */}
+                <div className={`p-4 rounded-3xl border transition-all ${
+                  isDark
+                    ? 'bg-[#1e1d1a]/85 border-white/5 shadow-xl hover:border-amber-500/20'
+                    : 'bg-white border-stone-200 shadow-md'
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-semibold tracking-wider uppercase text-stone-400">
+                      {lang === 'th' ? 'VPN ที่เชื่อมต่ออยู่' : 'Active Sessions'}
+                    </span>
+                    <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+                      <Activity className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-black text-emerald-400 flex items-center gap-2">
+                    {kpiSessionsQuery.isLoading ? '...' : activeSessions}
+                    {activeSessions > 0 && (
+                      <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                    )}
+                  </div>
+                  <p className="text-[11px] text-stone-500 mt-1">
+                    {lang === 'th' ? 'ออนไลน์แบบเรียลไทม์' : 'Live tunnels'}
+                  </p>
+                </div>
+
+                {/* Security Posture */}
+                <div className={`p-4 rounded-3xl border transition-all ${
+                  isDark
+                    ? 'bg-[#1e1d1a]/85 border-white/5 shadow-xl hover:border-amber-500/20'
+                    : 'bg-white border-stone-200 shadow-md'
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-semibold tracking-wider uppercase text-stone-400">
+                      {lang === 'th' ? 'สถานะความปลอดภัย' : 'Security Posture'}
+                    </span>
+                    <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
+                      <ShieldCheck className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <div className="text-sm font-bold text-emerald-400 flex items-center gap-1.5 mt-1">
+                    <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />
+                    Zero-Trust Active
+                  </div>
+                  <p className="text-[11px] text-stone-500 mt-1">
+                    WireGuard + TOTP MFA
+                  </p>
+                </div>
+              </div>
 
               {/* Collapsible VPN Agent Status Card for Admin */}
               <div className={`transition-all duration-300 ${showVpnPanel ? 'block pb-2' : 'hidden'}`}>

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ShieldCheck, ShieldAlert, Plus } from 'lucide-react';
 import {
   PolicyAction,
   PolicyProtocol,
@@ -77,14 +78,24 @@ export function PoliciesTab({ apiBaseUrl, accessToken, auth }: PoliciesTabProps)
 
   return (
     <section aria-label="Policies" className="space-y-6">
+      {/* Create Zero-Trust Policy Form Card */}
       <form
         onSubmit={handleSubmit}
-        className="rounded-lg border border-slate-800 bg-slate-950/60 p-4 space-y-4"
+        className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-6 backdrop-blur-xl shadow-2xl space-y-5"
       >
-        <h3 className="text-sm font-semibold text-slate-100">Create Zero-Trust Policy</h3>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="flex items-center gap-2.5 pb-2 border-b border-white/5">
+          <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
+            <Plus className="h-4 w-4" />
+          </div>
           <div>
-            <label htmlFor="policy-name" className="block text-xs text-slate-400 mb-1">
+            <h3 className="text-sm font-bold text-stone-100">Create Zero-Trust Policy</h3>
+            <p className="text-[11px] text-stone-400">Define role-based subnet routing and firewall packet inspection rules</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="policy-name" className="block text-xs font-medium text-stone-400 mb-1.5">
               Policy Name
             </label>
             <input
@@ -94,19 +105,19 @@ export function PoliciesTab({ apiBaseUrl, accessToken, auth }: PoliciesTabProps)
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Allow Core API"
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              className="w-full rounded-xl border border-white/10 bg-[#262420]/70 px-4 py-2.5 text-xs sm:text-sm text-stone-100 placeholder-stone-500 focus:border-amber-400 focus:outline-none transition-colors"
             />
           </div>
 
           <div>
-            <label htmlFor="policy-role" className="block text-xs text-slate-400 mb-1">
+            <label htmlFor="policy-role" className="block text-xs font-medium text-stone-400 mb-1.5">
               Role
             </label>
             <select
               id="policy-role"
               value={role}
               onChange={(e) => setRole(e.target.value as RoleName)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              className="w-full rounded-xl border border-white/10 bg-[#262420]/70 px-4 py-2.5 text-xs sm:text-sm text-stone-100 focus:border-amber-400 focus:outline-none transition-colors cursor-pointer"
             >
               <option value={RoleName.ADMIN}>ADMIN</option>
               <option value={RoleName.STAFF}>STAFF</option>
@@ -115,7 +126,7 @@ export function PoliciesTab({ apiBaseUrl, accessToken, auth }: PoliciesTabProps)
           </div>
 
           <div>
-            <label htmlFor="policy-cidr" className="block text-xs text-slate-400 mb-1">
+            <label htmlFor="policy-cidr" className="block text-xs font-medium text-stone-400 mb-1.5">
               Target CIDR
             </label>
             <input
@@ -125,19 +136,19 @@ export function PoliciesTab({ apiBaseUrl, accessToken, auth }: PoliciesTabProps)
               value={targetCidr}
               onChange={(e) => setTargetCidr(e.target.value)}
               placeholder="10.20.0.0/16"
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              className="w-full rounded-xl border border-white/10 bg-[#262420]/70 px-4 py-2.5 text-xs sm:text-sm text-stone-100 placeholder-stone-500 focus:border-amber-400 focus:outline-none transition-colors font-mono"
             />
           </div>
 
           <div>
-            <label htmlFor="policy-protocol" className="block text-xs text-slate-400 mb-1">
+            <label htmlFor="policy-protocol" className="block text-xs font-medium text-stone-400 mb-1.5">
               Protocol
             </label>
             <select
               id="policy-protocol"
               value={protocol}
               onChange={(e) => setProtocol(e.target.value as PolicyProtocol)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              className="w-full rounded-xl border border-white/10 bg-[#262420]/70 px-4 py-2.5 text-xs sm:text-sm text-stone-100 focus:border-amber-400 focus:outline-none transition-colors cursor-pointer"
             >
               <option value={PolicyProtocol.ANY}>ANY</option>
               <option value={PolicyProtocol.TCP}>TCP</option>
@@ -147,7 +158,7 @@ export function PoliciesTab({ apiBaseUrl, accessToken, auth }: PoliciesTabProps)
           </div>
 
           <div>
-            <label htmlFor="policy-port-range" className="block text-xs text-slate-400 mb-1">
+            <label htmlFor="policy-port-range" className="block text-xs font-medium text-stone-400 mb-1.5">
               Port Range (TCP/UDP)
             </label>
             <input
@@ -156,19 +167,19 @@ export function PoliciesTab({ apiBaseUrl, accessToken, auth }: PoliciesTabProps)
               value={portRange}
               onChange={(e) => setPortRange(e.target.value)}
               placeholder="443 or 8000-8080"
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              className="w-full rounded-xl border border-white/10 bg-[#262420]/70 px-4 py-2.5 text-xs sm:text-sm text-stone-100 placeholder-stone-500 focus:border-amber-400 focus:outline-none transition-colors font-mono"
             />
           </div>
 
           <div>
-            <label htmlFor="policy-action" className="block text-xs text-slate-400 mb-1">
+            <label htmlFor="policy-action" className="block text-xs font-medium text-stone-400 mb-1.5">
               Action
             </label>
             <select
               id="policy-action"
               value={action}
               onChange={(e) => setAction(e.target.value as PolicyAction)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              className="w-full rounded-xl border border-white/10 bg-[#262420]/70 px-4 py-2.5 text-xs sm:text-sm text-stone-100 focus:border-amber-400 focus:outline-none transition-colors cursor-pointer"
             >
               <option value={PolicyAction.ALLOW}>ALLOW</option>
               <option value={PolicyAction.DENY}>DENY</option>
@@ -176,7 +187,7 @@ export function PoliciesTab({ apiBaseUrl, accessToken, auth }: PoliciesTabProps)
           </div>
 
           <div>
-            <label htmlFor="policy-priority" className="block text-xs text-slate-400 mb-1">
+            <label htmlFor="policy-priority" className="block text-xs font-medium text-stone-400 mb-1.5">
               Priority
             </label>
             <input
@@ -187,7 +198,7 @@ export function PoliciesTab({ apiBaseUrl, accessToken, auth }: PoliciesTabProps)
               required
               value={priority}
               onChange={(e) => setPriority(e.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              className="w-full rounded-xl border border-white/10 bg-[#262420]/70 px-4 py-2.5 text-xs sm:text-sm text-stone-100 placeholder-stone-500 focus:border-amber-400 focus:outline-none transition-colors font-mono"
             />
           </div>
         </div>
@@ -195,7 +206,7 @@ export function PoliciesTab({ apiBaseUrl, accessToken, auth }: PoliciesTabProps)
         <button
           type="submit"
           disabled={createMutation.isPending}
-          className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400 disabled:opacity-50"
+          className="rounded-xl bg-[#f59e0b] hover:bg-[#d97706] px-6 py-2.5 text-xs sm:text-sm font-bold text-stone-950 shadow-md shadow-amber-500/20 disabled:opacity-50 transition-colors"
         >
           {createMutation.isPending ? 'Creating...' : 'Create Policy'}
         </button>
@@ -204,43 +215,51 @@ export function PoliciesTab({ apiBaseUrl, accessToken, auth }: PoliciesTabProps)
       {activeError && (
         <div
           role="alert"
-          className="rounded-lg border border-rose-500/40 bg-rose-950/60 px-3 py-2 text-sm text-rose-200"
+          className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-xs font-medium text-rose-300 flex items-center gap-2 shadow-lg"
         >
-          {activeError instanceof Error ? activeError.message : 'Policy request failed'}
+          <ShieldAlert className="h-4 w-4 text-rose-400 shrink-0" />
+          <span>{activeError instanceof Error ? activeError.message : 'Policy request failed'}</span>
         </div>
       )}
 
       {listQuery.isLoading ? (
-        <p className="text-sm text-slate-400">Loading policies...</p>
+        <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-8 text-center text-xs text-stone-400 shadow-xl">
+          Loading policies...
+        </div>
       ) : policies.length === 0 && !listQuery.error ? (
-        <p className="text-sm text-slate-400">No policies configured.</p>
+        <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-12 text-center text-xs text-stone-400 shadow-xl space-y-2">
+          <ShieldCheck className="h-8 w-8 text-stone-600 mx-auto" />
+          <p className="text-stone-300 font-medium">No policies configured.</p>
+          <p className="text-[11px] text-stone-500">Zero-Trust subnet routing policies will be displayed here.</p>
+        </div>
       ) : policies.length > 0 ? (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {policies.map((pol) => (
             <div
               key={pol.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2.5 text-sm"
+              className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-5 shadow-xl hover:border-amber-500/20 transition-all backdrop-blur-xl"
             >
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-slate-100">{pol.name}</span>
-                  <span className="rounded bg-slate-800 px-1.5 py-0.5 text-xs text-slate-300">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <span className="font-bold text-stone-100 text-sm tracking-tight">{pol.name}</span>
+                  <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 text-[11px] font-bold text-amber-300">
                     {pol.role}
                   </span>
                   <span
-                    className={`rounded px-1.5 py-0.5 text-xs font-semibold ${
+                    className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
                       pol.action === PolicyAction.ALLOW
-                        ? 'bg-emerald-500/15 text-emerald-300'
-                        : 'bg-rose-500/15 text-rose-300'
+                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                        : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
                     }`}
                   >
                     {pol.action}
                   </span>
-                  <span className="text-xs text-slate-400">Priority {pol.priority}</span>
+                  <span className="text-xs text-stone-400 font-mono">Priority {pol.priority}</span>
                 </div>
-                <div className="text-xs font-mono text-slate-400">
-                  <span>{pol.targetCidr}</span>
-                  <span> · {pol.protocol}</span>
+                <div className="text-xs font-mono text-stone-400 flex items-center gap-2">
+                  <span className="text-stone-300">{pol.targetCidr}</span>
+                  <span>·</span>
+                  <span className="text-amber-400/80">{pol.protocol}</span>
                   {pol.portRange ? <span>:{pol.portRange}</span> : null}
                 </div>
               </div>
@@ -249,7 +268,7 @@ export function PoliciesTab({ apiBaseUrl, accessToken, auth }: PoliciesTabProps)
                 type="button"
                 disabled={deleteMutation.isPending}
                 onClick={() => setPendingDeletePolicy(pol)}
-                className="rounded border border-rose-500/40 px-2.5 py-1 text-xs text-rose-300 hover:bg-rose-950/60 disabled:opacity-50"
+                className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3.5 py-1.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 disabled:opacity-50 transition-colors shadow-sm"
               >
                 Delete
               </button>
@@ -262,12 +281,14 @@ export function PoliciesTab({ apiBaseUrl, accessToken, auth }: PoliciesTabProps)
         isOpen={pendingDeletePolicy !== null}
         title="Delete Security Policy"
         message={
-          <p>
-            Are you sure you want to delete policy{' '}
-            <strong className="text-slate-100">{pendingDeletePolicy?.name}</strong> (
-            {pendingDeletePolicy?.role} {pendingDeletePolicy?.action} {pendingDeletePolicy?.targetCidr}
-            )? This rule will be immediately removed from the zero-trust firewall.
-          </p>
+          <div className="space-y-2 text-stone-300">
+            <p>
+              Are you sure you want to delete policy{' '}
+              <strong className="text-amber-400">{pendingDeletePolicy?.name}</strong> (
+              {pendingDeletePolicy?.role} {pendingDeletePolicy?.action} {pendingDeletePolicy?.targetCidr}
+              )? This rule will be immediately removed from the zero-trust firewall.
+            </p>
+          </div>
         }
         confirmLabel="Delete Policy"
         confirmVariant="danger"
