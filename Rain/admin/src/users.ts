@@ -184,13 +184,23 @@ export function registerUserRoutes(
               { sessions: { some: { status: SessionStatus.ACTIVE } } },
             ],
           },
-          select: { publicKey: true },
+          select: {
+            publicKey: true,
+            peerIdentity: true,
+            providerType: true,
+            gatewayId: true,
+          },
         });
 
         try {
           removedPublicKeys = await teardownPeersOnDaemon(
             vpnDaemon,
-            activePeers.map((p) => p.publicKey),
+            activePeers.map((p) => ({
+              publicKey: p.publicKey,
+              peerIdentity: p.peerIdentity,
+              providerType: p.providerType,
+              gatewayId: p.gatewayId,
+            })),
           );
         } catch (err) {
           const reason = err instanceof Error ? err.message : 'VPN daemon failed to remove peer';

@@ -6,10 +6,12 @@ import { registerUserRoutes } from './users.js';
 import { registerDeviceRoutes } from './devices.js';
 import { registerSessionRoutes } from './sessions.js';
 import { registerPolicyRoutes } from './policies.js';
+import { registerGatewayRoutes } from './gateways.js';
 import type { AdminVpnDaemonClient } from './revocation.js';
 
 export * from './audit.js';
 export * from './agent-versions.js';
+export * from './gateways.js';
 export * from './policies.js';
 export * from './revocation.js';
 
@@ -129,4 +131,5 @@ export const adminPlugin: FastifyPluginAsync<AdminPluginOptions> = async (app, o
   registerDeviceRoutes(app, prisma, vpnDaemon);
   registerSessionRoutes(app, prisma, vpnDaemon);
   registerPolicyRoutes(app, prisma, syncPolicies);
+  registerGatewayRoutes(app, prisma);
 };

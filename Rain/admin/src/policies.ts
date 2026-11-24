@@ -10,6 +10,7 @@ import {
   PolicyAction,
   PolicyProtocol,
   RoleName,
+  VpnProviderType,
   type CreateVpnPolicyRequest,
   type DaemonPolicyRule,
   type DaemonSyncPoliciesRequest,
@@ -102,6 +103,7 @@ export async function buildDaemonPolicySyncPayload(
       where: { status: SessionStatus.ACTIVE },
       include: {
         peer: true,
+        gateway: true,
         user: { include: { role: true } },
       },
     }),
@@ -129,12 +131,22 @@ export async function buildDaemonPolicySyncPayload(
   return {
     peers: activeSessions.map((session) => {
       const role = toSharedRole(session.user.role.name);
-      return {
+      const base = {
         publicKey: session.peer.publicKey,
         assignedIp: session.assignedIp,
         role,
         policies: rulesByRole.get(role) ?? [],
       };
+      if (session.providerType !== 'WIREGUARD' || session.gatewayId) {
+        return {
+          ...base,
+          providerType: session.providerType as VpnProviderType,
+          peerIdentity: session.peer.peerIdentity ?? session.peer.publicKey,
+          ...(session.gatewayId ? { gatewayId: session.gatewayId } : {}),
+          ...(session.gateway?.endpoint ? { gatewayEndpoint: session.gateway.endpoint } : {}),
+        };
+      }
+      return base;
     }),
   };
 }
