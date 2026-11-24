@@ -28,6 +28,65 @@ export enum PolicyProtocol {
   ICMP = 'ICMP',
 }
 
+export enum VpnProviderType {
+  WIREGUARD = 'WIREGUARD',
+  FORTINET = 'FORTINET',
+  CISCO = 'CISCO',
+}
+
+export enum GatewayIpamMode {
+  API_MANAGED = 'API_MANAGED',
+  GATEWAY_ASSIGNED = 'GATEWAY_ASSIGNED',
+}
+
+export interface VpnGatewayDto {
+  id: string;
+  name: string;
+  providerType: VpnProviderType;
+  endpoint: string;
+  subnetCidr: string;
+  ipamMode: GatewayIpamMode;
+  dns: string[];
+  allowedRoles: RoleName[];
+  isDefault: boolean;
+  isEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateVpnGatewayRequest {
+  name: string;
+  providerType: VpnProviderType;
+  endpoint: string;
+  subnetCidr?: string;
+  ipamMode?: GatewayIpamMode;
+  dns?: string[];
+  allowedRoles?: RoleName[];
+  isDefault?: boolean;
+  isEnabled?: boolean;
+}
+
+export interface UpdateVpnGatewayRequest {
+  name?: string;
+  providerType?: VpnProviderType;
+  endpoint?: string;
+  subnetCidr?: string;
+  ipamMode?: GatewayIpamMode;
+  dns?: string[];
+  allowedRoles?: RoleName[];
+  isDefault?: boolean;
+  isEnabled?: boolean;
+}
+
+export interface VpnGatewayListResponse {
+  items: VpnGatewayDto[];
+}
+
+export interface DeleteGatewayResponse {
+  success: boolean;
+  id: string;
+}
+
 export interface HealthResponse {
   status: 'ok' | 'error';
   database: 'connected' | 'disconnected';
@@ -89,6 +148,10 @@ export interface VpnSessionDto {
   hostname?: string;
   assignedIp: string;
   status: SessionStatus;
+  providerType?: VpnProviderType;
+  gatewayId?: string | null;
+  gatewayName?: string | null;
+  peerIdentity?: string;
   connectedAt: string;
   disconnectedAt: string | null;
 }
@@ -241,20 +304,51 @@ export interface LogoutResponse {
   success: boolean;
 }
 
+export interface ConnectTicketRequest {
+  gatewayId?: string;
+}
+
 export interface ConnectTicketResponse {
   ticket: string;
   expiresAt: string;
   expiresInSeconds: number;
+  gatewayId?: string | null;
+  providerType?: VpnProviderType;
+  gatewayName?: string | null;
 }
 
 export interface VpnConnectRequest {
   ticket: string;
-  publicKey: string;
+  publicKey?: string;
+  providerType?: VpnProviderType;
+  gatewayId?: string;
+  peerIdentity?: string;
   deviceFingerprint: string;
   hostname: string;
   agentVersion: string;
   platform?: string;
 }
+
+export type ProviderTunnelConfig =
+  | {
+      providerType: VpnProviderType.WIREGUARD;
+      serverPublicKey: string;
+    }
+  | {
+      providerType: VpnProviderType.FORTINET;
+      protocol: 'fortinet';
+      username: string;
+      ephemeralSecret: string;
+      serverCertDigest?: string | null;
+    }
+  | {
+      providerType: VpnProviderType.CISCO;
+      protocol: 'anyconnect';
+      username: string;
+      ephemeralSecret: string;
+      authGroup?: string | null;
+      serverCertDigest?: string | null;
+    };
 
 export interface VpnConnectResponse {
   sessionId: string;
@@ -264,11 +358,19 @@ export interface VpnConnectResponse {
   allowedIps: string[];
   dns: string[];
   connectedAt: string;
+  providerType?: VpnProviderType;
+  gatewayId?: string | null;
+  gatewayName?: string | null;
+  peerIdentity?: string;
+  tunnelConfig?: ProviderTunnelConfig;
 }
 
 export interface VpnDisconnectRequest {
   sessionId?: string;
   publicKey?: string;
+  peerIdentity?: string;
+  providerType?: VpnProviderType;
+  gatewayId?: string;
   deviceFingerprint?: string;
 }
 
@@ -287,14 +389,22 @@ export interface DaemonPolicyRule {
 }
 
 export interface DaemonAddPeerRequest {
-  publicKey: string;
+  publicKey?: string;
+  peerIdentity?: string;
+  providerType?: VpnProviderType;
+  gatewayId?: string;
+  gatewayEndpoint?: string;
   assignedIp: string;
   role?: RoleName;
   policies?: DaemonPolicyRule[];
 }
 
 export interface DaemonPeerPolicySync {
-  publicKey: string;
+  publicKey?: string;
+  peerIdentity?: string;
+  providerType?: VpnProviderType;
+  gatewayId?: string;
+  gatewayEndpoint?: string;
   assignedIp: string;
   role: RoleName;
   policies: DaemonPolicyRule[];
@@ -305,12 +415,18 @@ export interface DaemonSyncPoliciesRequest {
 }
 
 export interface DaemonRemovePeerRequest {
-  publicKey: string;
+  publicKey?: string;
+  peerIdentity?: string;
+  providerType?: VpnProviderType;
+  gatewayId?: string;
+  gatewayEndpoint?: string;
 }
 
 export interface DaemonPeerResponse {
   success: boolean;
-  publicKey: string;
+  publicKey?: string;
+  peerIdentity?: string;
+  providerType?: VpnProviderType;
   assignedIp?: string;
 }
 
@@ -333,6 +449,9 @@ export interface AgentStatusResponse {
   state: AgentTunnelState;
   version: string;
   publicKey: string;
+  providerType?: VpnProviderType;
+  gatewayId?: string | null;
+  peerIdentity?: string | null;
   assignedIp: string | null;
   serverEndpoint: string | null;
   allowedIps?: string[];
@@ -345,6 +464,8 @@ export interface AgentStatusResponse {
 
 export interface AgentConnectRequest {
   ticket: string;
+  providerType?: VpnProviderType;
+  gatewayId?: string;
 }
 
 export interface AgentConnectResponse {
@@ -352,6 +473,9 @@ export interface AgentConnectResponse {
   message: string;
   state: AgentTunnelState;
   publicKey: string;
+  providerType?: VpnProviderType;
+  gatewayId?: string | null;
+  peerIdentity?: string | null;
   assignedIp: string | null;
   serverEndpoint: string | null;
   allowedIps?: string[];
