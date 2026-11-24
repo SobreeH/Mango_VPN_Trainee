@@ -95,12 +95,12 @@ export function UsersTab({ apiBaseUrl, accessToken, auth }: UsersTabProps) {
     <section aria-label="Users" className="space-y-6">
       <form
         onSubmit={handleSubmit}
-        className="rounded-lg border border-slate-800 bg-slate-950/60 p-4 space-y-4"
+        className="rounded-3xl border border-white/5 bg-[#1e1d1a]/80 p-6 shadow-2xl backdrop-blur-xl space-y-4"
       >
-        <h3 className="text-sm font-semibold text-slate-100">Create User</h3>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <h3 className="text-sm font-bold text-stone-100">Create User</h3>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="new-user-username" className="block text-xs text-slate-400 mb-1">
+            <label htmlFor="new-user-username" className="block text-xs font-medium text-stone-400 mb-1">
               Username
             </label>
             <input
@@ -109,11 +109,11 @@ export function UsersTab({ apiBaseUrl, accessToken, auth }: UsersTabProps) {
               required
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              className="w-full h-11 rounded-xl border border-white/10 bg-[#262420]/70 px-4 text-xs sm:text-sm text-stone-100 placeholder-stone-500 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 focus:outline-none transition-colors"
             />
           </div>
           <div>
-            <label htmlFor="new-user-email" className="block text-xs text-slate-400 mb-1">
+            <label htmlFor="new-user-email" className="block text-xs font-medium text-stone-400 mb-1">
               Email
             </label>
             <input
@@ -122,12 +122,12 @@ export function UsersTab({ apiBaseUrl, accessToken, auth }: UsersTabProps) {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              className="w-full h-11 rounded-xl border border-white/10 bg-[#262420]/70 px-4 text-xs sm:text-sm text-stone-100 placeholder-stone-500 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 focus:outline-none transition-colors"
             />
           </div>
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label htmlFor="new-user-password" className="block text-xs text-slate-400">
+              <label htmlFor="new-user-password" className="block text-xs font-medium text-stone-400">
                 Password
               </label>
               <button
@@ -144,13 +144,13 @@ export function UsersTab({ apiBaseUrl, accessToken, auth }: UsersTabProps) {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              className="w-full h-11 rounded-xl border border-white/10 bg-[#262420]/70 px-4 text-xs sm:text-sm text-stone-100 placeholder-stone-500 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 focus:outline-none transition-colors"
             />
             <div className="mt-1 text-[11px]">
               <span
                 className={
                   password.length === 0
-                    ? 'text-slate-400'
+                    ? 'text-stone-400'
                     : password.length < 12
                     ? 'text-amber-400'
                     : 'text-emerald-400'
@@ -165,14 +165,14 @@ export function UsersTab({ apiBaseUrl, accessToken, auth }: UsersTabProps) {
             </div>
           </div>
           <div>
-            <label htmlFor="new-user-role" className="block text-xs text-slate-400 mb-1">
+            <label htmlFor="new-user-role" className="block text-xs font-medium text-stone-400 mb-1">
               Role
             </label>
             <select
               id="new-user-role"
               value={role}
               onChange={(e) => setRole(e.target.value as RoleName)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              className="w-full h-11 rounded-xl border border-white/10 bg-[#262420]/70 px-4 text-xs sm:text-sm text-stone-100 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 focus:outline-none transition-colors cursor-pointer"
             >
               <option value={RoleName.ADMIN}>ADMIN</option>
               <option value={RoleName.STAFF}>STAFF</option>
@@ -183,7 +183,7 @@ export function UsersTab({ apiBaseUrl, accessToken, auth }: UsersTabProps) {
         <button
           type="submit"
           disabled={!isFormValid || createMutation.isPending}
-          className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400 disabled:opacity-50 transition-colors"
+          className="h-11 rounded-xl bg-[#f59e0b] hover:bg-[#d97706] px-6 text-xs sm:text-sm font-bold text-stone-950 shadow-md shadow-amber-500/20 disabled:opacity-50 transition-colors"
         >
           {createMutation.isPending ? 'Creating...' : 'Create User'}
         </button>
@@ -192,7 +192,7 @@ export function UsersTab({ apiBaseUrl, accessToken, auth }: UsersTabProps) {
       {activeError && (
         <div
           role="alert"
-          className="rounded-lg border border-red-500/40 bg-red-950/50 p-3 text-sm text-red-200"
+          className="rounded-2xl border border-red-500/40 bg-red-950/50 p-4 text-xs sm:text-sm text-red-200"
         >
           {activeError instanceof Error ? activeError.message : 'User request failed'}
         </div>
@@ -200,7 +200,7 @@ export function UsersTab({ apiBaseUrl, accessToken, auth }: UsersTabProps) {
 
       {/* Search & Filter Bar */}
       {users.length > 0 && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-lg border border-slate-800 bg-slate-950/40 p-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-white/5 bg-[#1e1d1a]/60 p-4">
           <div className="flex-1">
             <input
               type="text"
@@ -208,18 +208,18 @@ export function UsersTab({ apiBaseUrl, accessToken, auth }: UsersTabProps) {
               placeholder="Search by username or email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full sm:max-w-xs rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500"
+              className="w-full sm:max-w-xs h-10 rounded-xl border border-white/10 bg-[#262420]/70 px-4 text-xs text-stone-100 placeholder-stone-500 focus:border-amber-400 focus:outline-none transition-colors"
             />
           </div>
           <div className="flex items-center gap-2">
-            <label htmlFor="filter-user-role" className="text-xs text-slate-400">
+            <label htmlFor="filter-user-role" className="text-xs text-stone-400">
               Role:
             </label>
             <select
               id="filter-user-role"
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value as 'ALL' | RoleName)}
-              className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-100"
+              className="h-10 rounded-xl border border-white/10 bg-[#262420]/70 px-3 text-xs text-stone-100 focus:border-amber-400 focus:outline-none cursor-pointer"
             >
               <option value="ALL">All Roles</option>
               <option value={RoleName.ADMIN}>ADMIN</option>
@@ -231,51 +231,64 @@ export function UsersTab({ apiBaseUrl, accessToken, auth }: UsersTabProps) {
       )}
 
       {listQuery.isLoading ? (
-        <p className="text-sm text-slate-400">Loading users...</p>
+        <p className="text-sm text-stone-400">Loading users...</p>
       ) : users.length === 0 && !listQuery.error ? (
-        <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-6 text-center text-sm text-slate-400">
+        <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/80 p-8 text-center text-sm text-stone-400">
           No users found.
         </div>
       ) : filteredUsers.length === 0 && users.length > 0 ? (
-        <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-6 text-center text-sm text-slate-400">
+        <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/80 p-8 text-center text-sm text-stone-400">
           No matching users found for "{searchTerm}".
         </div>
       ) : filteredUsers.length > 0 ? (
-        <div className="overflow-x-auto rounded-lg border border-slate-800">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-900 text-slate-400">
+        <div className="overflow-x-auto rounded-3xl border border-white/5 bg-[#1e1d1a]/80 shadow-2xl backdrop-blur-xl">
+          <table className="w-full text-left text-xs sm:text-sm text-stone-300">
+            <thead className="border-b border-white/5 text-stone-400 text-xs font-semibold">
               <tr>
-                <th className="px-3 py-2">Username</th>
-                <th className="px-3 py-2">Role</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Actions</th>
+                <th className="px-6 py-4">Username</th>
+                <th className="px-6 py-4">Role</th>
+                <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800">
+            <tbody className="divide-y divide-white/5">
               {filteredUsers.map((u) => (
-                <tr key={u.id}>
-                  <td className="px-3 py-2">
-                    <div className="font-medium text-slate-100">{u.username}</div>
-                    <div className="text-slate-400">{u.email}</div>
+                <tr key={u.id} className="hover:bg-white/[0.02] transition-colors">
+                  <td className="px-6 py-4">
+                    <div className="font-bold text-stone-100 text-sm tracking-tight">{u.username}</div>
+                    <div className="text-stone-400 text-xs mt-0.5">{u.email}</div>
                   </td>
-                  <td className="px-3 py-2 font-mono">{u.role}</td>
-                  <td className="px-3 py-2">
-                    <span
-                      className={`rounded px-2 py-0.5 text-[11px] font-semibold ${
-                        u.isActive
-                          ? 'bg-emerald-500/15 text-emerald-300'
-                          : 'bg-red-500/15 text-red-300'
-                      }`}
-                    >
-                      {u.isActive ? 'Active' : 'Disabled'}
+                  <td className="px-6 py-4">
+                    <span className="font-mono text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-full font-bold">
+                      {u.role}
                     </span>
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-6 py-4">
+                    <span
+                      className={`inline-flex items-center gap-2 rounded-full px-4 py-1 text-xs font-medium border ${
+                        u.isActive
+                          ? 'bg-[#162a1e]/90 border-emerald-900/40 text-emerald-400'
+                          : 'bg-[#2a1719]/90 border-rose-900/40 text-rose-400'
+                      }`}
+                    >
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          u.isActive ? 'bg-emerald-400 shadow-sm shadow-emerald-400/50' : 'bg-rose-400'
+                        }`}
+                      />
+                      <span>{u.isActive ? 'Active' : 'Disabled'}</span>
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
                     <button
                       type="button"
                       disabled={statusMutation.isPending}
                       onClick={() => setPendingToggle({ id: u.id, username: u.username, isActive: !u.isActive })}
-                      className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800 disabled:opacity-50"
+                      className={`rounded-xl px-5 py-1.5 text-xs font-medium border transition-colors disabled:opacity-35 disabled:cursor-not-allowed shadow-sm ${
+                        u.isActive
+                          ? 'border-rose-900/50 bg-[#381a1c]/80 text-rose-200 hover:bg-rose-900/60'
+                          : 'border-emerald-900/50 bg-[#162a1e]/80 text-emerald-300 hover:bg-emerald-900/60'
+                      }`}
                     >
                       {u.isActive ? 'Disable' : 'Enable'}
                     </button>

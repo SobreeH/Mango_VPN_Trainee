@@ -49,7 +49,7 @@ const { host: HOST, port: PORT } = resolveHostAndPort();
 const API_URL = (getenvFirst('API_URL', 'MANGO_API_URL') || 'http://localhost:4000').replace(/\/+$/, '');
 const ALLOWED_ORIGINS = (
   getenvFirst('AGENT_ALLOWED_ORIGINS', 'MANGO_AGENT_ALLOWED_ORIGINS') ||
-  'http://localhost:3000,http://127.0.0.1:3000'
+  'http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:3002,http://127.0.0.1:3002'
 )
   .split(',')
   .map((o) => o.trim())
@@ -237,7 +237,24 @@ const server = http.createServer(async (req, res) => {
         return sendError(res, 400, 'MISSING_TICKET', 'Connect ticket is required');
       }
 
+      const origin = req.headers.origin || '';
+      let portSuffix = '';
+      try {
+        if (origin) {
+          const u = new URL(origin);
+          if (u.port) {
+            portSuffix = '-' + u.port;
+          }
+        }
+      } catch {
+        // ignore
+      }
+
+      const activeFingerprint = DEVICE_FINGERPRINT + portSuffix;
+      const activeHostname = HOSTNAME + (portSuffix ? portSuffix : '');
+
       agentState.publicKey = generateX25519PublicKeyB64();
+      agentState.deviceFingerprint = activeFingerprint;
       agentState.state = 'connecting';
       agentState.lastError = null;
 
@@ -249,8 +266,8 @@ const server = http.createServer(async (req, res) => {
           body: JSON.stringify({
             ticket,
             publicKey: agentState.publicKey,
-            deviceFingerprint: DEVICE_FINGERPRINT,
-            hostname: HOSTNAME,
+            deviceFingerprint: activeFingerprint,
+            hostname: activeHostname,
             agentVersion: agentState.version,
             platform: PLATFORM,
           }),
@@ -300,7 +317,7 @@ const server = http.createServer(async (req, res) => {
             body: JSON.stringify({
               sessionId: agentState.sessionId || undefined,
               publicKey: agentState.publicKey,
-              deviceFingerprint: DEVICE_FINGERPRINT,
+              deviceFingerprint: agentState.deviceFingerprint || DEVICE_FINGERPRINT,
             }),
           });
         } catch {

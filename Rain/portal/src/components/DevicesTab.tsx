@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DeviceStatus, type DeviceDto } from '@mango/shared';
+import { X, ChevronDown } from 'lucide-react';
 import type { AuthRefreshContext } from '../api/auth';
 import { fetchDevices, revokeDevice } from '../lib/adminApi';
 import { ConfirmModal } from './ConfirmModal';
@@ -13,6 +14,8 @@ interface DevicesTabProps {
 
 export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
   const queryClient = useQueryClient();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | DeviceStatus>('ALL');
   const [deviceToRevoke, setDeviceToRevoke] = useState<{
     id: string;
     hostname: string;
@@ -35,56 +38,132 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
   const devices: DeviceDto[] = listQuery.data?.items ?? [];
   const activeError = listQuery.error ?? revokeMutation.error ?? null;
 
+  const filteredDevices = devices.filter((d) => {
+    const matchesSearch =
+      searchTerm.trim() === '' ||
+      d.hostname.toLowerCase().includes(searchTerm.toLowerCase().trim()) ||
+      (d.username && d.username.toLowerCase().includes(searchTerm.toLowerCase().trim())) ||
+      d.fingerprint.toLowerCase().includes(searchTerm.toLowerCase().trim());
+    const matchesStatus = statusFilter === 'ALL' || d.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
   return (
-    <section aria-label="Devices" className="space-y-4">
+    <section aria-label="Devices" className="space-y-6">
       {activeError && (
         <div
           role="alert"
-          className="rounded-lg border border-red-500/40 bg-red-950/50 p-3 text-sm text-red-200"
+          className="rounded-2xl border border-red-500/40 bg-red-950/50 p-4 text-xs sm:text-sm text-red-200"
         >
           {activeError instanceof Error ? activeError.message : 'Device request failed'}
         </div>
       )}
 
+      {/* Filter and Search Bar matching Reference UI */}
+      <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between">
+        <div className="relative flex-1">
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="ค้นหาชื่อเครื่องหรือผู้ใช้"
+            aria-label="Search devices"
+            className="w-full h-12 rounded-2xl border border-white/5 bg-[#262420]/70 px-5 pr-10 text-xs sm:text-sm text-stone-100 placeholder-stone-500 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 focus:outline-none transition-colors"
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm('')}
+              aria-label="Clear search"
+              className="absolute right-3.5 top-3.5 p-0.5 rounded-full text-stone-400 hover:text-stone-200"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        <div className="w-full sm:w-52 relative">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as 'ALL' | DeviceStatus)}
+            aria-label="Filter status"
+            className="w-full h-12 rounded-2xl border border-white/5 bg-[#262420]/70 px-5 pr-10 text-xs sm:text-sm text-stone-200 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 focus:outline-none transition-colors appearance-none cursor-pointer"
+          >
+            <option value="ALL">ทุกสถานะ</option>
+            <option value={DeviceStatus.ACTIVE}>ใช้งานอยู่</option>
+            <option value={DeviceStatus.REVOKED}>เพิกถอนแล้ว</option>
+          </select>
+          <ChevronDown className="absolute right-4 top-4 h-4 w-4 text-stone-400 pointer-events-none" />
+        </div>
+      </div>
+
       {listQuery.isLoading ? (
-        <p className="text-sm text-slate-400">Loading devices...</p>
+        <p className="text-sm text-stone-400">Loading devices...</p>
       ) : devices.length === 0 && !listQuery.error ? (
-        <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-6 text-center text-sm text-slate-400">
+        <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/80 p-8 text-center text-sm text-stone-400">
           No devices found.
         </div>
-      ) : devices.length > 0 ? (
-        <div className="overflow-x-auto rounded-lg border border-slate-800">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-900 text-slate-400">
+      ) : filteredDevices.length === 0 ? (
+        <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/80 p-8 text-center text-sm text-stone-400 space-y-2">
+          <p>ไม่พบอุปกรณ์ที่ตรงกับเงื่อนไขการค้นหา</p>
+          <button
+            type="button"
+            onClick={() => {
+              setSearchTerm('');
+              setStatusFilter('ALL');
+            }}
+            className="text-xs text-amber-400 hover:underline"
+          >
+            ล้างคำค้นหา
+          </button>
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-3xl border border-white/5 bg-[#1e1d1a]/80 shadow-2xl backdrop-blur-xl">
+          <table className="w-full text-left text-xs sm:text-sm text-stone-300">
+            <thead className="border-b border-white/5 text-stone-400 text-xs font-semibold">
               <tr>
-                <th className="px-3 py-2">Hostname</th>
-                <th className="px-3 py-2">User</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Actions</th>
+                <th className="px-6 py-4">อุปกรณ์</th>
+                <th className="px-6 py-4">ผู้ใช้</th>
+                <th className="px-6 py-4">สถานะ</th>
+                <th className="px-6 py-4 text-right">การทำงาน</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800">
-              {devices.map((d) => (
-                <tr key={d.id}>
-                  <td className="px-3 py-2">
-                    <div className="font-medium text-slate-100">{d.hostname}</div>
-                    <div className="font-mono text-[11px] text-slate-400">{d.fingerprint}</div>
+            <tbody className="divide-y divide-white/5">
+              {filteredDevices.map((d) => (
+                <tr key={d.id} className="hover:bg-white/[0.02] transition-colors">
+                  <td className="px-6 py-4">
+                    <div>
+                      <div className="font-bold text-stone-100 text-sm tracking-tight">{d.hostname}</div>
+                      <div className="font-mono text-xs text-stone-400 bg-[#141311] px-2 py-0.5 rounded border border-white/5 mt-1 inline-block">
+                        {d.fingerprint.length > 16
+                          ? `${d.fingerprint.slice(0, 4)}...${d.fingerprint.slice(-4)}`
+                          : d.fingerprint}
+                      </div>
+                    </div>
                   </td>
-                  <td className="px-3 py-2">{d.username ?? d.userId}</td>
-                  <td className="px-3 py-2">
+                  <td className="px-6 py-4 text-stone-300 font-medium">
+                    {d.username ?? d.userId}
+                  </td>
+                  <td className="px-6 py-4">
                     <span
-                      className={`rounded px-2 py-0.5 text-[11px] font-semibold ${
+                      className={`inline-flex items-center gap-2 rounded-full px-4 py-1 text-xs font-medium border ${
                         d.status === DeviceStatus.ACTIVE
-                          ? 'bg-emerald-500/15 text-emerald-300'
-                          : 'bg-red-500/15 text-red-300'
+                          ? 'bg-[#162a1e]/90 border-emerald-900/40 text-emerald-400'
+                          : 'bg-[#2a1719]/90 border-rose-900/40 text-rose-400'
                       }`}
                     >
-                      {d.status}
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          d.status === DeviceStatus.ACTIVE ? 'bg-emerald-400 shadow-sm shadow-emerald-400/50' : 'bg-rose-400'
+                        }`}
+                      />
+                      <span>{d.status === DeviceStatus.ACTIVE ? 'ใช้งานอยู่' : 'เพิกถอนแล้ว'}</span>
+                      <span className="sr-only">{d.status}</span>
                     </span>
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-6 py-4 text-right">
                     <button
                       type="button"
+                      aria-label="Revoke"
                       disabled={d.status === DeviceStatus.REVOKED || revokeMutation.isPending}
                       onClick={() =>
                         setDeviceToRevoke({
@@ -93,9 +172,9 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
                           fingerprint: d.fingerprint,
                         })
                       }
-                      className="rounded border border-red-700/60 px-2 py-1 text-xs text-red-200 hover:bg-red-950/60 disabled:opacity-40"
+                      className="rounded-xl border border-rose-900/50 bg-[#381a1c]/80 px-5 py-1.5 text-xs font-medium text-rose-200 hover:bg-rose-900/60 hover:text-rose-100 transition-colors disabled:opacity-35 disabled:cursor-not-allowed shadow-sm"
                     >
-                      Revoke
+                      เพิกถอน
                     </button>
                   </td>
                 </tr>
@@ -103,7 +182,7 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
             </tbody>
           </table>
         </div>
-      ) : null}
+      )}
 
       {/* Confirmation Modal for Device Revocation */}
       <ConfirmModal

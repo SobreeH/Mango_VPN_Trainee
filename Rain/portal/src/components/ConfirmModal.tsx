@@ -39,9 +39,9 @@ export function ConfirmModal({
   if (!isOpen) return null;
 
   const confirmColors = {
-    danger: 'bg-red-600 hover:bg-red-500 text-white disabled:bg-red-800',
-    warning: 'bg-amber-500 hover:bg-amber-400 text-slate-950 disabled:bg-amber-700',
-    primary: 'bg-indigo-600 hover:bg-indigo-500 text-white disabled:bg-indigo-800',
+    danger: 'bg-rose-700 hover:bg-rose-600 text-white disabled:bg-rose-900',
+    warning: 'bg-[#f59e0b] hover:bg-[#d97706] text-stone-950 font-bold disabled:bg-amber-700',
+    primary: 'bg-[#f59e0b] hover:bg-[#d97706] text-stone-950 font-bold disabled:bg-amber-700',
   }[confirmVariant];
 
   return (
@@ -49,13 +49,13 @@ export function ConfirmModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#141311]/85 p-4 backdrop-blur-md animate-in fade-in duration-150"
     >
-      <div className="w-full max-w-md rounded-xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-4">
-        <h3 id="confirm-modal-title" className="text-base font-semibold text-slate-100">
+      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#1e1d1a] p-6 shadow-2xl space-y-4">
+        <h3 id="confirm-modal-title" className="text-base font-semibold text-stone-100">
           {title}
         </h3>
-        <div className="text-sm text-slate-300 leading-relaxed">
+        <div className="text-sm text-stone-300 leading-relaxed">
           {message}
         </div>
         <div className="flex justify-end gap-3 pt-2">
@@ -63,7 +63,7 @@ export function ConfirmModal({
             type="button"
             disabled={isLoading}
             onClick={onCancel}
-            className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+            className="rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-stone-300 hover:bg-white/5 disabled:opacity-50"
           >
             {cancelLabel}
           </button>
@@ -71,7 +71,7 @@ export function ConfirmModal({
             type="button"
             disabled={isLoading}
             onClick={onConfirm}
-            className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50 ${confirmColors}`}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50 ${confirmColors}`}
           >
             {isLoading ? 'Processing...' : confirmLabel}
           </button>

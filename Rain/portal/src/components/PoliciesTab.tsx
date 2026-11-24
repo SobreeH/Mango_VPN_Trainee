@@ -8,6 +8,7 @@ import {
 } from '@mango/shared';
 import type { AuthRefreshContext } from '../api/auth';
 import { createPolicy, deletePolicy, fetchPolicies } from '../lib/adminApi';
+import { ConfirmModal } from './ConfirmModal';
 
 interface PoliciesTabProps {
   apiBaseUrl: string;
@@ -24,6 +25,7 @@ export function PoliciesTab({ apiBaseUrl, accessToken, auth }: PoliciesTabProps)
   const [portRange, setPortRange] = useState('');
   const [action, setAction] = useState<PolicyAction>(PolicyAction.ALLOW);
   const [priority, setPriority] = useState('100');
+  const [pendingDeletePolicy, setPendingDeletePolicy] = useState<VpnPolicyDto | null>(null);
 
   const listQuery = useQuery({
     queryKey: ['policies', apiBaseUrl],
@@ -60,6 +62,7 @@ export function PoliciesTab({ apiBaseUrl, accessToken, auth }: PoliciesTabProps)
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deletePolicy(apiBaseUrl, accessToken, id, auth),
     onSuccess: () => {
+      setPendingDeletePolicy(null);
       void queryClient.invalidateQueries({ queryKey: ['policies', apiBaseUrl] });
     },
   });
@@ -245,7 +248,7 @@ export function PoliciesTab({ apiBaseUrl, accessToken, auth }: PoliciesTabProps)
               <button
                 type="button"
                 disabled={deleteMutation.isPending}
-                onClick={() => deleteMutation.mutate(pol.id)}
+                onClick={() => setPendingDeletePolicy(pol)}
                 className="rounded border border-rose-500/40 px-2.5 py-1 text-xs text-rose-300 hover:bg-rose-950/60 disabled:opacity-50"
               >
                 Delete
@@ -254,6 +257,28 @@ export function PoliciesTab({ apiBaseUrl, accessToken, auth }: PoliciesTabProps)
           ))}
         </div>
       ) : null}
+
+      <ConfirmModal
+        isOpen={pendingDeletePolicy !== null}
+        title="Delete Security Policy"
+        message={
+          <p>
+            Are you sure you want to delete policy{' '}
+            <strong className="text-slate-100">{pendingDeletePolicy?.name}</strong> (
+            {pendingDeletePolicy?.role} {pendingDeletePolicy?.action} {pendingDeletePolicy?.targetCidr}
+            )? This rule will be immediately removed from the zero-trust firewall.
+          </p>
+        }
+        confirmLabel="Delete Policy"
+        confirmVariant="danger"
+        isLoading={deleteMutation.isPending}
+        onConfirm={() => {
+          if (pendingDeletePolicy) {
+            deleteMutation.mutate(pendingDeletePolicy.id);
+          }
+        }}
+        onCancel={() => setPendingDeletePolicy(null)}
+      />
     </section>
   );
 }
