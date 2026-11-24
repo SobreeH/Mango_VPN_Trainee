@@ -279,8 +279,20 @@ const server = http.createServer(async (req, res) => {
         // ignore
       }
 
-      const activeFingerprint = DEVICE_FINGERPRINT + portSuffix;
-      const activeHostname = HOSTNAME + (portSuffix ? portSuffix : '');
+      // Support user role hint in dev mode to allow multi-user demo on a single link/port
+      const userHint = (
+        req.headers['x-mango-dev-user'] ||
+        body.userHint ||
+        ''
+      )
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, '');
+
+      const userSuffix = userHint ? `-${userHint}` : portSuffix;
+      const activeFingerprint = DEVICE_FINGERPRINT + userSuffix;
+      const activeHostname = HOSTNAME + (userSuffix ? userSuffix : '');
 
       agentState.publicKey = generateX25519PublicKeyB64();
       agentState.deviceFingerprint = activeFingerprint;

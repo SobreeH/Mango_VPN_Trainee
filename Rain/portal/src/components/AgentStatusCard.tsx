@@ -161,7 +161,7 @@ export function AgentStatusCard({ accessToken, userRole, auth }: AgentStatusCard
     setIsTunnelBusy(true);
     try {
       const { ticket } = await requestConnectTicket(accessToken, auth);
-      const res = await connectAgent(pairingToken.trim(), ticket);
+      const res = await connectAgent(pairingToken.trim(), ticket, userRole?.toLowerCase());
       setView({
         ...view,
         status: {

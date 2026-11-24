@@ -87,14 +87,19 @@ export async function requestConnectTicket(
 export async function connectAgent(
   pairingToken: string,
   ticket: string,
+  userHint?: string,
 ): Promise<AgentConnectResponse> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Mango-Agent-Token': pairingToken,
+  };
+  if (userHint) {
+    headers['X-Mango-Dev-User'] = userHint;
+  }
   const res = await fetch(`${getAgentBaseUrl()}/connect`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Mango-Agent-Token': pairingToken,
-    },
-    body: JSON.stringify({ ticket }),
+    headers,
+    body: JSON.stringify({ ticket, userHint }),
   });
   if (!res.ok) {
     throw await parseAgentError(res, `Agent connect failed (${res.status})`);
