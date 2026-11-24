@@ -29,6 +29,7 @@ export function AgentStatusCard({ accessToken, userRole, auth }: AgentStatusCard
   const [isPairing, setIsPairing] = useState(false);
   const [isTunnelBusy, setIsTunnelBusy] = useState(false);
   const [tunnelError, setTunnelError] = useState<string | null>(null);
+  const [disconnectMessage, setDisconnectMessage] = useState<string | null>(null);
 
   const probeAgent = useCallback(async (tokenToCheck?: string) => {
     setView({ kind: 'checking' });
@@ -102,6 +103,7 @@ export function AgentStatusCard({ accessToken, userRole, auth }: AgentStatusCard
   async function handleConnectVpn() {
     if (view.kind !== 'paired' || !accessToken) return;
     setTunnelError(null);
+    setDisconnectMessage(null);
     setIsTunnelBusy(true);
     try {
       const { ticket } = await requestConnectTicket(accessToken, auth);
@@ -130,9 +132,11 @@ export function AgentStatusCard({ accessToken, userRole, auth }: AgentStatusCard
   async function handleDisconnectVpn() {
     if (view.kind !== 'paired') return;
     setTunnelError(null);
+    setDisconnectMessage(null);
     setIsTunnelBusy(true);
     try {
       const res = await disconnectAgent(pairingToken.trim());
+      setDisconnectMessage('ตัดการเชื่อมต่อ VPN เรียบร้อยแล้ว (Disconnected safely)');
       setView({
         ...view,
         status: {
@@ -287,7 +291,9 @@ export function AgentStatusCard({ accessToken, userRole, auth }: AgentStatusCard
                       ? (view.status.connectedSince
                           ? `เชื่อมต่อเมื่อ ${new Date(view.status.connectedSince).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · อุโมงค์ WireGuard ทำงานปกติ`
                           : 'เชื่อมต่อแล้ว · อุโมงค์ WireGuard ทำงานปกติ')
-                      : 'กดปุ่มด้านขวาเพื่อเริ่มการเชื่อมต่อเครือข่ายความปลอดภัย'}
+                      : disconnectMessage
+                        ? `${disconnectMessage} · กดปุ่มด้านขวาเพื่อเริ่มการเชื่อมต่อใหม่`
+                        : 'กดปุ่มด้านขวาเพื่อเริ่มการเชื่อมต่อเครือข่ายความปลอดภัย'}
                   </p>
                 </div>
               </div>
