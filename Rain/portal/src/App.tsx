@@ -54,20 +54,58 @@ type AuthStep =
   | { kind: 'mfa'; challenge: LoginResponse }
   | { kind: 'authenticated'; session: AuthTokensResponse };
 
-export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppProps) {
-  const [step, setStep] = useState<AuthStep>(
-    initialSession
-      ? {
-          kind: 'authenticated',
-          session: {
-            accessToken: initialSession.accessToken,
-            refreshToken: initialSession.refreshToken ?? '',
-            expiresIn: 900,
-            user: initialSession.user,
-          },
+const SESSION_STORAGE_KEY = 'mango_vpn_auth_session';
+
+function getStoredSession(): AuthTokensResponse | null {
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      const data = sessionStorage.getItem(SESSION_STORAGE_KEY);
+      if (data) {
+        const parsed = JSON.parse(data) as AuthTokensResponse;
+        if (parsed?.accessToken && parsed?.user) {
+          return parsed;
         }
-      : { kind: 'login' },
-  );
+      }
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return null;
+}
+
+function saveStoredSession(session: AuthTokensResponse | null): void {
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      if (session) {
+        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+      } else {
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      }
+    }
+  } catch {
+    // ignore storage errors
+  }
+}
+
+export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppProps) {
+  const [step, setStep] = useState<AuthStep>(() => {
+    if (initialSession) {
+      return {
+        kind: 'authenticated',
+        session: {
+          accessToken: initialSession.accessToken,
+          refreshToken: initialSession.refreshToken ?? '',
+          expiresIn: 900,
+          user: initialSession.user,
+        },
+      };
+    }
+    const stored = getStoredSession();
+    if (stored) {
+      return { kind: 'authenticated', session: stored };
+    }
+    return { kind: 'login' };
+  });
   const [activeTab, setActiveTab] = useState<AdminTab>('audit-logs');
   const [clientTab, setClientTab] = useState<'connection' | 'profile' | 'help'>('connection');
   const [username, setUsername] = useState('');
@@ -168,6 +206,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
       });
       setPassword('');
       setOtpCode('');
+      saveStoredSession(session);
       setStep({ kind: 'authenticated', session });
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'OTP verification failed');
@@ -177,6 +216,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
   }
 
   function clearLocalSession(nextError: string | null = null) {
+    saveStoredSession(null);
     setUsername('');
     setPassword('');
     setOtpCode('');
@@ -201,7 +241,10 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
       ? {
           refreshToken: step.session.refreshToken,
           apiBaseUrl,
-          onSessionUpdate: (newSession) => setStep({ kind: 'authenticated', session: newSession }),
+          onSessionUpdate: (newSession) => {
+            saveStoredSession(newSession);
+            setStep({ kind: 'authenticated', session: newSession });
+          },
           onAuthExpired: (message) => {
             clearLocalSession(
               message ||
