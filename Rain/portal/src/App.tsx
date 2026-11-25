@@ -12,6 +12,7 @@ import {
   Laptop,
   Eye,
   EyeOff,
+  ChevronDown,
   ShieldCheck,
   Activity,
   HelpCircle,
@@ -140,6 +141,15 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showSetupKey, setShowSetupKey] = useState(false);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    monitoring: true,
+    management: true,
+    audit: true,
+  });
+
+  const toggleSidebarGroup = (groupKey: string) => {
+    setOpenGroups((prev) => ({ ...prev, [groupKey]: !prev[groupKey] }));
+  };
 
   useEffect(() => {
     try {
@@ -332,111 +342,92 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                   </div>
                 </div>
 
-                {/* Navigation Groups */}
-                <nav role="tablist" aria-label="Admin Governance" className="space-y-6">
-                  {/* Group 1: Management (จัดการ) */}
-                  <div className="space-y-1">
-                    <p className={`text-xs font-semibold px-3 pb-1 tracking-wide ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
-                      {lang === 'th' ? 'จัดการ' : 'Management'}
-                    </p>
-                    {[
-                      { id: 'users', labelTh: 'ผู้ใช้', labelEn: 'Users' },
-                      { id: 'devices', labelTh: 'อุปกรณ์', labelEn: 'Devices' },
-                      { id: 'policies', labelTh: 'นโยบาย', labelEn: 'Policies' },
-                      { id: 'gateways', labelTh: 'เกตเวย์', labelEn: 'Gateways' },
-                    ].map((item) => {
-                      const isActive = activeTab === item.id;
-                      return (
+                {/* Collapsible & Ordered Navigation Groups */}
+                <nav role="tablist" aria-label="Admin Governance" className="space-y-4">
+                  {[
+                    {
+                      key: 'monitoring',
+                      titleTh: '1. การเชื่อมต่อ & ติดตามสด',
+                      titleEn: '1. VPN & Live Monitoring',
+                      items: [
+                        { id: 'vpn-connect', labelTh: 'เชื่อมต่อ VPN', labelEn: 'VPN Connect' },
+                        { id: 'sessions', labelTh: 'เซสชัน', labelEn: 'Sessions' },
+                      ],
+                    },
+                    {
+                      key: 'management',
+                      titleTh: '2. จัดการสิทธิ์ & เครือข่าย',
+                      titleEn: '2. Management',
+                      items: [
+                        { id: 'users', labelTh: 'ผู้ใช้', labelEn: 'Users' },
+                        { id: 'devices', labelTh: 'อุปกรณ์', labelEn: 'Devices' },
+                        { id: 'policies', labelTh: 'นโยบาย', labelEn: 'Policies' },
+                        { id: 'gateways', labelTh: 'เกตเวย์', labelEn: 'Gateways' },
+                      ],
+                    },
+                    {
+                      key: 'audit',
+                      titleTh: '3. ตรวจสอบ & ระบบ',
+                      titleEn: '3. Audit & System',
+                      items: [
+                        { id: 'audit-logs', labelTh: 'บันทึกการใช้งาน', labelEn: 'Audit Logs' },
+                        { id: 'agent-versions', labelTh: 'เวอร์ชัน Agent', labelEn: 'Agent Versions' },
+                      ],
+                    },
+                  ].map((group) => {
+                    const isOpen = openGroups[group.key] ?? true;
+                    return (
+                      <div key={group.key} className="space-y-1">
                         <button
-                          key={item.id}
                           type="button"
-                          role="tab"
-                          aria-label={item.labelEn}
-                          aria-selected={isActive}
-                          onClick={() => setActiveTab(item.id as AdminTab)}
-                          className={`w-full flex items-center px-4 py-2.5 rounded-xl text-xs sm:text-sm transition-all text-left ${
-                            isActive
-                              ? isDark
-                                ? 'bg-[#7a4918]/85 text-amber-100 font-semibold shadow-sm'
-                                : 'bg-[#f59e0b] text-stone-950 font-semibold shadow-sm'
-                              : isDark
-                                ? 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40 font-medium'
-                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium'
+                          aria-expanded={isOpen}
+                          aria-label={group.titleEn}
+                          onClick={() => toggleSidebarGroup(group.key)}
+                          className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
+                            isDark
+                              ? 'text-stone-400 hover:text-stone-200 hover:bg-white/5'
+                              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                           }`}
                         >
-                          <span>{lang === 'th' ? item.labelTh : item.labelEn}</span>
+                          <span>{lang === 'th' ? group.titleTh : group.titleEn}</span>
+                          <ChevronDown
+                            className={`h-3.5 w-3.5 transition-transform duration-200 ${
+                              isOpen ? 'rotate-0' : '-rotate-90'
+                            }`}
+                          />
                         </button>
-                      );
-                    })}
-                  </div>
 
-                  {/* Group 2: Live Monitoring (ติดตามสด) */}
-                  <div className="space-y-1">
-                    <p className={`text-xs font-semibold px-3 pb-1 tracking-wide ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
-                      {lang === 'th' ? 'ติดตามสด' : 'Live Monitoring'}
-                    </p>
-                    {[
-                      { id: 'sessions', labelTh: 'เซสชัน', labelEn: 'Sessions' },
-                      { id: 'vpn-connect', labelTh: 'เชื่อมต่อ VPN', labelEn: 'VPN Connect' },
-                    ].map((item) => {
-                      const isActive = activeTab === item.id;
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          role="tab"
-                          aria-label={item.labelEn}
-                          aria-selected={isActive}
-                          onClick={() => setActiveTab(item.id as AdminTab)}
-                          className={`w-full flex items-center px-4 py-2.5 rounded-xl text-xs sm:text-sm transition-all text-left ${
-                            isActive
-                              ? isDark
-                                ? 'bg-[#7a4918]/85 text-amber-100 font-semibold shadow-sm'
-                                : 'bg-[#f59e0b] text-stone-950 font-semibold shadow-sm'
-                              : isDark
-                                ? 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40 font-medium'
-                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium'
-                          }`}
-                        >
-                          <span>{lang === 'th' ? item.labelTh : item.labelEn}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Group 3: Audit & System (ตรวจสอบ) */}
-                  <div className="space-y-1">
-                    <p className={`text-xs font-semibold px-3 pb-1 tracking-wide ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
-                      {lang === 'th' ? 'ตรวจสอบ' : 'Audit & System'}
-                    </p>
-                    {[
-                      { id: 'audit-logs', labelTh: 'บันทึกการใช้งาน', labelEn: 'Audit Logs' },
-                      { id: 'agent-versions', labelTh: 'เวอร์ชัน Agent', labelEn: 'Agent Versions' },
-                    ].map((item) => {
-                      const isActive = activeTab === item.id;
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          role="tab"
-                          aria-label={item.labelEn}
-                          aria-selected={isActive}
-                          onClick={() => setActiveTab(item.id as AdminTab)}
-                          className={`w-full flex items-center px-4 py-2.5 rounded-xl text-xs sm:text-sm transition-all text-left ${
-                            isActive
-                              ? isDark
-                                ? 'bg-[#7a4918]/85 text-amber-100 font-semibold shadow-sm'
-                                : 'bg-[#f59e0b] text-stone-950 font-semibold shadow-sm'
-                              : isDark
-                                ? 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40 font-medium'
-                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium'
-                          }`}
-                        >
-                          <span>{lang === 'th' ? item.labelTh : item.labelEn}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                        {isOpen && (
+                          <div className="space-y-1 pl-1">
+                            {group.items.map((item) => {
+                              const isActive = activeTab === item.id;
+                              return (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  role="tab"
+                                  aria-label={item.labelEn}
+                                  aria-selected={isActive}
+                                  onClick={() => setActiveTab(item.id as AdminTab)}
+                                  className={`w-full flex items-center px-4 py-2.5 rounded-xl text-xs sm:text-sm transition-all text-left ${
+                                    isActive
+                                      ? isDark
+                                        ? 'bg-[#7a4918]/85 text-amber-100 font-semibold shadow-sm'
+                                        : 'bg-[#f59e0b] text-stone-950 font-semibold shadow-sm'
+                                      : isDark
+                                        ? 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40 font-medium'
+                                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium'
+                                  }`}
+                                >
+                                  <span>{lang === 'th' ? item.labelTh : item.labelEn}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </nav>
               </div>
 

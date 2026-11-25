@@ -682,4 +682,34 @@ describe('Portal Admin Users, Devices & Sessions Tabs (fetch seam)', () => {
     expect(await screen.findByText('สร้างบัญชีผู้ใช้ใหม่')).toBeInTheDocument();
     expect(screen.queryByText(/Agent Reachable \(Unpaired\)/i)).not.toBeInTheDocument();
   });
+
+  it('allows collapsing and expanding Admin Sidebar category groups', async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/audit-logs')) {
+        return new Response(
+          JSON.stringify({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 1 }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response(JSON.stringify({ message: 'Not found' }), { status: 404 });
+    });
+
+    renderWithQuery(<App initialSession={adminSession} />);
+
+    // Management group starts expanded
+    const mgmtToggle = screen.getByRole('button', { name: /2\. Management/i });
+    expect(mgmtToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('tab', { name: /Users/i })).toBeInTheDocument();
+
+    // Collapse Management group -> Users tab is hidden
+    fireEvent.click(mgmtToggle);
+    expect(mgmtToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('tab', { name: /Users/i })).not.toBeInTheDocument();
+
+    // Expand Management group -> Users tab returns
+    fireEvent.click(mgmtToggle);
+    expect(mgmtToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('tab', { name: /Users/i })).toBeInTheDocument();
+  });
 });
