@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Activity, Download, ShieldAlert, Wifi } from 'lucide-react';
+import { Activity, Download, Filter, PowerOff, RefreshCw, Search, ShieldAlert, Wifi, X } from 'lucide-react';
 import { SessionStatus, VpnProviderType, type VpnSessionDto } from '@mango/shared';
 import type { AuthRefreshContext } from '../api/auth';
-import { disconnectSession, fetchSessions } from '../lib/adminApi';
+import { disconnectAllSessions, disconnectSession, fetchSessions } from '../lib/adminApi';
 import { useToast } from './Toast';
 import { ConfirmModal } from './ConfirmModal';
 
@@ -54,6 +54,9 @@ function exportSessionsToCsv(sessionsToExport: VpnSessionDto[]) {
 export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps) {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | SessionStatus>('ALL');
+  const [confirmTerminateAll, setConfirmTerminateAll] = useState(false);
   const [sessionToDisconnect, setSessionToDisconnect] = useState<{
     id: string;
     username: string;
@@ -84,39 +87,159 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps)
     },
   });
 
+  const disconnectAllMutation = useMutation({
+    mutationFn: () => disconnectAllSessions(apiBaseUrl, accessToken, auth),
+    onSuccess: (res) => {
+      showToast({
+        type: 'warning',
+        title: 'All Active Sessions Terminated',
+        message: `Disconnected ${res.disconnectedCount} active VPN session(s) across gateways.`,
+      });
+      setConfirmTerminateAll(false);
+      void queryClient.invalidateQueries({ queryKey: ['admin-sessions', apiBaseUrl] });
+    },
+    onError: (err) => {
+      showToast({
+        type: 'error',
+        title: 'Mass Termination Failed',
+        message: err instanceof Error ? err.message : 'Failed to disconnect all sessions',
+      });
+      setConfirmTerminateAll(false);
+    },
+  });
+
   const sessions: VpnSessionDto[] = listQuery.data?.items ?? [];
-  const activeError = listQuery.error ?? disconnectMutation.error ?? null;
+  const activeSessionsCount = sessions.filter((s) => s.status === SessionStatus.ACTIVE).length;
+  const activeError =
+    listQuery.error ?? disconnectMutation.error ?? disconnectAllMutation.error ?? null;
+
+  const filteredSessions = sessions.filter((s) => {
+    const term = searchTerm.toLowerCase().trim();
+    const matchesSearch =
+      term === '' ||
+      (s.username && s.username.toLowerCase().includes(term)) ||
+      s.userId.toLowerCase().includes(term) ||
+      (s.hostname && s.hostname.toLowerCase().includes(term)) ||
+      s.assignedIp.toLowerCase().includes(term) ||
+      (s.gatewayName && s.gatewayName.toLowerCase().includes(term)) ||
+      (s.providerType && s.providerType.toLowerCase().includes(term));
+
+    const matchesStatus = statusFilter === 'ALL' || s.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   return (
     <section aria-label="Sessions" className="space-y-6">
-      {/* Header Card with Export CSV */}
-      <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-6 backdrop-blur-xl shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {/* Header Card with Export CSV & Emergency Terminate All */}
+      <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-6 backdrop-blur-xl shadow-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-2xl bg-amber-500/10 text-amber-400">
             <Wifi className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-stone-100">Active & Historical VPN Sessions</h2>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-sm font-bold text-stone-100">Active & Historical VPN Sessions</h2>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 text-[11px] font-mono font-semibold text-emerald-400">
+                {activeSessionsCount > 0 && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                )}
+                {activeSessionsCount} Active
+              </span>
+            </div>
             <p className="text-[11px] text-stone-400">Live WireGuard cryptographic tunnels and real-time IPAM tracking</p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            exportSessionsToCsv(sessions);
-            showToast({
-              type: 'success',
-              title: 'Report Downloaded',
-              message: `Exported ${sessions.length} VPN session records to CSV.`,
-            });
-          }}
-          disabled={sessions.length === 0}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 px-4 py-2 text-xs font-semibold shadow-sm transition-all disabled:opacity-40"
-        >
-          <Download className="h-3.5 w-3.5" />
-          <span>Export CSV</span>
-        </button>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => void listQuery.refetch()}
+            disabled={listQuery.isFetching}
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-[#262420] px-3.5 py-2 text-xs font-medium text-stone-200 hover:border-amber-500/40 hover:text-amber-300 transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${listQuery.isFetching ? 'animate-spin text-amber-400' : ''}`} />
+            <span>Refresh</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              exportSessionsToCsv(filteredSessions);
+              showToast({
+                type: 'success',
+                title: 'Report Downloaded',
+                message: `Exported ${filteredSessions.length} VPN session records to CSV.`,
+              });
+            }}
+            disabled={filteredSessions.length === 0}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 px-4 py-2 text-xs font-semibold shadow-sm transition-all disabled:opacity-40"
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span>Export CSV</span>
+          </button>
+
+          <button
+            type="button"
+            disabled={activeSessionsCount === 0 || disconnectAllMutation.isPending}
+            onClick={() => setConfirmTerminateAll(true)}
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-500/40 bg-rose-950/60 hover:bg-rose-900/70 text-rose-200 px-4 py-2 text-xs font-bold shadow-sm transition-all disabled:opacity-35 disabled:cursor-not-allowed"
+          >
+            <PowerOff className="h-3.5 w-3.5 text-rose-400" />
+            <span>Terminate All Active</span>
+          </button>
+        </div>
       </div>
+
+      {/* Quick Search & Status Filter Bar */}
+      {sessions.length > 0 && (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-4 sm:p-5 shadow-xl backdrop-blur-xl">
+          <div className="flex-1 flex items-center gap-3">
+            <div className="relative flex-1 sm:max-w-xs">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-stone-500" />
+              <input
+                type="text"
+                aria-label="Search sessions"
+                placeholder="Search by user, device, IP..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full h-10 rounded-xl border border-white/10 bg-[#262420]/70 pl-9 pr-8 text-xs text-stone-100 placeholder-stone-500 focus:border-amber-400 focus:outline-none transition-colors"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  aria-label="Clear search"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-300"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+            <span className="text-[11px] font-mono text-stone-400 bg-white/5 px-2.5 py-1.5 rounded-lg border border-white/5 whitespace-nowrap">
+              {filteredSessions.length} / {sessions.length} Sessions
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label htmlFor="filter-session-status" className="text-xs text-stone-400 flex items-center gap-1">
+              <Filter className="h-3 w-3 text-stone-500" />
+              Status:
+            </label>
+            <select
+              id="filter-session-status"
+              aria-label="Filter session status"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as 'ALL' | SessionStatus)}
+              className="h-10 rounded-xl border border-white/10 bg-[#262420]/70 px-3 text-xs text-stone-100 focus:border-amber-400 focus:outline-none cursor-pointer"
+            >
+              <option value="ALL">All Statuses</option>
+              <option value={SessionStatus.ACTIVE}>ACTIVE</option>
+              <option value={SessionStatus.DISCONNECTED}>DISCONNECTED</option>
+              <option value={SessionStatus.EXPIRED}>EXPIRED</option>
+            </select>
+          </div>
+        </div>
+      )}
 
       {activeError && (
         <div
@@ -138,7 +261,22 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps)
           <p className="text-stone-300 font-medium">No VPN sessions found.</p>
           <p className="text-[11px] text-stone-500">Connected peers and tunnel states will appear here in real-time.</p>
         </div>
-      ) : sessions.length > 0 ? (
+      ) : sessions.length > 0 && filteredSessions.length === 0 ? (
+        <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-8 text-center text-xs text-stone-400 shadow-xl space-y-3">
+          <ShieldAlert className="h-7 w-7 text-stone-500 mx-auto" />
+          <p className="text-stone-300 font-medium">No sessions match your search or filter.</p>
+          <button
+            type="button"
+            onClick={() => {
+              setSearchTerm('');
+              setStatusFilter('ALL');
+            }}
+            className="rounded-xl border border-white/10 bg-[#262420] px-4 py-2 text-xs font-semibold text-amber-400 hover:bg-[#2e2a24] transition-colors"
+          >
+            Clear Filters
+          </button>
+        </div>
+      ) : filteredSessions.length > 0 ? (
         <div className="overflow-hidden rounded-3xl border border-white/5 bg-[#1e1d1a]/85 shadow-2xl backdrop-blur-xl">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -152,7 +290,7 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps)
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {sessions.map((s) => {
+                {filteredSessions.map((s) => {
                   const provider = s.providerType ?? VpnProviderType.WIREGUARD;
                   const providerBadgeClass =
                     provider === VpnProviderType.FORTINET
@@ -244,6 +382,29 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps)
           }
         }}
         onCancel={() => setSessionToDisconnect(null)}
+      />
+
+      {/* Confirmation Modal for Emergency Terminate All Active Sessions */}
+      <ConfirmModal
+        isOpen={confirmTerminateAll}
+        title="Terminate All Active VPN Sessions"
+        message={
+          <div className="space-y-2 text-stone-300">
+            <p>
+              Are you sure you want to immediately terminate all{' '}
+              <strong className="text-rose-400">{activeSessionsCount} active VPN session(s)</strong>?
+            </p>
+            <p className="text-xs text-amber-400 font-medium pt-1">
+              ⚠️ All active peers across connected gateways will be torn down immediately, severing
+              network access for all currently connected users.
+            </p>
+          </div>
+        }
+        confirmLabel="Terminate All Sessions"
+        confirmVariant="danger"
+        isLoading={disconnectAllMutation.isPending}
+        onConfirm={() => disconnectAllMutation.mutate()}
+        onCancel={() => setConfirmTerminateAll(false)}
       />
     </section>
   );

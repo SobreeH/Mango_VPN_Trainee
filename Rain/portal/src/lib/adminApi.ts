@@ -11,6 +11,7 @@ import type {
   DeletePolicyResponse,
   DeviceDto,
   DeviceListResponse,
+  DisconnectAllSessionsResponse,
   UpdateAgentVersionRequest,
   UpdateUserStatusRequest,
   UpdateVpnGatewayRequest,
@@ -222,6 +223,22 @@ export function disconnectSession(
 ): Promise<VpnSessionDto> {
   return requestJson<VpnSessionDto>(
     `${apiBaseUrl}/api/sessions/${encodeURIComponent(id)}/disconnect`,
+    accessToken,
+    {
+      method: 'POST',
+      body: JSON.stringify({}),
+    },
+    auth,
+  );
+}
+
+export function disconnectAllSessions(
+  apiBaseUrl: string,
+  accessToken: string,
+  auth?: AuthRefreshContext,
+): Promise<DisconnectAllSessionsResponse> {
+  return requestJson<DisconnectAllSessionsResponse>(
+    `${apiBaseUrl}/api/sessions/disconnect-all`,
     accessToken,
     {
       method: 'POST',

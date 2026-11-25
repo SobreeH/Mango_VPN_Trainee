@@ -3,6 +3,7 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 import {
   SessionStatus,
   VpnProviderType,
+  type DisconnectAllSessionsResponse,
   type VpnSessionDto,
   type VpnSessionListResponse,
 } from '@mango/shared';
@@ -164,5 +165,77 @@ export function registerSessionRoutes(
     });
 
     return reply.status(200).send(toSessionDto(updated));
+  });
+
+  app.post('/sessions/disconnect-all', async (request, reply) => {
+    const activeSessions = await prisma.vpnSession.findMany({
+      where: { status: SessionStatus.ACTIVE },
+      include: { peer: true },
+    });
+
+    if (activeSessions.length === 0) {
+      const response: DisconnectAllSessionsResponse = {
+        success: true,
+        disconnectedCount: 0,
+      };
+      return reply.status(200).send(response);
+    }
+
+    try {
+      await teardownPeersOnDaemon(
+        vpnDaemon,
+        activeSessions.map((s) => ({
+          publicKey: s.peer.publicKey,
+          peerIdentity: s.peer.peerIdentity,
+          providerType: s.providerType,
+          gatewayId: s.gatewayId,
+        })),
+      );
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : 'VPN daemon failed to remove peers';
+      return reply.status(502).send({
+        statusCode: 502,
+        error: 'Bad Gateway',
+        message: `VPN daemon failed: ${reason}`,
+      });
+    }
+
+    const activeIds = activeSessions.map((s) => s.id);
+    const peerIds = [...new Set(activeSessions.map((s) => s.peerId))];
+    const now = new Date();
+
+    const disconnectedCount = await prisma.$transaction(async (tx) => {
+      const updated = await tx.vpnSession.updateMany({
+        where: { id: { in: activeIds }, status: SessionStatus.ACTIVE },
+        data: { status: SessionStatus.DISCONNECTED, disconnectedAt: now },
+      });
+
+      await tx.vpnPeer.updateMany({
+        where: { id: { in: peerIds }, isActive: true },
+        data: { isActive: false },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          actorUserId: request.authUser?.id ?? null,
+          action: 'SESSION_FORCE_DISCONNECTED_ALL',
+          targetType: 'VpnSession',
+          targetId: null,
+          ipAddress: request.ip,
+          metadata: {
+            disconnectedCount: updated.count,
+            sessionIds: activeIds,
+          },
+        },
+      });
+
+      return updated.count;
+    });
+
+    const response: DisconnectAllSessionsResponse = {
+      success: true,
+      disconnectedCount,
+    };
+    return reply.status(200).send(response);
   });
 }
