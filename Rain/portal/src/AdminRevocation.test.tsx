@@ -31,11 +31,15 @@ describe('Portal Admin Users, Devices & Sessions Tabs (fetch seam)', () => {
   beforeEach(() => {
     fetchMock.mockReset();
     vi.stubGlobal('fetch', fetchMock);
+    try { window.localStorage?.clear?.(); } catch {}
+    try { window.sessionStorage?.clear?.(); } catch {}
   });
 
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    try { window.localStorage?.clear?.(); } catch {}
+    try { window.sessionStorage?.clear?.(); } catch {}
   });
 
   it('does not render Users, Devices, or Sessions tabs for STAFF or CLIENT', () => {
