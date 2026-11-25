@@ -12,7 +12,6 @@ import {
   Laptop,
   Eye,
   EyeOff,
-  Power,
   ShieldCheck,
   Activity,
   HelpCircle,
@@ -50,7 +49,8 @@ type AdminTab =
   | 'devices'
   | 'sessions'
   | 'policies'
-  | 'gateways';
+  | 'gateways'
+  | 'vpn-connect';
 
 const loginSchema = z.object({
   username: z.string().trim().min(1, 'Username is required'),
@@ -140,7 +140,6 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showSetupKey, setShowSetupKey] = useState(false);
-  const [showVpnPanel, setShowVpnPanel] = useState(false);
 
   useEffect(() => {
     try {
@@ -378,6 +377,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                     </p>
                     {[
                       { id: 'sessions', labelTh: 'เซสชัน', labelEn: 'Sessions' },
+                      { id: 'vpn-connect', labelTh: 'เชื่อมต่อ VPN', labelEn: 'VPN Connect' },
                     ].map((item) => {
                       const isActive = activeTab === item.id;
                       return (
@@ -472,6 +472,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                     {activeTab === 'policies' && (lang === 'th' ? 'นโยบาย' : 'Policies')}
                     {activeTab === 'gateways' && (lang === 'th' ? 'เกตเวย์' : 'Gateways')}
                     {activeTab === 'sessions' && (lang === 'th' ? 'เซสชัน' : 'Sessions')}
+                    {activeTab === 'vpn-connect' && (lang === 'th' ? 'เชื่อมต่อ VPN' : 'VPN Connect')}
                     {activeTab === 'audit-logs' && (lang === 'th' ? 'บันทึกการใช้งาน' : 'Audit Logs')}
                     {activeTab === 'agent-versions' && (lang === 'th' ? 'เวอร์ชัน Agent' : 'Agent Versions')}
                   </h2>
@@ -479,23 +480,6 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
 
                 {/* Top Right Utility Controls matching Reference Mockup */}
                 <div className="flex items-center gap-3">
-                  {/* Collapsible VPN Toggle Button */}
-                  <button
-                    type="button"
-                    onClick={() => setShowVpnPanel(!showVpnPanel)}
-                    title={lang === 'th' ? 'แผงควบคุม VPN' : 'VPN Control Panel'}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold border transition-all ${
-                      showVpnPanel
-                        ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
-                        : isDark
-                          ? 'border-white/5 bg-[#262420]/70 text-stone-400 hover:text-stone-200'
-                          : 'border-stone-300 bg-stone-100 text-stone-700 hover:bg-stone-200'
-                    }`}
-                  >
-                    <Power className="h-3 w-3 text-amber-400" />
-                    <span className="hidden sm:inline">{lang === 'th' ? 'VPN' : 'VPN'}</span>
-                  </button>
-
                   {/* Language Switcher Pills */}
                   <div className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
                     isDark ? 'bg-[#1e1d1a]/85 border-white/5' : 'bg-white border-stone-200'
@@ -560,7 +544,8 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                 </div>
               </header>
 
-              {/* Admin Overview KPI Summary Cards */}
+              {/* Admin Overview KPI Summary Cards (hidden on VPN Connect tab for clean layout) */}
+              {activeTab !== 'vpn-connect' && (
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
                 {/* Total Users */}
                 <div className={`p-4 rounded-3xl border transition-all ${
@@ -654,19 +639,18 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                   </p>
                 </div>
               </div>
-
-              {/* Collapsible VPN Agent Status Card for Admin */}
-              <div className={`transition-all duration-300 ${showVpnPanel ? 'block pb-2' : 'hidden'}`}>
-                <AgentStatusCard
-                  accessToken={step.session.accessToken}
-                  userRole={step.session.user.role}
-                  username={step.session.user.username}
-                  auth={authContext}
-                />
-              </div>
+              )}
 
               {/* Active Tab View */}
               <div>
+                {activeTab === 'vpn-connect' && (
+                  <AgentStatusCard
+                    accessToken={step.session.accessToken}
+                    userRole={step.session.user.role}
+                    username={step.session.user.username}
+                    auth={authContext}
+                  />
+                )}
                 {activeTab === 'audit-logs' && (
                   <AuditLogsTab
                     apiBaseUrl={apiBaseUrl}

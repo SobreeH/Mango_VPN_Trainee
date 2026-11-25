@@ -638,4 +638,48 @@ describe('Portal Admin Users, Devices & Sessions Tabs (fetch seam)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Light mode/i }));
     expect(document.documentElement.classList.contains('dark')).toBe(false);
   });
+
+  it('renders VPN Connect inside Admin Sidebar and hides AgentStatusCard when switching to another tab', async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/audit-logs')) {
+        return new Response(
+          JSON.stringify({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 1 }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (url.includes('127.0.0.1:47821/health')) {
+        return new Response(
+          JSON.stringify({
+            status: 'ok',
+            service: 'mango-agent-windows',
+            version: '2.0.0',
+            tunnelActive: false,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (url.endsWith('/api/users')) {
+        return new Response(JSON.stringify({ items: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify({ message: 'Not found' }), { status: 404 });
+    });
+
+    renderWithQuery(<App initialSession={adminSession} />);
+
+    // Top-right floating VPN button should no longer exist
+    expect(screen.queryByTitle(/VPN Control Panel/i)).not.toBeInTheDocument();
+
+    // Open VPN Connect from Sidebar
+    fireEvent.click(screen.getByRole('tab', { name: /VPN Connect/i }));
+    expect(await screen.findByText(/Agent Reachable \(Unpaired\)/i)).toBeInTheDocument();
+
+    // Switch to Users tab -> VPN panel should disappear
+    fireEvent.click(screen.getByRole('tab', { name: /Users/i }));
+    expect(await screen.findByText('สร้างบัญชีผู้ใช้ใหม่')).toBeInTheDocument();
+    expect(screen.queryByText(/Agent Reachable \(Unpaired\)/i)).not.toBeInTheDocument();
+  });
 });
