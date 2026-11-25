@@ -431,4 +431,76 @@ describe('Portal Admin Users, Devices & Sessions Tabs (fetch seam)', () => {
 
     expect(await screen.findByText('HQ FortiGate')).toBeInTheDocument();
   });
+
+  it('supports inspecting full device details, OS badges, summary counts, and filtering in Devices tab', async () => {
+    const devices = [
+      {
+        id: 'dev-mac-1',
+        userId: 'u-1',
+        username: 'alice.staff',
+        hostname: 'Alice-MacBook-Pro',
+        fingerprint: 'fp-macos-1234567890abcdef',
+        status: DeviceStatus.ACTIVE,
+        lastSeenAt: '2026-11-24T08:30:00.000Z',
+        createdAt: '2026-11-20T02:00:00.000Z',
+      },
+      {
+        id: 'dev-lin-2',
+        userId: 'u-2',
+        username: 'bob.client',
+        hostname: 'ubuntu-ops-server',
+        fingerprint: 'fp-linux-abcdef1234567890',
+        status: DeviceStatus.REVOKED,
+        lastSeenAt: null,
+        createdAt: '2026-11-21T04:00:00.000Z',
+      },
+    ];
+
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/audit-logs')) {
+        return new Response(
+          JSON.stringify({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 1 }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (url.endsWith('/api/devices')) {
+        return new Response(JSON.stringify({ items: devices }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify({ message: 'Not found' }), { status: 404 });
+    });
+
+    renderWithQuery(<App initialSession={adminSession} />);
+
+    fireEvent.click(screen.getByRole('tab', { name: /Devices/i }));
+    expect(await screen.findByText('Alice-MacBook-Pro')).toBeInTheDocument();
+    expect(screen.getByText('ubuntu-ops-server')).toBeInTheDocument();
+    expect(screen.getByText('ทั้งหมด 2 เครื่อง')).toBeInTheDocument();
+    expect(screen.getByText('macOS')).toBeInTheDocument();
+    expect(screen.getByText('Linux / Server')).toBeInTheDocument();
+
+    // Search by hostname
+    fireEvent.change(screen.getByLabelText(/Search devices/i), { target: { value: 'MacBook' } });
+    expect(screen.getByText('Alice-MacBook-Pro')).toBeInTheDocument();
+    expect(screen.queryByText('ubuntu-ops-server')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText(/Clear search/i));
+    expect(screen.getByText('ubuntu-ops-server')).toBeInTheDocument();
+
+    // Open Inspect modal for Alice-MacBook-Pro
+    const inspectBtns = screen.getAllByRole('button', { name: /Inspect device/i });
+    fireEvent.click(inspectBtns[0]!);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('fp-macos-1234567890abcdef');
+    expect(dialog).toHaveTextContent('dev-mac-1');
+
+    // Close Inspect modal
+    fireEvent.click(screen.getByRole('button', { name: /Close inspect modal/i }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+  });
 });
