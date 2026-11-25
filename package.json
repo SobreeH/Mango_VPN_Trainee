@@ -10,6 +10,7 @@
   ],
   "scripts": {
     "check:env": "node scripts/check-environment.mjs",
+    "env:init": "node scripts/init-env.mjs",
     "dev:api": "npm --workspace=@mango/api run dev",
     "dev:portal": "npm --workspace=@mango/portal run dev",
     "dev:portal:admin": "npm --workspace=@mango/portal run dev:admin",
