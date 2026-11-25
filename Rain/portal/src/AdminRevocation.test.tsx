@@ -601,4 +601,37 @@ describe('Portal Admin Users, Devices & Sessions Tabs (fetch seam)', () => {
       expect(screen.getByText('0 Active')).toBeInTheDocument();
     });
   });
+
+  it('switches Admin tabs between TH/EN language and Light/Dark themes', async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/audit-logs')) {
+        return new Response(
+          JSON.stringify({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 1 }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (url.endsWith('/api/users')) {
+        return new Response(JSON.stringify({ items: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify({ message: 'Not found' }), { status: 404 });
+    });
+
+    renderWithQuery(<App initialSession={adminSession} />);
+
+    // Switch to Users tab (defaults to TH)
+    fireEvent.click(screen.getByRole('tab', { name: /Users/i }));
+    expect(await screen.findByText('สร้างบัญชีผู้ใช้ใหม่')).toBeInTheDocument();
+
+    // Switch language to EN
+    fireEvent.click(screen.getByRole('button', { name: /^EN$/i }));
+    expect(await screen.findByRole('heading', { name: 'Create User' })).toBeInTheDocument();
+
+    // Switch theme to Light mode
+    fireEvent.click(screen.getByRole('button', { name: /Light mode/i }));
+    expect(document.documentElement.classList.contains('dark')).toBe(false);
+  });
 });
