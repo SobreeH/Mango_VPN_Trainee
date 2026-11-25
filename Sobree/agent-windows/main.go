@@ -28,29 +28,50 @@ const (
 	defaultVersion     = "2.0.0"
 	defaultApiBaseURL  = "http://localhost:4000"
 	tunnelIfaceName    = "mango0"
+
+	ProviderWireGuard = "WIREGUARD"
+	ProviderFortinet  = "FORTINET"
+	ProviderCisco     = "CISCO"
 )
 
-// TunnelConfig holds the WireGuard interface configuration applied by WireGuardRunner.
+// TunnelConfig holds the tunnel configuration applied by TunnelRunner / WireGuardRunner.
 type TunnelConfig struct {
-	InterfaceName   string
-	PrivateKeyB64   string
-	AssignedIP      string
-	ServerPublicKey string
-	ServerEndpoint  string
-	AllowedIPs      []string
-	DNS             []string
+	ProviderType     string
+	InterfaceName    string
+	PrivateKeyB64    string
+	AssignedIP       string
+	ServerPublicKey  string
+	ServerEndpoint   string
+	AllowedIPs       []string
+	DNS              []string
+	Username         string
+	EphemeralSecret  string
+	AuthGroup        string
+	ServerCertDigest string
 }
 
-// WireGuardRunner abstracts local WireGuard tunnel activation/teardown (wireguard.exe / WinTun).
+// WireGuardRunner abstracts local tunnel activation/teardown (WireGuard, Fortinet, Cisco).
 type WireGuardRunner interface {
 	Activate(ctx context.Context, cfg TunnelConfig) error
 	Deactivate(ctx context.Context, interfaceName string) error
 }
 
+// TunnelRunner aliases WireGuardRunner for multi-provider tunnel drivers.
+type TunnelRunner = WireGuardRunner
+
 type commandExecFunc func(ctx context.Context, name string, args ...string) ([]byte, error)
+type commandExecWithStdinFunc func(ctx context.Context, stdinData string, name string, args ...string) ([]byte, error)
 
 func defaultCommandExec(ctx context.Context, name string, args ...string) ([]byte, error) {
 	return exec.CommandContext(ctx, name, args...).CombinedOutput()
+}
+
+func defaultCommandExecWithStdin(ctx context.Context, stdinData string, name string, args ...string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, name, args...)
+	if stdinData != "" {
+		cmd.Stdin = strings.NewReader(stdinData)
+	}
+	return cmd.CombinedOutput()
 }
 
 func tunnelConfigPath(baseDir, interfaceName string) string {
@@ -157,6 +178,79 @@ func (r linuxWireGuardRunner) Deactivate(ctx context.Context, interfaceName stri
 	return nil
 }
 
+type openConnectRunner struct {
+	Protocol string
+	GOOS     string
+	Exec     commandExecWithStdinFunc
+}
+
+func (r openConnectRunner) execFn() commandExecWithStdinFunc {
+	if r.Exec != nil {
+		return r.Exec
+	}
+	return defaultCommandExecWithStdin
+}
+
+func (r openConnectRunner) Activate(ctx context.Context, cfg TunnelConfig) error {
+	endpoint := strings.TrimSpace(cfg.ServerEndpoint)
+	username := strings.TrimSpace(cfg.Username)
+	secret := cfg.EphemeralSecret
+	if endpoint == "" || username == "" || secret == "" {
+		return fmt.Errorf("openconnect requires serverEndpoint, username, and ephemeralSecret")
+	}
+
+	proto := strings.TrimSpace(r.Protocol)
+	if proto == "" {
+		if strings.EqualFold(cfg.ProviderType, ProviderFortinet) {
+			proto = "fortinet"
+		} else {
+			proto = "anyconnect"
+		}
+	}
+
+	args := []string{
+		"--protocol=" + proto,
+		"--non-inter",
+		"--passwd-on-stdin",
+		"--user=" + username,
+	}
+	if strings.TrimSpace(cfg.AuthGroup) != "" {
+		args = append(args, "--authgroup="+strings.TrimSpace(cfg.AuthGroup))
+	}
+	if strings.TrimSpace(cfg.ServerCertDigest) != "" {
+		args = append(args, "--servercert="+strings.TrimSpace(cfg.ServerCertDigest))
+	}
+	if strings.TrimSpace(cfg.InterfaceName) != "" {
+		args = append(args, "--interface="+strings.TrimSpace(cfg.InterfaceName))
+	}
+	args = append(args, endpoint)
+
+	out, err := r.execFn()(ctx, secret+"\n", "openconnect", args...)
+	if err != nil {
+		return fmt.Errorf("openconnect (%s) failed: %v (%s)", proto, err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+func (r openConnectRunner) Deactivate(ctx context.Context, _ string) error {
+	goos := strings.TrimSpace(r.GOOS)
+	if goos == "" {
+		goos = runtime.GOOS
+	}
+	if goos == "windows" {
+		out, err := r.execFn()(ctx, "", "taskkill", "/IM", "openconnect.exe", "/F")
+		if err != nil {
+			return fmt.Errorf("openconnect taskkill failed: %v (%s)", err, strings.TrimSpace(string(out)))
+		}
+		return nil
+	}
+	out, err := r.execFn()(ctx, "", "pkill", "-SIGTERM", "-f", "openconnect")
+	if err != nil {
+		return fmt.Errorf("openconnect pkill failed: %v (%s)", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
 func defaultWireGuardRunnerForOS(goos string) WireGuardRunner {
 	if goos == "linux" {
 		return linuxWireGuardRunner{}
@@ -175,7 +269,31 @@ func defaultPlatform(goos, goarch string) string {
 	return goos + "-" + arch
 }
 
-// AgentConfig configures the loopback Windows Agent HTTP handler.
+func normalizeProviderType(raw string) (string, error) {
+	trimmed := strings.ToUpper(strings.TrimSpace(raw))
+	if trimmed == "" {
+		return ProviderWireGuard, nil
+	}
+	switch trimmed {
+	case ProviderWireGuard, ProviderFortinet, ProviderCisco:
+		return trimmed, nil
+	default:
+		return "", fmt.Errorf("unsupported providerType %q: must be WIREGUARD, FORTINET, or CISCO", raw)
+	}
+}
+
+func providerDisplayName(provider string) string {
+	switch provider {
+	case ProviderFortinet:
+		return "Fortinet SSL-VPN"
+	case ProviderCisco:
+		return "Cisco AnyConnect"
+	default:
+		return "WireGuard"
+	}
+}
+
+// AgentConfig configures the loopback Agent HTTP handler.
 type AgentConfig struct {
 	AllowedOrigins    []string
 	PairingToken      string
@@ -186,6 +304,7 @@ type AgentConfig struct {
 	Platform          string
 	HTTPClient        *http.Client
 	WgRunner          WireGuardRunner
+	ProviderRunners   map[string]TunnelRunner
 }
 
 type agentState struct {
@@ -193,6 +312,9 @@ type agentState struct {
 	startedAt      time.Time
 	version        string
 	state          string
+	providerType   string
+	gatewayID      *string
+	peerIdentity   *string
 	privateKey     *ecdh.PrivateKey
 	publicKeyB64   string
 	sessionID      *string
@@ -304,6 +426,22 @@ func NewHandler(cfg AgentConfig) http.Handler {
 		wgRunner = defaultWireGuardRunnerForOS(runtime.GOOS)
 	}
 
+	runnerFor := func(provider string) TunnelRunner {
+		if cfg.ProviderRunners != nil {
+			if r, ok := cfg.ProviderRunners[provider]; ok && r != nil {
+				return r
+			}
+		}
+		switch provider {
+		case ProviderFortinet:
+			return openConnectRunner{Protocol: "fortinet"}
+		case ProviderCisco:
+			return openConnectRunner{Protocol: "anyconnect"}
+		default:
+			return wgRunner
+		}
+	}
+
 	priv, pubB64, err := generateCurve25519Keypair()
 	if err != nil {
 		log.Fatalf("failed to generate Curve25519 keypair: %v", err)
@@ -313,6 +451,7 @@ func NewHandler(cfg AgentConfig) http.Handler {
 		startedAt:    time.Now().UTC(),
 		version:      version,
 		state:        "disconnected",
+		providerType: ProviderWireGuard,
 		privateKey:   priv,
 		publicKeyB64: pubB64,
 		allowedIPs:   []string{},
@@ -356,6 +495,9 @@ func NewHandler(cfg AgentConfig) http.Handler {
 			"state":          st.state,
 			"version":        st.version,
 			"publicKey":      st.publicKeyB64,
+			"providerType":   st.providerType,
+			"gatewayId":      st.gatewayID,
+			"peerIdentity":   st.peerIdentity,
 			"sessionId":      st.sessionID,
 			"assignedIp":     st.assignedIP,
 			"serverEndpoint": st.serverEndpoint,
@@ -367,10 +509,17 @@ func NewHandler(cfg AgentConfig) http.Handler {
 		})
 	}))
 
-	notifyApiDisconnect := func(ctx context.Context, sessionID *string, pubKey string) {
+	notifyApiDisconnect := func(ctx context.Context, sessionID *string, peerID, provider string, gatewayID *string) {
 		payload := map[string]any{
-			"publicKey":         pubKey,
+			"publicKey":         peerID,
 			"deviceFingerprint": fingerprint,
+		}
+		if provider != "" && provider != ProviderWireGuard {
+			payload["providerType"] = provider
+			payload["peerIdentity"] = peerID
+		}
+		if gatewayID != nil && *gatewayID != "" {
+			payload["gatewayId"] = *gatewayID
 		}
 		if sessionID != nil && *sessionID != "" {
 			payload["sessionId"] = *sessionID
@@ -389,7 +538,9 @@ func NewHandler(cfg AgentConfig) http.Handler {
 
 	mux.HandleFunc("POST /connect", requirePairing(func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			Ticket string `json:"ticket"`
+			Ticket       string `json:"ticket"`
+			ProviderType string `json:"providerType,omitempty"`
+			GatewayID    string `json:"gatewayId,omitempty"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "INVALID_JSON", "Request body must be valid JSON")
@@ -398,6 +549,12 @@ func NewHandler(cfg AgentConfig) http.Handler {
 		ticket := strings.TrimSpace(req.Ticket)
 		if ticket == "" {
 			writeError(w, http.StatusBadRequest, "MISSING_TICKET", "Connect ticket is required")
+			return
+		}
+
+		requestedProvider, err := normalizeProviderType(req.ProviderType)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "UNSUPPORTED_PROVIDER", err.Error())
 			return
 		}
 
@@ -410,18 +567,29 @@ func NewHandler(cfg AgentConfig) http.Handler {
 		st.mu.Lock()
 		st.privateKey = newPriv
 		st.publicKeyB64 = newPubB64
+		st.providerType = requestedProvider
 		st.state = "connecting"
 		st.lastError = nil
 		st.mu.Unlock()
 
-		apiPayload, _ := json.Marshal(map[string]string{
+		connectReqPayload := map[string]string{
 			"ticket":            ticket,
-			"publicKey":         newPubB64,
 			"deviceFingerprint": fingerprint,
 			"hostname":          hostname,
 			"agentVersion":      version,
 			"platform":          platform,
-		})
+		}
+		if requestedProvider == ProviderWireGuard {
+			connectReqPayload["publicKey"] = newPubB64
+		}
+		if strings.TrimSpace(req.ProviderType) != "" {
+			connectReqPayload["providerType"] = requestedProvider
+		}
+		if gw := strings.TrimSpace(req.GatewayID); gw != "" {
+			connectReqPayload["gatewayId"] = gw
+		}
+
+		apiPayload, _ := json.Marshal(connectReqPayload)
 		apiReq, err := http.NewRequestWithContext(r.Context(), http.MethodPost, apiBaseURL+"/api/vpn/connect", bytes.NewReader(apiPayload))
 		if err != nil {
 			errMsg := err.Error()
@@ -471,6 +639,18 @@ func NewHandler(cfg AgentConfig) http.Handler {
 			AllowedIPs      []string `json:"allowedIps"`
 			DNS             []string `json:"dns"`
 			ConnectedAt     string   `json:"connectedAt"`
+			ProviderType    string   `json:"providerType"`
+			GatewayID       *string  `json:"gatewayId"`
+			PeerIdentity    string   `json:"peerIdentity"`
+			TunnelConfig    *struct {
+				ProviderType     string  `json:"providerType"`
+				ServerPublicKey  string  `json:"serverPublicKey"`
+				Protocol         string  `json:"protocol"`
+				Username         string  `json:"username"`
+				EphemeralSecret  string  `json:"ephemeralSecret"`
+				AuthGroup        *string `json:"authGroup"`
+				ServerCertDigest *string `json:"serverCertDigest"`
+			} `json:"tunnelConfig"`
 		}
 		if err := json.NewDecoder(apiResp.Body).Decode(&connectData); err != nil {
 			errMsg := "Invalid response from control plane API"
@@ -482,8 +662,20 @@ func NewHandler(cfg AgentConfig) http.Handler {
 			return
 		}
 
+		activeProvider := requestedProvider
+		if strings.TrimSpace(connectData.ProviderType) != "" {
+			if normalized, normErr := normalizeProviderType(connectData.ProviderType); normErr == nil {
+				activeProvider = normalized
+			}
+		}
+		activeIdentity := strings.TrimSpace(connectData.PeerIdentity)
+		if activeIdentity == "" {
+			activeIdentity = newPubB64
+		}
+
 		privB64 := base64.StdEncoding.EncodeToString(newPriv.Bytes())
-		if err := wgRunner.Activate(r.Context(), TunnelConfig{
+		tunnelCfg := TunnelConfig{
+			ProviderType:    activeProvider,
 			InterfaceName:   tunnelIfaceName,
 			PrivateKeyB64:   privB64,
 			AssignedIP:      connectData.AssignedIP,
@@ -491,15 +683,34 @@ func NewHandler(cfg AgentConfig) http.Handler {
 			ServerEndpoint:  connectData.ServerEndpoint,
 			AllowedIPs:      connectData.AllowedIPs,
 			DNS:             connectData.DNS,
-		}); err != nil {
+		}
+		if connectData.TunnelConfig != nil {
+			if connectData.TunnelConfig.ServerPublicKey != "" {
+				tunnelCfg.ServerPublicKey = connectData.TunnelConfig.ServerPublicKey
+			}
+			tunnelCfg.Username = connectData.TunnelConfig.Username
+			tunnelCfg.EphemeralSecret = connectData.TunnelConfig.EphemeralSecret
+			if connectData.TunnelConfig.AuthGroup != nil {
+				tunnelCfg.AuthGroup = *connectData.TunnelConfig.AuthGroup
+			}
+			if connectData.TunnelConfig.ServerCertDigest != nil {
+				tunnelCfg.ServerCertDigest = *connectData.TunnelConfig.ServerCertDigest
+			}
+		}
+
+		if err := runnerFor(activeProvider).Activate(r.Context(), tunnelCfg); err != nil {
 			errMsg := err.Error()
 			sessID := connectData.SessionID
-			notifyApiDisconnect(r.Context(), &sessID, newPubB64)
+			notifyApiDisconnect(r.Context(), &sessID, activeIdentity, activeProvider, connectData.GatewayID)
 			st.mu.Lock()
 			st.state = "error"
 			st.lastError = &errMsg
 			st.mu.Unlock()
-			writeError(w, http.StatusInternalServerError, "WIREGUARD_ACTIVATE_FAILED", errMsg)
+			errCode := "TUNNEL_ACTIVATE_FAILED"
+			if activeProvider == ProviderWireGuard {
+				errCode = "WIREGUARD_ACTIVATE_FAILED"
+			}
+			writeError(w, http.StatusInternalServerError, errCode, errMsg)
 			return
 		}
 
@@ -513,6 +724,10 @@ func NewHandler(cfg AgentConfig) http.Handler {
 
 		st.mu.Lock()
 		st.state = "connected"
+		st.providerType = activeProvider
+		st.gatewayID = connectData.GatewayID
+		st.peerIdentity = &activeIdentity
+		st.publicKeyB64 = activeIdentity
 		st.sessionID = &sessID
 		st.assignedIP = &assignedIP
 		st.serverEndpoint = &endpoint
@@ -523,9 +738,12 @@ func NewHandler(cfg AgentConfig) http.Handler {
 
 		writeJSON(w, http.StatusOK, map[string]any{
 			"success":        true,
-			"message":        "WireGuard tunnel connected",
+			"message":        fmt.Sprintf("%s tunnel connected", providerDisplayName(activeProvider)),
 			"state":          "connected",
-			"publicKey":      newPubB64,
+			"providerType":   activeProvider,
+			"gatewayId":      connectData.GatewayID,
+			"peerIdentity":   activeIdentity,
+			"publicKey":      activeIdentity,
 			"sessionId":      sessID,
 			"assignedIp":     assignedIP,
 			"serverEndpoint": endpoint,
@@ -538,23 +756,41 @@ func NewHandler(cfg AgentConfig) http.Handler {
 		st.mu.RLock()
 		sessID := st.sessionID
 		pubKey := st.publicKeyB64
+		peerID := st.peerIdentity
+		activeProvider := st.providerType
+		gatewayID := st.gatewayID
 		wasConnected := st.state == "connected"
 		st.mu.RUnlock()
 
+		if activeProvider == "" {
+			activeProvider = ProviderWireGuard
+		}
+		effectiveID := pubKey
+		if peerID != nil && *peerID != "" {
+			effectiveID = *peerID
+		}
+
 		if wasConnected {
-			if err := wgRunner.Deactivate(r.Context(), tunnelIfaceName); err != nil {
+			if err := runnerFor(activeProvider).Deactivate(r.Context(), tunnelIfaceName); err != nil {
 				errMsg := err.Error()
 				st.mu.Lock()
 				st.lastError = &errMsg
 				st.mu.Unlock()
-				writeError(w, http.StatusInternalServerError, "WIREGUARD_DEACTIVATE_FAILED", errMsg)
+				errCode := "TUNNEL_DEACTIVATE_FAILED"
+				if activeProvider == ProviderWireGuard {
+					errCode = "WIREGUARD_DEACTIVATE_FAILED"
+				}
+				writeError(w, http.StatusInternalServerError, errCode, errMsg)
 				return
 			}
-			notifyApiDisconnect(r.Context(), sessID, pubKey)
+			notifyApiDisconnect(r.Context(), sessID, effectiveID, activeProvider, gatewayID)
 		}
 
 		st.mu.Lock()
 		st.state = "disconnected"
+		st.providerType = ProviderWireGuard
+		st.gatewayID = nil
+		st.peerIdentity = nil
 		st.sessionID = nil
 		st.assignedIP = nil
 		st.serverEndpoint = nil
@@ -567,7 +803,7 @@ func NewHandler(cfg AgentConfig) http.Handler {
 
 		writeJSON(w, http.StatusOK, map[string]any{
 			"success": true,
-			"message": "WireGuard tunnel disconnected",
+			"message": fmt.Sprintf("%s tunnel disconnected", providerDisplayName(activeProvider)),
 			"state":   "disconnected",
 		})
 	}))

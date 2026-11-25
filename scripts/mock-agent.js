@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 
 /**
- * MANGO VPN - Local Windows Agent Simulator
+ * MANGO VPN - Local Endpoint Agent Simulator
  *
  * Mirrors Sobree/agent-windows/main.go on http://127.0.0.1:47821:
  * - Strict Origin allowlist (never wildcard or unconditional reflection)
  * - Chromium Private Network Access (PNA) preflight headers
  * - Local pairing token (X-Mango-Agent-Token) on /status, /connect, /disconnect
- * - In-memory X25519 (Curve25519) keypair generation
- * - Connect Ticket contract on POST /connect ({ ticket })
+ * - In-memory X25519 (Curve25519) keypair generation for WireGuard
+ * - Multi-provider dispatch (WIREGUARD, FORTINET, CISCO) on POST /connect
  *
  * ZERO external dependencies. Runs directly with Node.js >= 18.
  */
@@ -45,6 +45,8 @@ function loadDotenvFallback() {
   }
 }
 loadDotenvFallback();
+
+const VALID_PROVIDERS = new Set(['WIREGUARD', 'FORTINET', 'CISCO']);
 
 function getenvFirst(...keys) {
   for (const key of keys) {
@@ -111,6 +113,12 @@ function generateX25519PublicKeyB64() {
   return spki.subarray(spki.length - 32).toString('base64');
 }
 
+function providerDisplayName(provider) {
+  if (provider === 'FORTINET') return 'Fortinet SSL-VPN';
+  if (provider === 'CISCO') return 'Cisco AnyConnect';
+  return 'WireGuard';
+}
+
 const userStates = new Map();
 
 function getAgentState(userHint) {
@@ -119,6 +127,9 @@ function getAgentState(userHint) {
     userStates.set(key, {
       version: DEFAULT_VERSION,
       state: 'disconnected', // 'disconnected' | 'connecting' | 'connected' | 'disconnecting' | 'error'
+      providerType: 'WIREGUARD',
+      gatewayId: null,
+      peerIdentity: null,
       sessionId: null,
       assignedIp: null,
       serverEndpoint: null,
@@ -267,6 +278,9 @@ const server = http.createServer(async (req, res) => {
         state: state.state,
         version: state.version,
         publicKey: state.publicKey,
+        providerType: state.providerType,
+        gatewayId: state.gatewayId,
+        peerIdentity: state.peerIdentity,
         sessionId: state.sessionId,
         assignedIp: state.assignedIp,
         serverEndpoint: state.serverEndpoint,
@@ -284,6 +298,18 @@ const server = http.createServer(async (req, res) => {
       if (!ticket) {
         return sendError(res, 400, 'MISSING_TICKET', 'Connect ticket is required');
       }
+
+      const rawProvider = typeof body.providerType === 'string' ? body.providerType.trim().toUpperCase() : '';
+      const requestedProvider = rawProvider || 'WIREGUARD';
+      if (!VALID_PROVIDERS.has(requestedProvider)) {
+        return sendError(
+          res,
+          400,
+          'UNSUPPORTED_PROVIDER',
+          `unsupported providerType ${JSON.stringify(body.providerType)}: must be WIREGUARD, FORTINET, or CISCO`,
+        );
+      }
+      const requestedGatewayId = typeof body.gatewayId === 'string' ? body.gatewayId.trim() : '';
 
       const origin = req.headers.origin || '';
       let portSuffix = '';
@@ -315,23 +341,34 @@ const server = http.createServer(async (req, res) => {
       const agentState = getAgentState(userHint);
 
       agentState.publicKey = generateX25519PublicKeyB64();
+      agentState.providerType = requestedProvider;
       agentState.deviceFingerprint = activeFingerprint;
       agentState.state = 'connecting';
       agentState.lastError = null;
+
+      const connectPayload = {
+        ticket,
+        deviceFingerprint: activeFingerprint,
+        hostname: activeHostname,
+        agentVersion: agentState.version,
+        platform: PLATFORM,
+      };
+      if (requestedProvider === 'WIREGUARD') {
+        connectPayload.publicKey = agentState.publicKey;
+      }
+      if (rawProvider) {
+        connectPayload.providerType = requestedProvider;
+      }
+      if (requestedGatewayId) {
+        connectPayload.gatewayId = requestedGatewayId;
+      }
 
       let apiRes;
       try {
         apiRes = await fetch(`${API_URL}/api/vpn/connect`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ticket,
-            publicKey: agentState.publicKey,
-            deviceFingerprint: activeFingerprint,
-            hostname: activeHostname,
-            agentVersion: agentState.version,
-            platform: PLATFORM,
-          }),
+          body: JSON.stringify(connectPayload),
         });
       } catch (err) {
         agentState.state = 'error';
@@ -346,7 +383,17 @@ const server = http.createServer(async (req, res) => {
         return sendError(res, apiRes.status, 'API_CONNECT_REJECTED', agentState.lastError);
       }
 
+      const activeProvider =
+        typeof apiData.providerType === 'string' && VALID_PROVIDERS.has(apiData.providerType)
+          ? apiData.providerType
+          : requestedProvider;
+      const activeIdentity = apiData.peerIdentity || agentState.publicKey;
+
       agentState.state = 'connected';
+      agentState.providerType = activeProvider;
+      agentState.gatewayId = apiData.gatewayId || null;
+      agentState.peerIdentity = activeIdentity;
+      agentState.publicKey = activeIdentity;
       agentState.sessionId = apiData.sessionId || null;
       agentState.assignedIp = apiData.assignedIp || null;
       agentState.serverEndpoint = apiData.serverEndpoint || null;
@@ -358,9 +405,12 @@ const server = http.createServer(async (req, res) => {
 
       return sendJson(res, 200, {
         success: true,
-        message: 'WireGuard tunnel connected',
+        message: `${providerDisplayName(activeProvider)} tunnel connected`,
         state: 'connected',
-        publicKey: agentState.publicKey,
+        providerType: activeProvider,
+        gatewayId: agentState.gatewayId,
+        peerIdentity: activeIdentity,
+        publicKey: activeIdentity,
         sessionId: agentState.sessionId,
         assignedIp: agentState.assignedIp,
         serverEndpoint: agentState.serverEndpoint,
@@ -381,17 +431,25 @@ const server = http.createServer(async (req, res) => {
         .toLowerCase()
         .replace(/[^a-z0-9_-]/g, '');
       const agentState = getAgentState(userHint);
-
+      const prevProvider = agentState.providerType || 'WIREGUARD';
       if (agentState.state === 'connected') {
         try {
+          const discPayload = {
+            sessionId: agentState.sessionId || undefined,
+            publicKey: agentState.peerIdentity || agentState.publicKey,
+            deviceFingerprint: agentState.deviceFingerprint || DEVICE_FINGERPRINT,
+          };
+          if (prevProvider !== 'WIREGUARD') {
+            discPayload.providerType = prevProvider;
+            discPayload.peerIdentity = agentState.peerIdentity || agentState.publicKey;
+          }
+          if (agentState.gatewayId) {
+            discPayload.gatewayId = agentState.gatewayId;
+          }
           await fetch(`${API_URL}/api/vpn/disconnect`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sessionId: agentState.sessionId || undefined,
-              publicKey: agentState.publicKey,
-              deviceFingerprint: agentState.deviceFingerprint || DEVICE_FINGERPRINT,
-            }),
+            body: JSON.stringify(discPayload),
           });
         } catch {
           // Best-effort notification when API is unreachable
@@ -399,6 +457,9 @@ const server = http.createServer(async (req, res) => {
       }
 
       agentState.state = 'disconnected';
+      agentState.providerType = 'WIREGUARD';
+      agentState.gatewayId = null;
+      agentState.peerIdentity = null;
       agentState.sessionId = null;
       agentState.assignedIp = null;
       agentState.serverEndpoint = null;
@@ -410,7 +471,7 @@ const server = http.createServer(async (req, res) => {
 
       return sendJson(res, 200, {
         success: true,
-        message: 'WireGuard tunnel disconnected',
+        message: `${providerDisplayName(prevProvider)} tunnel disconnected`,
         state: 'disconnected',
       });
     }
@@ -425,10 +486,11 @@ if (require.main === module) {
   server.listen(PORT, HOST, () => {
     console.log(`
 ============================================================
-  MANGO VPN - Local Windows Agent Simulator (v2)
+  MANGO VPN - Local Endpoint Agent Simulator (v2)
 ============================================================
   Address:        http://${HOST}:${PORT}
   Platform:       ${PLATFORM}
+  Providers:      WIREGUARD, FORTINET, CISCO
   AllowedOrigins: ${ALLOWED_ORIGINS.join(', ')}
   PairingToken:   ${PAIRING_TOKEN}
 ============================================================

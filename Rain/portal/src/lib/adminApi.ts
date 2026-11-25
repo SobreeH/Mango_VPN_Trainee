@@ -5,14 +5,19 @@ import type {
   AuditLogQuery,
   CreateAgentVersionRequest,
   CreateUserRequest,
+  CreateVpnGatewayRequest,
   CreateVpnPolicyRequest,
+  DeleteGatewayResponse,
   DeletePolicyResponse,
   DeviceDto,
   DeviceListResponse,
   UpdateAgentVersionRequest,
   UpdateUserStatusRequest,
+  UpdateVpnGatewayRequest,
   UserDto,
   UserListResponse,
+  VpnGatewayDto,
+  VpnGatewayListResponse,
   VpnPolicyDto,
   VpnPolicyListResponse,
   VpnSessionDto,
@@ -264,6 +269,68 @@ export function deletePolicy(
 ): Promise<DeletePolicyResponse> {
   return requestJson<DeletePolicyResponse>(
     `${apiBaseUrl}/api/policies/${encodeURIComponent(id)}`,
+    accessToken,
+    { method: 'DELETE' },
+    auth,
+  );
+}
+
+export function fetchGateways(
+  apiBaseUrl: string,
+  accessToken: string,
+  auth?: AuthRefreshContext,
+): Promise<VpnGatewayListResponse> {
+  return requestJson<VpnGatewayListResponse>(
+    `${apiBaseUrl}/api/gateways`,
+    accessToken,
+    undefined,
+    auth,
+  );
+}
+
+export function createGateway(
+  apiBaseUrl: string,
+  accessToken: string,
+  payload: CreateVpnGatewayRequest,
+  auth?: AuthRefreshContext,
+): Promise<VpnGatewayDto> {
+  return requestJson<VpnGatewayDto>(
+    `${apiBaseUrl}/api/gateways`,
+    accessToken,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    auth,
+  );
+}
+
+export function updateGateway(
+  apiBaseUrl: string,
+  accessToken: string,
+  id: string,
+  payload: UpdateVpnGatewayRequest,
+  auth?: AuthRefreshContext,
+): Promise<VpnGatewayDto> {
+  return requestJson<VpnGatewayDto>(
+    `${apiBaseUrl}/api/gateways/${encodeURIComponent(id)}`,
+    accessToken,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    },
+    auth,
+  );
+}
+
+export function deleteGateway(
+  apiBaseUrl: string,
+  accessToken: string,
+  id: string,
+  auth?: AuthRefreshContext,
+): Promise<DeleteGatewayResponse> {
+  return requestJson<DeleteGatewayResponse>(
+    `${apiBaseUrl}/api/gateways/${encodeURIComponent(id)}`,
     accessToken,
     { method: 'DELETE' },
     auth,

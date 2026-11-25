@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { RoleName } from '@mango/shared';
+import { RoleName, VpnProviderType } from '@mango/shared';
 import { AgentStatusCard } from './AgentStatusCard';
 
 describe('AgentStatusCard (fetch seam)', () => {
@@ -325,5 +325,102 @@ describe('AgentStatusCard (fetch seam)', () => {
       expect(screen.getByRole('alert')).toHaveTextContent(/connect ticket has expired/i);
     });
     expect(screen.queryByText(/^connected$/i)).not.toBeInTheDocument();
+  });
+
+  it('connects via selected Fortinet provider and forwards providerType to local agent', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            status: 'ok',
+            service: 'mango-agent-windows',
+            version: '2.0.0',
+            tunnelActive: false,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            state: 'disconnected',
+            version: '2.0.0',
+            publicKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+            providerType: VpnProviderType.WIREGUARD,
+            assignedIp: null,
+            serverEndpoint: null,
+            allowedIps: [],
+            connectedSince: null,
+            bytesReceived: 0,
+            bytesSent: 0,
+            lastError: null,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ticket: 'fg-ticket-1',
+            expiresAt: '2026-11-24T03:00:00Z',
+            expiresInSeconds: 60,
+          }),
+          { status: 201, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            message: 'Fortinet SSL-VPN tunnel connected',
+            state: 'connected',
+            providerType: VpnProviderType.FORTINET,
+            peerIdentity: 'fortinet-alice-1',
+            publicKey: 'fortinet-alice-1',
+            sessionId: 'sess-fg-1',
+            assignedIp: '10.40.0.2',
+            serverEndpoint: 'fg.mango.internal:443',
+            allowedIps: ['10.20.0.0/16'],
+            connectedSince: '2026-11-24T02:59:00Z',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+
+    render(<AgentStatusCard accessToken="jwt-access-token" userRole={RoleName.STAFF} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/agent pairing token/i)).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText(/agent pairing token/i), {
+      target: { value: 'valid-pairing-token' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /pair agent/i }));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/vpn provider/i)).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText(/vpn provider/i), {
+      target: { value: `default:${VpnProviderType.FORTINET}` },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /connect vpn/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('10.40.0.2')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('fg.mango.internal:443')).toBeInTheDocument();
+    expect(screen.getAllByText(/Fortinet SSL-VPN/i).length).toBeGreaterThan(0);
+
+    const agentConnectCall = fetchMock.mock.calls[3]!;
+    expect(agentConnectCall[0]).toBe('http://127.0.0.1:47821/connect');
+    expect(JSON.parse(String(agentConnectCall[1]?.body))).toEqual(
+      expect.objectContaining({
+        ticket: 'fg-ticket-1',
+        providerType: VpnProviderType.FORTINET,
+      }),
+    );
   });
 });

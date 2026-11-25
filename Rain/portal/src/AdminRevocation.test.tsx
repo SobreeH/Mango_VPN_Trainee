@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { DeviceStatus, RoleName, SessionStatus } from '@mango/shared';
+import { DeviceStatus, GatewayIpamMode, RoleName, SessionStatus, VpnProviderType } from '@mango/shared';
 import { App } from './App';
 
 function renderWithQuery(ui: React.ReactElement) {
@@ -346,5 +346,89 @@ describe('Portal Admin Users, Devices & Sessions Tabs (fetch seam)', () => {
       expect(screen.queryByText(/Are you sure you want to disable account/i)).not.toBeInTheDocument();
     });
     expect(patchCalled).toBe(false);
+  });
+
+  it('renders Gateways tab for ADMIN and creates/toggles/deletes multi-provider VPN gateways', async () => {
+    const gateways = [
+      {
+        id: 'gw-1',
+        name: 'Primary WireGuard',
+        providerType: VpnProviderType.WIREGUARD,
+        endpoint: 'wg.mango.internal:51820',
+        subnetCidr: '10.13.13.0/24',
+        ipamMode: GatewayIpamMode.API_MANAGED,
+        dns: ['1.1.1.1'],
+        allowedRoles: [RoleName.ADMIN, RoleName.STAFF, RoleName.CLIENT],
+        isDefault: true,
+        isEnabled: true,
+        createdAt: '2026-11-24T00:00:00.000Z',
+        updatedAt: '2026-11-24T00:00:00.000Z',
+      },
+    ];
+
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/api/audit-logs')) {
+        return new Response(
+          JSON.stringify({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 1 }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (url.endsWith('/api/gateways') && (!init?.method || init.method === 'GET')) {
+        return new Response(JSON.stringify({ items: gateways }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.endsWith('/api/gateways') && init?.method === 'POST') {
+        const body = JSON.parse(String(init.body));
+        const created = {
+          id: 'gw-2',
+          name: body.name,
+          providerType: body.providerType,
+          endpoint: body.endpoint,
+          subnetCidr: body.subnetCidr,
+          ipamMode: body.ipamMode,
+          dns: ['1.1.1.1'],
+          allowedRoles: body.allowedRoles,
+          isDefault: Boolean(body.isDefault),
+          isEnabled: true,
+          createdAt: '2026-11-24T01:00:00.000Z',
+          updatedAt: '2026-11-24T01:00:00.000Z',
+        };
+        gateways.push(created);
+        return new Response(JSON.stringify(created), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.endsWith('/api/gateways/gw-2') && init?.method === 'DELETE') {
+        const idx = gateways.findIndex((g) => g.id === 'gw-2');
+        if (idx >= 0) gateways.splice(idx, 1);
+        return new Response(JSON.stringify({ success: true, id: 'gw-2' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify({ message: 'Not found' }), { status: 404 });
+    });
+
+    renderWithQuery(<App initialSession={adminSession} />);
+
+    fireEvent.click(screen.getByRole('tab', { name: /Gateways/i }));
+    expect(await screen.findByText('Primary WireGuard')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/Gateway Name/i), {
+      target: { value: 'HQ FortiGate' },
+    });
+    fireEvent.change(screen.getByLabelText(/VPN Provider/i), {
+      target: { value: VpnProviderType.FORTINET },
+    });
+    fireEvent.change(screen.getByLabelText(/Endpoint/i), {
+      target: { value: 'fg.mango.internal:443' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Register Gateway/i }));
+
+    expect(await screen.findByText('HQ FortiGate')).toBeInTheDocument();
   });
 });

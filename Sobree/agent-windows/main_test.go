@@ -604,3 +604,103 @@ func TestGetenvFirstPrefersPrimaryAndFallsBackToAlias(t *testing.T) {
 		t.Fatalf("expected primary AGENT_LISTEN_ADDR to win, got %q", got)
 	}
 }
+
+func TestFortinetAndCiscoProviderConnectAndOpenConnectRunner(t *testing.T) {
+	for _, tc := range []struct {
+		provider string
+		protocol string
+		endpoint string
+		ip       string
+	}{
+		{"FORTINET", "fortinet", "fg.mango.internal:443", "10.40.0.5"},
+		{"CISCO", "anyconnect", "asa.mango.internal:443", "10.50.0.8"},
+	} {
+		t.Run(tc.provider, func(t *testing.T) {
+			var connectPayload map[string]any
+			var disconnectPayload map[string]any
+			apiSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				switch r.URL.Path {
+				case "/api/vpn/connect":
+					_ = json.NewDecoder(r.Body).Decode(&connectPayload)
+					_ = json.NewEncoder(w).Encode(map[string]any{
+						"sessionId":      "sess-" + tc.provider,
+						"assignedIp":     tc.ip,
+						"serverEndpoint": tc.endpoint,
+						"allowedIps":     []string{"10.20.0.0/16"},
+						"dns":            []string{"1.1.1.1"},
+						"connectedAt":    "2026-11-24T02:00:00Z",
+						"providerType":   tc.provider,
+						"gatewayId":      "gw-" + tc.provider,
+						"peerIdentity":   strings.ToLower(tc.provider) + "-user-1",
+						"tunnelConfig": map[string]any{
+							"providerType":    tc.provider,
+							"protocol":        tc.protocol,
+							"username":        "alice",
+							"ephemeralSecret": "ephemeral-secret-xyz",
+						},
+					})
+				case "/api/vpn/disconnect":
+					_ = json.NewDecoder(r.Body).Decode(&disconnectPayload)
+					_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+				}
+			}))
+			defer apiSrv.Close()
+
+			var execCalls []string
+			var lastStdin string
+			runner := openConnectRunner{
+				Protocol: tc.protocol,
+				GOOS:     "linux",
+				Exec: func(_ context.Context, stdinData, name string, args ...string) ([]byte, error) {
+					lastStdin = stdinData
+					execCalls = append(execCalls, name+" "+strings.Join(args, " "))
+					return nil, nil
+				},
+			}
+
+			handler := NewHandler(AgentConfig{
+				AllowedOrigins:  []string{"http://localhost:3000"},
+				PairingToken:    "test-pairing-token-32bytes-minimum",
+				ApiBaseURL:      apiSrv.URL,
+				ProviderRunners: map[string]TunnelRunner{tc.provider: runner},
+			})
+
+			body, _ := json.Marshal(map[string]string{
+				"ticket":       "ticket-" + tc.provider,
+				"providerType": tc.provider,
+				"gatewayId":    "gw-" + tc.provider,
+			})
+			req := httptest.NewRequest(http.MethodPost, "/connect", bytes.NewReader(body))
+			req.Header.Set("Origin", "http://localhost:3000")
+			req.Header.Set("X-Mango-Agent-Token", "test-pairing-token-32bytes-minimum")
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Fatalf("expected 200 on %s connect, got %d: %s", tc.provider, rec.Code, rec.Body.String())
+			}
+			if _, hasPubKey := connectPayload["publicKey"]; hasPubKey {
+				t.Fatalf("non-WireGuard provider %s should not send WireGuard publicKey", tc.provider)
+			}
+			if lastStdin != "ephemeral-secret-xyz\n" {
+				t.Fatalf("expected ephemeral secret via stdin, got %q", lastStdin)
+			}
+			if len(execCalls) != 1 || !strings.Contains(execCalls[0], "--protocol="+tc.protocol) {
+				t.Fatalf("expected openconnect with --protocol=%s, got %+v", tc.protocol, execCalls)
+			}
+
+			discReq := httptest.NewRequest(http.MethodPost, "/disconnect", nil)
+			discReq.Header.Set("Origin", "http://localhost:3000")
+			discReq.Header.Set("X-Mango-Agent-Token", "test-pairing-token-32bytes-minimum")
+			discRec := httptest.NewRecorder()
+			handler.ServeHTTP(discRec, discReq)
+			if discRec.Code != http.StatusOK {
+				t.Fatalf("expected 200 on %s disconnect, got %d: %s", tc.provider, discRec.Code, discRec.Body.String())
+			}
+			if disconnectPayload["providerType"] != tc.provider {
+				t.Fatalf("expected providerType %s in disconnect payload, got %+v", tc.provider, disconnectPayload)
+			}
+		})
+	}
+}

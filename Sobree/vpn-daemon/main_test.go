@@ -54,15 +54,15 @@ func TestHealthEndpoint(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", rec.Code)
 	}
 
-	var body map[string]string
+	var body map[string]any
 	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode JSON: %v", err)
 	}
 	if body["status"] != "ok" {
-		t.Fatalf("expected status ok, got %q", body["status"])
+		t.Fatalf("expected status ok, got %v", body["status"])
 	}
 	if body["service"] != "mango-vpn-daemon" {
-		t.Fatalf("expected service mango-vpn-daemon, got %q", body["service"])
+		t.Fatalf("expected service mango-vpn-daemon, got %v", body["service"])
 	}
 }
 
@@ -454,5 +454,114 @@ func TestInitGatewayCreatesInterfaceAndNftables(t *testing.T) {
 
 	if !reflect.DeepEqual(runner.calls, wantCalls) {
 		t.Fatalf("unexpected command sequence:\ngot:  %+v\nwant: %+v", runner.calls, wantCalls)
+	}
+}
+
+func TestFortinetAndCiscoDriversProvisionSyncAndRemovePeers(t *testing.T) {
+	var fortinetCalls []string
+	fortinetSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fortinetCalls = append(fortinetCalls, r.Method+" "+r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"success"}`))
+	}))
+	defer fortinetSrv.Close()
+
+	var ciscoCalls []string
+	ciscoSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ciscoCalls = append(ciscoCalls, r.Method+" "+r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	}))
+	defer ciscoSrv.Close()
+
+	secret := "super-secret-daemon-token-32-chars"
+	wgRunner := &fakeCommandRunner{}
+	mux := NewMux(DaemonConfig{
+		SharedSecret:   secret,
+		Interface:      "wg0",
+		Runner:         wgRunner,
+		FortiGateURL:   fortinetSrv.URL,
+		FortiGateToken: "fg-token",
+		CiscoURL:       ciscoSrv.URL,
+		CiscoToken:     "cisco-token",
+	})
+
+	// 1. Add Fortinet peer with policy
+	fgBody, _ := json.Marshal(map[string]any{
+		"providerType": "FORTINET",
+		"gatewayId":    "gw-fg-1",
+		"peerIdentity": "fortinet-alice-123",
+		"assignedIp":   "10.40.0.10",
+		"role":         "STAFF",
+		"policies": []map[string]any{
+			{"targetCidr": "10.20.0.0/16", "protocol": "TCP", "portRange": "443", "action": "ALLOW", "priority": 10},
+		},
+	})
+	fgReq := httptest.NewRequest(http.MethodPost, "/peers", bytes.NewReader(fgBody))
+	fgReq.Header.Set("Content-Type", "application/json")
+	fgReq.Header.Set("Authorization", "Bearer "+secret)
+	fgRec := httptest.NewRecorder()
+	mux.ServeHTTP(fgRec, fgReq)
+	if fgRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 on Fortinet add, got %d: %s", fgRec.Code, fgRec.Body.String())
+	}
+	if len(wgRunner.calls) != 0 {
+		t.Fatalf("expected 0 wg/nft calls for FORTINET provider, got %d", len(wgRunner.calls))
+	}
+	if !reflect.DeepEqual(fortinetCalls, []string{"POST /api/v2/cmdb/user/local", "PUT /api/v2/cmdb/firewall/policy"}) {
+		t.Fatalf("unexpected FortiGate API calls: %+v", fortinetCalls)
+	}
+
+	// 2. Add Cisco peer
+	csBody, _ := json.Marshal(map[string]any{
+		"providerType": "CISCO",
+		"gatewayId":    "gw-cs-1",
+		"peerIdentity": "cisco-bob-456",
+		"assignedIp":   "10.50.0.12",
+		"role":         "CLIENT",
+		"policies":     []map[string]any{},
+	})
+	csReq := httptest.NewRequest(http.MethodPost, "/peers", bytes.NewReader(csBody))
+	csReq.Header.Set("Content-Type", "application/json")
+	csReq.Header.Set("Authorization", "Bearer "+secret)
+	csRec := httptest.NewRecorder()
+	mux.ServeHTTP(csRec, csReq)
+	if csRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 on Cisco add, got %d: %s", csRec.Code, csRec.Body.String())
+	}
+	if !reflect.DeepEqual(ciscoCalls, []string{"POST /api/vpn/sessions", "PUT /api/access/acl"}) {
+		t.Fatalf("unexpected Cisco API calls: %+v", ciscoCalls)
+	}
+
+	// 3. Remove Fortinet & Cisco peers
+	remFgBody, _ := json.Marshal(map[string]string{"providerType": "FORTINET", "peerIdentity": "fortinet-alice-123"})
+	remFgReq := httptest.NewRequest(http.MethodPost, "/peers/remove", bytes.NewReader(remFgBody))
+	remFgReq.Header.Set("Content-Type", "application/json")
+	remFgReq.Header.Set("Authorization", "Bearer "+secret)
+	remFgRec := httptest.NewRecorder()
+	mux.ServeHTTP(remFgRec, remFgReq)
+	if remFgRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 on Fortinet remove, got %d: %s", remFgRec.Code, remFgRec.Body.String())
+	}
+
+	remCsReq := httptest.NewRequest(http.MethodDelete, "/peers/cisco-bob-456?providerType=CISCO", nil)
+	remCsReq.Header.Set("Authorization", "Bearer "+secret)
+	remCsRec := httptest.NewRecorder()
+	mux.ServeHTTP(remCsRec, remCsReq)
+	if remCsRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 on Cisco DELETE, got %d: %s", remCsRec.Code, remCsRec.Body.String())
+	}
+	if ciscoCalls[len(ciscoCalls)-1] != "DELETE /api/vpn/sessions/cisco-bob-456" {
+		t.Fatalf("expected Cisco DELETE /api/vpn/sessions/cisco-bob-456, got %+v", ciscoCalls)
+	}
+
+	// 4. Reject unknown provider
+	badReq := httptest.NewRequest(http.MethodPost, "/peers", bytes.NewBufferString(`{"providerType":"OPENCONNECT_MAGIC","publicKey":"abc","assignedIp":"10.13.13.5"}`))
+	badReq.Header.Set("Content-Type", "application/json")
+	badReq.Header.Set("Authorization", "Bearer "+secret)
+	badRec := httptest.NewRecorder()
+	mux.ServeHTTP(badRec, badReq)
+	if badRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for unsupported providerType, got %d", badRec.Code)
 	}
 }

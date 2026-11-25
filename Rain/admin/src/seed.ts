@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { PrismaClient, RoleName } from '@prisma/client';
+import { GatewayIpamMode, PrismaClient, RoleName, VpnProviderType } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 function loadEnvFileIfPresent(filePath: string): void {
@@ -96,6 +96,25 @@ export async function seedDatabase(
       passwordHash,
       roleId: adminRole.id,
       isActive: true,
+    },
+  });
+
+  await prisma.vpnGateway.upsert({
+    where: { name: 'Primary WireGuard Gateway' },
+    update: {},
+    create: {
+      name: 'Primary WireGuard Gateway',
+      providerType: VpnProviderType.WIREGUARD,
+      endpoint: env.WG_SERVER_ENDPOINT?.trim() || '127.0.0.1:51820',
+      subnetCidr: env.WG_GATEWAY_SUBNET?.trim() || '10.13.13.0/24',
+      ipamMode: GatewayIpamMode.API_MANAGED,
+      dns: (env.WG_DNS ?? '1.1.1.1')
+        .split(',')
+        .map((d) => d.trim())
+        .filter(Boolean),
+      allowedRoles: [RoleName.ADMIN, RoleName.STAFF, RoleName.CLIENT],
+      isDefault: true,
+      isEnabled: true,
     },
   });
 

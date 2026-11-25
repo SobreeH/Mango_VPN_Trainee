@@ -38,6 +38,7 @@ function endpoint() {
 const PORT = endpoint();
 const peers = new Map();
 const MAX_BODY = 1e6;
+const VALID_PROVIDERS = new Set(['WIREGUARD', 'FORTINET', 'CISCO']);
 class ContractError extends Error { constructor(code, message) { super(message); this.code = code; } }
 const error = (res, status, code, message) => send(res, status, { success: false, error: { code, message } });
 function send(res, status, data) {
@@ -61,10 +62,25 @@ function body(req) {
     req.on('error', reject);
   });
 }
+function providerType(raw) {
+  const value = String(raw || '').trim().toUpperCase();
+  if (!value) return 'WIREGUARD';
+  if (!VALID_PROVIDERS.has(value)) throw new ContractError('UNSUPPORTED_PROVIDER', `unsupported providerType ${JSON.stringify(raw)}: must be WIREGUARD, FORTINET, or CISCO`);
+  return value;
+}
 function key(value) {
   const trimmed = String(value || '').trim();
   try { if (Buffer.from(trimmed, 'base64').length === 32 && /^[A-Za-z0-9+/]+={0,2}$/.test(trimmed)) return trimmed; } catch {}
   throw new ContractError('INVALID_PUBLIC_KEY', 'publicKey must be a valid 32-byte base64 WireGuard key');
+}
+function peerIdentity(value) {
+  const trimmed = String(value || '').trim();
+  if (/^[A-Za-z0-9._:-]{3,128}$/.test(trimmed)) return trimmed;
+  throw new ContractError('INVALID_PEER_IDENTITY', 'peerIdentity must be 3-128 characters of [A-Za-z0-9._:-]');
+}
+function resolvePeerId(provider, publicKey, identity) {
+  const raw = String(identity || '').trim() || String(publicKey || '').trim();
+  return provider === 'WIREGUARD' ? key(raw) : peerIdentity(raw);
 }
 function ip(value) {
   const text = String(value || '').trim();
@@ -86,24 +102,63 @@ function policyRules(rules) {
 }
 async function handle(req, res) {
   const url = new URL(req.url, 'http://127.0.0.1');
-  if (req.method === 'GET' && url.pathname === '/health') return send(res, 200, { status: 'ok', service: 'mango-vpn-daemon', mock: true });
+  if (req.method === 'GET' && url.pathname === '/health') return send(res, 200, { status: 'ok', service: 'mango-vpn-daemon', providers: ['WIREGUARD', 'FORTINET', 'CISCO'], mock: true });
   const known = ['/peers', '/peers/remove', '/policies/sync', '/peers/policies'];
   const isDelete = url.pathname.startsWith('/peers/') && req.method === 'DELETE';
   if (!(known.includes(url.pathname) || isDelete)) return error(res, 404, 'NOT_FOUND', `Endpoint ${url.pathname} not found on VPN daemon`);
   if (!auth(req, res)) return;
   try {
     if (req.method === 'POST' && url.pathname === '/peers') {
-      const data = await body(req); const publicKey = key(data.publicKey); const assignedIp = ip(data.assignedIp); const policies = data.policies == null ? undefined : policyRules(data.policies);
-      peers.set(publicKey, { publicKey, assignedIp, role: String(data.role || '').trim(), policies: policies || [] });
-      console.log(`[DEV MOCK DAEMON] peer added: ${publicKey}`); return send(res, 200, { success: true, publicKey, assignedIp });
+      const data = await body(req);
+      const provider = providerType(data.providerType);
+      const id = resolvePeerId(provider, data.publicKey, data.peerIdentity);
+      const assignedIp = ip(data.assignedIp);
+      const policies = data.policies == null ? undefined : policyRules(data.policies);
+      peers.set(`${provider}:${id}`, { providerType: provider, publicKey: id, peerIdentity: id, assignedIp, role: String(data.role || '').trim(), policies: policies || [] });
+      console.log(`[DEV MOCK DAEMON] peer added (${provider}): ${id}`);
+      const resp = { success: true, publicKey: id, assignedIp };
+      if (provider !== 'WIREGUARD' || data.peerIdentity) { resp.providerType = provider; resp.peerIdentity = id; }
+      return send(res, 200, resp);
     }
     if ((req.method === 'POST' && url.pathname === '/policies/sync') || (req.method === 'PUT' && url.pathname === '/peers/policies')) {
       const data = await body(req); const next = new Map();
-      for (const item of data.peers || []) { const publicKey = key(item.publicKey); next.set(publicKey, { publicKey, assignedIp: ip(item.assignedIp), role: String(item.role || '').trim(), policies: policyRules(item.policies) }); }
-      peers.clear(); for (const [k, v] of next) peers.set(k, v); console.log(`[DEV MOCK DAEMON] policies synced: ${peers.size} peer(s)`); return send(res, 200, { success: true, peers: peers.size });
+      for (const item of data.peers || []) {
+        const provider = providerType(item.providerType);
+        const id = resolvePeerId(provider, item.publicKey, item.peerIdentity);
+        next.set(`${provider}:${id}`, { providerType: provider, publicKey: id, peerIdentity: id, assignedIp: ip(item.assignedIp), role: String(item.role || '').trim(), policies: policyRules(item.policies) });
+      }
+      peers.clear(); for (const [k, v] of next) peers.set(k, v);
+      console.log(`[DEV MOCK DAEMON] policies synced: ${peers.size} peer(s)`);
+      return send(res, 200, { success: true, peers: peers.size });
     }
-    if (req.method === 'POST' && url.pathname === '/peers/remove') { const data = await body(req); const publicKey = key(data.publicKey); peers.delete(publicKey); console.log(`[DEV MOCK DAEMON] peer removed: ${publicKey}`); return send(res, 200, { success: true, publicKey }); }
-    if (req.method === 'DELETE' && isDelete) { const publicKey = key(decodeURIComponent(url.pathname.slice('/peers/'.length))); peers.delete(publicKey); console.log(`[DEV MOCK DAEMON] peer removed: ${publicKey}`); return send(res, 200, { success: true, publicKey }); }
+    if (req.method === 'POST' && url.pathname === '/peers/remove') {
+      const data = await body(req);
+      let provider = providerType(data.providerType);
+      const rawId = String(data.peerIdentity || data.publicKey || '').trim();
+      if (!data.providerType && rawId) {
+        for (const p of ['FORTINET', 'CISCO']) { if (peers.has(`${p}:${rawId}`)) { provider = p; break; } }
+      }
+      const id = resolvePeerId(provider, data.publicKey, data.peerIdentity);
+      peers.delete(`${provider}:${id}`);
+      console.log(`[DEV MOCK DAEMON] peer removed (${provider}): ${id}`);
+      const resp = { success: true, publicKey: id };
+      if (provider !== 'WIREGUARD' || data.peerIdentity) { resp.providerType = provider; resp.peerIdentity = id; }
+      return send(res, 200, resp);
+    }
+    if (req.method === 'DELETE' && isDelete) {
+      const rawId = decodeURIComponent(url.pathname.slice('/peers/'.length));
+      const reqProvider = url.searchParams.get('providerType');
+      let provider = providerType(reqProvider);
+      if (!reqProvider && rawId) {
+        for (const p of ['FORTINET', 'CISCO']) { if (peers.has(`${p}:${rawId}`)) { provider = p; break; } }
+      }
+      const id = resolvePeerId(provider, rawId, rawId);
+      peers.delete(`${provider}:${id}`);
+      console.log(`[DEV MOCK DAEMON] peer removed (${provider}): ${id}`);
+      const resp = { success: true, publicKey: id };
+      if (provider !== 'WIREGUARD') { resp.providerType = provider; resp.peerIdentity = id; }
+      return send(res, 200, resp);
+    }
     return error(res, 405, 'METHOD_NOT_ALLOWED', 'Method not allowed');
   } catch (e) { return error(res, 400, e.message === 'invalid' ? 'INVALID_JSON' : e.message === 'too large' ? 'INVALID_JSON' : e.code || 'INVALID_POLICY', e.message === 'invalid' ? 'Request body must be valid JSON' : e.message === 'too large' ? 'Request body too large' : e.message); }
 }

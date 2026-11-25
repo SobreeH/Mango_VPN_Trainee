@@ -3,11 +3,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import {
   DeviceStatus,
+  GatewayIpamMode,
   PolicyAction,
   PolicyProtocol,
   PrismaClient,
   RoleName,
   SessionStatus,
+  VpnProviderType,
 } from '@prisma/client';
 import type { DaemonAddPeerRequest, DaemonRemovePeerRequest } from '@mango/shared';
 import bcrypt from 'bcryptjs';
@@ -224,6 +226,7 @@ describe('VPN Connect & Disconnect HTTP Seam (app.inject against PostgreSQL)', (
     await prisma.vpnPolicy.deleteMany();
     await prisma.agentVersion.deleteMany();
     await prisma.connectTicket.deleteMany();
+    await prisma.vpnGateway.deleteMany();
     await prisma.authRateLimit.deleteMany();
     await prisma.refreshToken.deleteMany();
     await prisma.auditLog.deleteMany();
@@ -631,5 +634,107 @@ describe('VPN Connect & Disconnect HTTP Seam (app.inject against PostgreSQL)', (
       },
     });
     expect(upToDateRes.statusCode).toBe(200);
+  });
+
+  it('supports Fortinet and Cisco gateways with role discovery, per-gateway IPAM, and ephemeral tunnelConfig', async () => {
+    const fgGateway = await prisma.vpnGateway.create({
+      data: {
+        name: 'HQ FortiGate SSL-VPN',
+        providerType: VpnProviderType.FORTINET,
+        endpoint: 'fg.mango.internal:443',
+        subnetCidr: '10.40.0.0/24',
+        ipamMode: GatewayIpamMode.API_MANAGED,
+        dns: ['10.40.0.1'],
+        allowedRoles: [RoleName.STAFF, RoleName.ADMIN],
+        isEnabled: true,
+      },
+    });
+    await prisma.vpnGateway.create({
+      data: {
+        name: 'Cisco Admin Only',
+        providerType: VpnProviderType.CISCO,
+        endpoint: 'asa.mango.internal:443',
+        subnetCidr: '10.50.0.0/24',
+        ipamMode: GatewayIpamMode.API_MANAGED,
+        allowedRoles: [RoleName.ADMIN],
+        isEnabled: true,
+      },
+    });
+
+    const { user: staffUser } = await seedUserAndTicket({ username: 'nina-fg', role: RoleName.STAFF });
+    const staffToken = jwt.sign(
+      {
+        sub: staffUser.id,
+        role: RoleName.STAFF,
+        tokenVersion: staffUser.tokenVersion,
+        type: 'access',
+      },
+      config.jwtSecret,
+      { algorithm: 'HS256', expiresIn: 900 },
+    );
+
+    const gwRes = await app.inject({
+      method: 'GET',
+      url: '/api/vpn/gateways',
+      headers: { authorization: `Bearer ${staffToken}` },
+    });
+    expect(gwRes.statusCode).toBe(200);
+    expect(gwRes.json().items).toHaveLength(1);
+    expect(gwRes.json().items[0].id).toBe(fgGateway.id);
+
+    const ticketRes = await app.inject({
+      method: 'POST',
+      url: '/api/vpn/ticket',
+      headers: { authorization: `Bearer ${staffToken}` },
+      payload: { gatewayId: fgGateway.id },
+    });
+    expect(ticketRes.statusCode).toBe(201);
+    expect(ticketRes.json().gatewayId).toBe(fgGateway.id);
+    expect(ticketRes.json().providerType).toBe(VpnProviderType.FORTINET);
+
+    const connectRes = await app.inject({
+      method: 'POST',
+      url: '/api/vpn/connect',
+      payload: {
+        ticket: ticketRes.json().ticket,
+        deviceFingerprint: 'fp-nina-fg',
+        hostname: 'NINA-PC',
+        agentVersion: '2.0.0',
+      },
+    });
+    expect(connectRes.statusCode).toBe(200);
+    const body = connectRes.json();
+    expect(body.providerType).toBe(VpnProviderType.FORTINET);
+    expect(body.gatewayId).toBe(fgGateway.id);
+    expect(body.assignedIp).toBe('10.40.0.2');
+    expect(body.serverEndpoint).toBe('fg.mango.internal:443');
+    expect(body.tunnelConfig).toMatchObject({
+      providerType: 'FORTINET',
+      protocol: 'fortinet',
+      username: 'nina-fg',
+    });
+    expect(typeof body.tunnelConfig.ephemeralSecret).toBe('string');
+
+    expect(addedPeers[0]).toMatchObject({
+      providerType: 'FORTINET',
+      gatewayId: fgGateway.id,
+      peerIdentity: body.peerIdentity,
+      assignedIp: '10.40.0.2',
+    });
+
+    const discRes = await app.inject({
+      method: 'POST',
+      url: '/api/vpn/disconnect',
+      payload: {
+        sessionId: body.sessionId,
+        peerIdentity: body.peerIdentity,
+      },
+    });
+    expect(discRes.statusCode).toBe(200);
+    expect(removedPeers[0]).toMatchObject({
+      providerType: 'FORTINET',
+      gatewayId: fgGateway.id,
+      peerIdentity: body.peerIdentity,
+    });
   });
 });

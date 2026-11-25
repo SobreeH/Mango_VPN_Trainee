@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import jwt from 'jsonwebtoken';
-import { DeviceStatus, RoleName, SessionStatus } from '@mango/shared';
+import { DeviceStatus, GatewayIpamMode, RoleName, SessionStatus, VpnProviderType } from '@mango/shared';
 import { buildApp, type VpnDaemonClient } from './app.js';
 import { loadConfig, type ApiConfig } from './config.js';
 import { createPrismaClient } from './lib/prisma.js';
@@ -71,6 +71,7 @@ describe('Admin Users, Devices, Sessions & Real-time Revocation (app.inject agai
     await prisma.vpnPeer.deleteMany();
     await prisma.device.deleteMany();
     await prisma.connectTicket.deleteMany();
+    await prisma.vpnGateway.deleteMany();
     await prisma.agentVersion.deleteMany();
     await prisma.refreshToken.deleteMany();
     await prisma.auditLog.deleteMany();
@@ -444,5 +445,58 @@ describe('Admin Users, Devices, Sessions & Real-time Revocation (app.inject agai
       where: { action: 'SESSION_FORCE_DISCONNECTED', targetId: session.id },
     });
     expect(audit).not.toBeNull();
+  });
+
+  it('enforces ADMIN RBAC and supports CRUD + audit logs on /api/gateways', async () => {
+    const staffGet = await app.inject({
+      method: 'GET',
+      url: '/api/gateways',
+      headers: { authorization: `Bearer ${staffToken}` },
+    });
+    expect(staffGet.statusCode).toBe(403);
+
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/api/gateways',
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: {
+        name: 'Cisco Branch ASA',
+        providerType: VpnProviderType.CISCO,
+        endpoint: 'asa.branch.internal:443',
+        subnetCidr: '10.50.0.0/24',
+        ipamMode: GatewayIpamMode.API_MANAGED,
+        allowedRoles: [RoleName.ADMIN, RoleName.STAFF],
+        isDefault: true,
+      },
+    });
+    expect(createRes.statusCode).toBe(201);
+    const created = createRes.json();
+    expect(created.providerType).toBe(VpnProviderType.CISCO);
+    expect(created.isDefault).toBe(true);
+
+    const patchRes = await app.inject({
+      method: 'PATCH',
+      url: `/api/gateways/${created.id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { isEnabled: false },
+    });
+    expect(patchRes.statusCode).toBe(200);
+    expect(patchRes.json().isEnabled).toBe(false);
+
+    const listRes = await app.inject({
+      method: 'GET',
+      url: '/api/gateways',
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(listRes.statusCode).toBe(200);
+    expect(listRes.json().items).toHaveLength(1);
+
+    const delRes = await app.inject({
+      method: 'DELETE',
+      url: `/api/gateways/${created.id}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(delRes.statusCode).toBe(200);
+    expect(delRes.json().success).toBe(true);
   });
 });

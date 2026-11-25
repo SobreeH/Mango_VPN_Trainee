@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import {
   SessionStatus,
+  VpnProviderType,
   type VpnSessionDto,
   type VpnSessionListResponse,
 } from '@mango/shared';
@@ -15,10 +16,14 @@ function toSessionDto(row: {
   deviceId: string;
   assignedIp: string;
   status: string;
+  providerType?: string;
+  gatewayId?: string | null;
   connectedAt: Date;
   disconnectedAt: Date | null;
   user?: { username: string } | null;
   device?: { hostname: string } | null;
+  gateway?: { name: string } | null;
+  peer?: { publicKey: string; peerIdentity: string | null } | null;
 }): VpnSessionDto {
   return {
     id: row.id,
@@ -28,6 +33,10 @@ function toSessionDto(row: {
     ...(row.device?.hostname ? { hostname: row.device.hostname } : {}),
     assignedIp: row.assignedIp,
     status: row.status as SessionStatus,
+    ...(row.providerType ? { providerType: row.providerType as VpnProviderType } : {}),
+    ...(row.gatewayId !== undefined ? { gatewayId: row.gatewayId } : {}),
+    ...(row.gateway?.name ? { gatewayName: row.gateway.name } : {}),
+    ...(row.peer ? { peerIdentity: row.peer.peerIdentity ?? row.peer.publicKey } : {}),
     connectedAt: row.connectedAt.toISOString(),
     disconnectedAt: row.disconnectedAt ? row.disconnectedAt.toISOString() : null,
   };
@@ -57,6 +66,8 @@ export function registerSessionRoutes(
       include: {
         user: { select: { username: true } },
         device: { select: { hostname: true } },
+        gateway: { select: { name: true } },
+        peer: { select: { publicKey: true, peerIdentity: true } },
       },
       orderBy: [{ connectedAt: 'desc' }],
     });
@@ -81,6 +92,7 @@ export function registerSessionRoutes(
       where: { id },
       include: {
         peer: true,
+        gateway: true,
         user: { select: { username: true } },
         device: { select: { hostname: true } },
       },
@@ -101,7 +113,14 @@ export function registerSessionRoutes(
     }
 
     try {
-      await teardownPeersOnDaemon(vpnDaemon, [session.peer.publicKey]);
+      await teardownPeersOnDaemon(vpnDaemon, [
+        {
+          publicKey: session.peer.publicKey,
+          peerIdentity: session.peer.peerIdentity,
+          providerType: session.providerType,
+          gatewayId: session.gatewayId,
+        },
+      ]);
     } catch (err) {
       const reason = err instanceof Error ? err.message : 'VPN daemon failed to remove peer';
       return reply.status(502).send({
@@ -119,6 +138,8 @@ export function registerSessionRoutes(
         include: {
           user: { select: { username: true } },
           device: { select: { hostname: true } },
+          gateway: { select: { name: true } },
+          peer: { select: { publicKey: true, peerIdentity: true } },
         },
       });
 
@@ -133,6 +154,8 @@ export function registerSessionRoutes(
             userId: session.userId,
             deviceId: session.deviceId,
             assignedIp: session.assignedIp,
+            providerType: session.providerType,
+            gatewayId: session.gatewayId,
           },
         },
       });

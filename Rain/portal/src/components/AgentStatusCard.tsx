@@ -11,7 +11,13 @@ import {
   ShieldCheck,
   WifiOff,
 } from 'lucide-react';
-import type { AgentHealthResponse, AgentStatusResponse, RoleName } from '@mango/shared';
+import {
+  VpnProviderType,
+  type AgentHealthResponse,
+  type AgentStatusResponse,
+  type RoleName,
+  type VpnGatewayDto,
+} from '@mango/shared';
 
 function formatBytes(bytes?: number): string {
   if (!bytes || bytes <= 0) return '0 B';
@@ -25,6 +31,7 @@ import {
   connectAgent,
   disconnectAgent,
   fetchAgentStatus,
+  fetchAvailableGateways,
   requestConnectTicket,
 } from '../api/agent';
 import type { AuthRefreshContext } from '../api/auth';
@@ -40,6 +47,19 @@ export interface AgentStatusCardProps {
   userRole?: RoleName;
   username?: string;
   auth?: AuthRefreshContext;
+  gateways?: VpnGatewayDto[];
+}
+
+function providerLabel(provider?: VpnProviderType): string {
+  switch (provider) {
+    case VpnProviderType.FORTINET:
+      return 'Fortinet SSL-VPN';
+    case VpnProviderType.CISCO:
+      return 'Cisco AnyConnect';
+    case VpnProviderType.WIREGUARD:
+    default:
+      return 'WireGuard';
+  }
 }
 
 const LOCAL_STORAGE_TOKEN_KEY = 'mango_agent_pairing_token';
@@ -69,12 +89,28 @@ function savePairingToken(token: string): void {
   }
 }
 
-export function AgentStatusCard({ accessToken, userRole, username, auth }: AgentStatusCardProps) {
+export function AgentStatusCard({
+  accessToken,
+  userRole,
+  username,
+  auth,
+  gateways: initialGateways,
+}: AgentStatusCardProps) {
   const [view, setView] = useState<AgentViewState>({ kind: 'checking' });
   const [pairingToken, setPairingToken] = useState<string>(() => getSavedPairingToken());
   const [isPairing, setIsPairing] = useState(false);
   const [isTunnelBusy, setIsTunnelBusy] = useState(false);
   const [tunnelError, setTunnelError] = useState<string | null>(null);
+  const [gateways, setGateways] = useState<VpnGatewayDto[]>(initialGateways ?? []);
+  const [selectedGatewayKey, setSelectedGatewayKey] = useState<string>(() => {
+    if (initialGateways && initialGateways.length > 0) {
+      const def = initialGateways.find((g) => g.isDefault) ?? initialGateways[0]!;
+      return `gw:${def.id}`;
+    }
+    return `default:${VpnProviderType.WIREGUARD}`;
+  });
+  const [isLoadingGateways, setIsLoadingGateways] = useState(false);
+  const [showTechDetails, setShowTechDetails] = useState(false);
   const [disconnectMessage, setDisconnectMessage] = useState<string | null>(null);
 
   const probeAgent = useCallback(async (tokenToCheck?: string) => {
@@ -85,7 +121,7 @@ export function AgentStatusCard({ accessToken, userRole, username, auth }: Agent
     } catch (err) {
       setView({
         kind: 'unreachable',
-        reason: err instanceof Error ? err.message : 'Local Windows Agent is not responding',
+        reason: err instanceof Error ? err.message : 'Local Endpoint Agent is not responding',
       });
       return;
     }
@@ -119,6 +155,24 @@ export function AgentStatusCard({ accessToken, userRole, username, auth }: Agent
     const saved = getSavedPairingToken();
     void probeAgent(saved || undefined);
   }, [probeAgent]);
+
+  async function handleLoadGateways() {
+    if (!accessToken) return;
+    setTunnelError(null);
+    setIsLoadingGateways(true);
+    try {
+      const res = await fetchAvailableGateways(accessToken, auth);
+      setGateways(res.items);
+      if (res.items.length > 0) {
+        const def = res.items.find((g) => g.isDefault) ?? res.items[0]!;
+        setSelectedGatewayKey(`gw:${def.id}`);
+      }
+    } catch (err) {
+      setTunnelError(err instanceof Error ? err.message : 'Failed to load VPN gateways');
+    } finally {
+      setIsLoadingGateways(false);
+    }
+  }
 
   // Auto-retry polling when Agent is unreachable
   useEffect(() => {
@@ -217,14 +271,41 @@ export function AgentStatusCard({ accessToken, userRole, username, auth }: Agent
     setDisconnectMessage(null);
     setIsTunnelBusy(true);
     try {
-      const { ticket } = await requestConnectTicket(accessToken, auth);
-      const userHint = (username || userRole || '').toLowerCase();
-      const res = await connectAgent(pairingToken.trim(), ticket, userHint);
+      const userHint = (username || userRole || '').toLowerCase() || undefined;
+      let ticketRes;
+      let res;
+      if (selectedGatewayKey.startsWith('gw:')) {
+        const gwId = selectedGatewayKey.slice(3);
+        const selectedGw = gateways.find((g) => g.id === gwId);
+        ticketRes = await requestConnectTicket(accessToken, auth, gwId);
+        res = await connectAgent(pairingToken.trim(), ticketRes.ticket, {
+          providerType: selectedGw?.providerType,
+          gatewayId: gwId,
+          userHint,
+        });
+      } else if (selectedGatewayKey !== `default:${VpnProviderType.WIREGUARD}`) {
+        const providerType = selectedGatewayKey.slice('default:'.length) as VpnProviderType;
+        ticketRes = await requestConnectTicket(accessToken, auth);
+        res = await connectAgent(pairingToken.trim(), ticketRes.ticket, {
+          providerType,
+          userHint,
+        });
+      } else {
+        ticketRes = await requestConnectTicket(accessToken, auth);
+        res = await connectAgent(
+          pairingToken.trim(),
+          ticketRes.ticket,
+          userHint ? { userHint } : undefined,
+        );
+      }
       setView({
         ...view,
         status: {
           ...view.status,
           state: res.state,
+          providerType: res.providerType ?? view.status.providerType,
+          gatewayId: res.gatewayId ?? null,
+          peerIdentity: res.peerIdentity ?? res.publicKey,
           publicKey: res.publicKey,
           assignedIp: res.assignedIp,
           serverEndpoint: res.serverEndpoint,
@@ -255,6 +336,8 @@ export function AgentStatusCard({ accessToken, userRole, username, auth }: Agent
         status: {
           ...view.status,
           state: res.state,
+          gatewayId: null,
+          peerIdentity: null,
           assignedIp: null,
           serverEndpoint: null,
           allowedIps: [],
@@ -270,7 +353,8 @@ export function AgentStatusCard({ accessToken, userRole, username, auth }: Agent
     }
   }
 
-  const [showTechDetails, setShowTechDetails] = useState(false);
+  const activeProvider = view.kind === 'paired' ? view.status.providerType : undefined;
+  const activeProviderName = providerLabel(activeProvider);
 
   return (
     <div className="w-full space-y-6">
@@ -295,13 +379,12 @@ export function AgentStatusCard({ accessToken, userRole, username, auth }: Agent
               Auto-reconnecting...
             </span>
           </div>
-
           <div className="space-y-1">
             <p className="text-xs sm:text-sm text-stone-300 font-medium">
-              ไม่สามารถเชื่อมต่อไปยัง Windows Agent (127.0.0.1:47821) ได้
+              ไม่สามารถเชื่อมต่อไปยัง Endpoint Agent (127.0.0.1:47821) ได้
             </p>
             <p className="text-xs text-stone-400 leading-relaxed font-mono">
-              Start the local MANGO Windows Agent on 127.0.0.1:47821 ({view.reason}).
+              Start the local MANGO Endpoint Agent on 127.0.0.1:47821 ({view.reason}).
             </p>
           </div>
 
@@ -334,7 +417,7 @@ export function AgentStatusCard({ accessToken, userRole, username, auth }: Agent
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
-                WINDOWS AGENT
+                ENDPOINT AGENT
               </span>
               <span className="font-mono text-[11px] px-2 py-0.5 rounded-full bg-white/5 text-stone-400 border border-white/5">
                 v{view.health.version}
@@ -396,7 +479,7 @@ export function AgentStatusCard({ accessToken, userRole, username, auth }: Agent
 
       {view.kind === 'paired' && (
         <div className="space-y-6">
-          {/* Card 1: Hero Connection Status Card matching Reference Mockup */}
+          {/* Card 1: Hero Connection Status Card */}
           <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-6 sm:p-8 shadow-2xl backdrop-blur-xl space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               {/* Left Side: Status Icon & Text */}
@@ -414,7 +497,7 @@ export function AgentStatusCard({ accessToken, userRole, username, auth }: Agent
                 </div>
 
                 <div>
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex flex-wrap items-center gap-2.5">
                     <h3 className="text-xl sm:text-2xl font-extrabold text-stone-100 tracking-tight">
                       {view.status.state === 'connected' ? 'เชื่อมต่อ VPN แล้ว' : 'พร้อมเชื่อมต่อ VPN'}
                     </h3>
@@ -424,22 +507,69 @@ export function AgentStatusCard({ accessToken, userRole, username, auth }: Agent
                     <span className="text-[10px] font-mono text-stone-500 bg-white/5 px-2 py-0.5 rounded border border-white/5">
                       Agent Paired &amp; Ready · v{view.health.version}
                     </span>
+                    {view.status.state === 'connected' && (
+                      <span className="text-[10px] font-mono text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
+                        {activeProviderName}
+                      </span>
+                    )}
                   </div>
 
                   <p className="text-xs text-stone-400 mt-1">
                     {view.status.state === 'connected'
                       ? (view.status.connectedSince
-                          ? `เชื่อมต่อเมื่อ ${new Date(view.status.connectedSince).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · อุโมงค์ WireGuard ทำงานปกติ`
-                          : 'เชื่อมต่อแล้ว · อุโมงค์ WireGuard ทำงานปกติ')
+                          ? `เชื่อมต่อเมื่อ ${new Date(view.status.connectedSince).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · อุโมงค์ ${activeProviderName} ทำงานปกติ`
+                          : `เชื่อมต่อแล้ว · อุโมงค์ ${activeProviderName} ทำงานปกติ`)
                       : disconnectMessage
                         ? `${disconnectMessage} · กดปุ่มด้านขวาเพื่อเริ่มการเชื่อมต่อใหม่`
-                        : 'กดปุ่มด้านขวาเพื่อเริ่มการเชื่อมต่อเครือข่ายความปลอดภัย'}
+                        : 'เลือกโปรโตคอลหรือเกตเวย์ แล้วกดปุ่มด้านขวาเพื่อเริ่มการเชื่อมต่อ'}
                   </p>
                 </div>
               </div>
 
-              {/* Right Side: Action Button */}
-              <div className="shrink-0 flex items-center gap-3">
+              {/* Right Side: Gateway Selector & Action Button */}
+              <div className="shrink-0 flex flex-wrap items-center gap-3">
+                {view.status.state !== 'connected' && accessToken && (
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      aria-label="VPN Provider"
+                      disabled={isTunnelBusy}
+                      value={selectedGatewayKey}
+                      onChange={(e) => setSelectedGatewayKey(e.target.value)}
+                      className="h-10 rounded-xl border border-white/10 bg-[#262420] px-3 text-xs text-stone-200 focus:border-amber-400 focus:outline-none disabled:opacity-50"
+                    >
+                      {gateways.length > 0 ? (
+                        gateways.map((gw) => (
+                          <option key={gw.id} value={`gw:${gw.id}`}>
+                            {gw.name} ({gw.providerType})
+                          </option>
+                        ))
+                      ) : (
+                        <>
+                          <option value={`default:${VpnProviderType.WIREGUARD}`}>
+                            WireGuard (Default)
+                          </option>
+                          <option value={`default:${VpnProviderType.FORTINET}`}>
+                            Fortinet SSL-VPN
+                          </option>
+                          <option value={`default:${VpnProviderType.CISCO}`}>
+                            Cisco AnyConnect
+                          </option>
+                        </>
+                      )}
+                    </select>
+                    <button
+                      type="button"
+                      disabled={isLoadingGateways || isTunnelBusy}
+                      onClick={() => void handleLoadGateways()}
+                      title="Load registered VPN gateways"
+                      aria-label="Load Gateways"
+                      className="h-10 rounded-xl border border-white/10 bg-[#262420] px-2.5 text-xs text-stone-300 hover:text-white disabled:opacity-50"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${isLoadingGateways ? 'animate-spin' : ''}`} />
+                    </button>
+                  </div>
+                )}
+
                 {view.status.state === 'connected' ? (
                   <button
                     type="button"
@@ -498,7 +628,9 @@ export function AgentStatusCard({ accessToken, userRole, username, auth }: Agent
 
                 {/* Node 2: VPN Gateway */}
                 <div className="sm:col-span-3 rounded-2xl border border-white/5 bg-[#141311]/70 p-4 text-center">
-                  <span className="text-[11px] text-stone-400 block font-medium">VPN Gateway</span>
+                  <span className="text-[11px] text-stone-400 block font-medium">
+                    VPN Gateway ({activeProviderName})
+                  </span>
                   <span className="font-mono font-bold text-stone-300 text-xs mt-0.5 block">
                     {view.status.serverEndpoint ?? '127.0.0.1:51820'}
                   </span>
@@ -546,9 +678,9 @@ export function AgentStatusCard({ accessToken, userRole, username, auth }: Agent
             </div>
 
             <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-5 shadow-xl">
-              <span className="text-stone-400 text-xs block font-medium">ระยะเวลาเชื่อมต่อ</span>
+              <span className="text-stone-400 text-xs block font-medium">สถานะโปรโตคอล</span>
               <span className="text-xl sm:text-2xl font-extrabold text-stone-100 font-mono mt-1.5 block">
-                {view.status.state === 'connected' ? 'เชื่อมต่อแล้ว' : 'ไม่ได้เชื่อมต่อ'}
+                {view.status.state === 'connected' ? activeProviderName : 'ไม่ได้เชื่อมต่อ'}
               </span>
             </div>
 
@@ -624,14 +756,26 @@ export function AgentStatusCard({ accessToken, userRole, username, auth }: Agent
                 {showTechDetails && (
                   <div className="mt-3 p-3 rounded-2xl border border-white/5 bg-[#141311]/70 space-y-2 text-xs">
                     <div className="flex items-center justify-between text-stone-400">
-                      <span>Curve25519 Key</span>
+                      <span>
+                        {activeProvider === VpnProviderType.WIREGUARD || !activeProvider
+                          ? 'Curve25519 Key'
+                          : 'Peer Identity'}
+                      </span>
                       <span className="font-mono text-stone-200">
-                        {view.status.publicKey ? `${view.status.publicKey.slice(0, 12)}...` : '-'}
+                        {(view.status.peerIdentity ?? view.status.publicKey)
+                          ? `${(view.status.peerIdentity ?? view.status.publicKey).slice(0, 12)}...`
+                          : '-'}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-stone-400">
                       <span>Protocol</span>
-                      <span className="font-mono text-stone-200">WireGuard (RFC 6238)</span>
+                      <span className="font-mono text-stone-200">
+                        {activeProvider === VpnProviderType.FORTINET
+                          ? 'Fortinet SSL-VPN (OpenConnect)'
+                          : activeProvider === VpnProviderType.CISCO
+                            ? 'Cisco AnyConnect (OpenConnect)'
+                            : 'WireGuard (Curve25519)'}
+                      </span>
                     </div>
                   </div>
                 )}
@@ -693,7 +837,7 @@ export function AgentStatusCard({ accessToken, userRole, username, auth }: Agent
                 </div>
                 <div className="flex items-center gap-2.5 text-stone-300">
                   <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                  <span>Windows Agent จับคู่แล้ว · v{view.health.version}</span>
+                  <span>Endpoint Agent จับคู่แล้ว · v{view.health.version}</span>
                 </div>
                 <div className="flex items-center gap-2.5 text-stone-300">
                   <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Activity, Download, ShieldAlert, Wifi } from 'lucide-react';
-import { SessionStatus, type VpnSessionDto } from '@mango/shared';
+import { SessionStatus, VpnProviderType, type VpnSessionDto } from '@mango/shared';
 import type { AuthRefreshContext } from '../api/auth';
 import { disconnectSession, fetchSessions } from '../lib/adminApi';
 import { useToast } from './Toast';
@@ -145,51 +145,69 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps)
               <thead className="bg-[#141311]/80 text-[11px] uppercase tracking-wider text-stone-400 border-b border-white/5">
                 <tr>
                   <th className="px-4 py-3.5">User / Device</th>
+                  <th className="px-4 py-3.5">Provider / Gateway</th>
                   <th className="px-4 py-3.5">Assigned IP</th>
                   <th className="px-4 py-3.5">Status</th>
                   <th className="px-4 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {sessions.map((s) => (
-                  <tr key={s.id} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="px-4 py-3.5">
-                      <div className="font-semibold text-stone-200">{s.username ?? s.userId}</div>
-                      <div className="text-[11px] text-stone-500 font-mono">{s.hostname ?? s.deviceId}</div>
-                    </td>
-                    <td className="px-4 py-3.5 font-mono text-[11px] text-emerald-400 font-semibold">{s.assignedIp}</td>
-                    <td className="px-4 py-3.5">
-                      <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wider ${
-                          s.status === SessionStatus.ACTIVE
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                            : 'bg-stone-800 text-stone-400 border border-white/5'
-                        }`}
-                      >
-                        {s.status === SessionStatus.ACTIVE && (
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                {sessions.map((s) => {
+                  const provider = s.providerType ?? VpnProviderType.WIREGUARD;
+                  const providerBadgeClass =
+                    provider === VpnProviderType.FORTINET
+                      ? 'bg-rose-500/10 text-rose-300 border border-rose-500/30'
+                      : provider === VpnProviderType.CISCO
+                        ? 'bg-sky-500/10 text-sky-300 border border-sky-500/30'
+                        : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30';
+                  return (
+                    <tr key={s.id} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="px-4 py-3.5">
+                        <div className="font-semibold text-stone-200">{s.username ?? s.userId}</div>
+                        <div className="text-[11px] text-stone-500 font-mono">{s.hostname ?? s.deviceId}</div>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wider ${providerBadgeClass}`}>
+                          {provider}
+                        </span>
+                        {s.gatewayName && (
+                          <div className="text-[11px] text-stone-400 mt-1">{s.gatewayName}</div>
                         )}
-                        {s.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3.5 text-right">
-                      <button
-                        type="button"
-                        disabled={s.status !== SessionStatus.ACTIVE || disconnectMutation.isPending}
-                        onClick={() =>
-                          setSessionToDisconnect({
-                            id: s.id,
-                            username: s.username ?? s.userId,
-                            assignedIp: s.assignedIp,
-                          })
-                        }
-                        className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 disabled:opacity-30 transition-colors shadow-sm"
-                      >
-                        Disconnect
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-4 py-3.5 font-mono text-[11px] text-emerald-400 font-semibold">{s.assignedIp}</td>
+                      <td className="px-4 py-3.5">
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wider ${
+                            s.status === SessionStatus.ACTIVE
+                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                              : 'bg-stone-800 text-stone-400 border border-white/5'
+                          }`}
+                        >
+                          {s.status === SessionStatus.ACTIVE && (
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          )}
+                          {s.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <button
+                          type="button"
+                          disabled={s.status !== SessionStatus.ACTIVE || disconnectMutation.isPending}
+                          onClick={() =>
+                            setSessionToDisconnect({
+                              id: s.id,
+                              username: s.username ?? s.userId,
+                              assignedIp: s.assignedIp,
+                            })
+                          }
+                          className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 disabled:opacity-30 transition-colors shadow-sm"
+                        >
+                          Disconnect
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -210,7 +228,7 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps)
               Assigned IP: {sessionToDisconnect?.assignedIp}
             </p>
             <p className="text-xs text-amber-400 font-medium pt-1">
-              ⚠️ The WireGuard peer will be immediately removed from the gateway daemon, terminating
+              ⚠️ The VPN peer/session will be immediately removed from the gateway daemon, terminating
               active network access.
             </p>
           </div>
