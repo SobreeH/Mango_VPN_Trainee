@@ -423,4 +423,67 @@ describe('AgentStatusCard (fetch seam)', () => {
       }),
     );
   });
+
+  it('allows inspecting Client, Gateway, and Network topology nodes interactively', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            status: 'ok',
+            service: 'mango-agent-windows',
+            version: '2.0.0',
+            tunnelActive: true,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            state: 'connected',
+            version: '2.0.0',
+            publicKey: 'PUBKEY1234567890ABCDEF',
+            assignedIp: '10.13.13.9',
+            serverEndpoint: 'vpn.mango.internal:51820',
+            allowedIps: ['10.20.0.0/16', '10.25.0.0/16'],
+            connectedSince: '2026-11-25T02:00:00Z',
+            bytesReceived: 2048,
+            bytesSent: 1024,
+            lastError: null,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+
+    render(<AgentStatusCard accessToken="jwt-token" userRole={RoleName.STAFF} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/agent pairing token/i)).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText(/agent pairing token/i), {
+      target: { value: 'valid-pairing-token' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /pair agent/i }));
+
+    expect(await screen.findByText('TUNNEL ACTIVE')).toBeInTheDocument();
+
+    // Inspect Client Node
+    fireEvent.click(screen.getByRole('button', { name: /Inspect client node/i }));
+    const region = screen.getByRole('region', { name: /Topology node details/i });
+    expect(region).toHaveTextContent('10.13.13.9');
+
+    // Inspect Gateway Node
+    fireEvent.click(screen.getByRole('button', { name: /Inspect gateway node/i }));
+    expect(region).toHaveTextContent('PUBKEY1234');
+    expect(region).toHaveTextContent('CONNECTED (Zero-Trust)');
+
+    // Inspect Network Node
+    fireEvent.click(screen.getByRole('button', { name: /Inspect network node/i }));
+    expect(region).toHaveTextContent('10.25.0.0/16');
+
+    // Close inspector
+    fireEvent.click(screen.getByRole('button', { name: /Close node details/i }));
+    expect(screen.queryByRole('region', { name: /Topology node details/i })).not.toBeInTheDocument();
+  });
 });

@@ -35,6 +35,7 @@ import {
   requestConnectTicket,
 } from '../api/agent';
 import type { AuthRefreshContext } from '../api/auth';
+import { NetworkTopology } from './NetworkTopology';
 
 type AgentViewState =
   | { kind: 'checking' }
@@ -608,52 +609,18 @@ export function AgentStatusCard({
               </div>
             )}
 
-            {/* Visual Tunnel Hop Diagram */}
-            <div className="pt-6 border-t border-white/5">
-              <div className="grid grid-cols-1 sm:grid-cols-11 items-center gap-2 text-xs">
-                {/* Node 1: User Device */}
-                <div className="sm:col-span-3 rounded-2xl border border-white/5 bg-[#141311]/70 p-4 text-center">
-                  <span className="text-[11px] text-stone-400 block font-medium">เครื่องของคุณ</span>
-                  <span className="font-mono font-bold text-stone-200 text-sm mt-0.5 block">
-                    {view.status.assignedIp ? `IP: ${view.status.assignedIp}` : '10.13.13.2'}
-                  </span>
-                </div>
-
-                {/* Line 1 */}
-                <div className="hidden sm:flex sm:col-span-1 items-center justify-center">
-                  <div className={`h-0.5 w-full rounded transition-colors ${
-                    view.status.state === 'connected' ? 'bg-emerald-500 shadow-sm shadow-emerald-400/50' : 'bg-stone-800'
-                  }`} />
-                </div>
-
-                {/* Node 2: VPN Gateway */}
-                <div className="sm:col-span-3 rounded-2xl border border-white/5 bg-[#141311]/70 p-4 text-center">
-                  <span className="text-[11px] text-stone-400 block font-medium">
-                    VPN Gateway ({activeProviderName})
-                  </span>
-                  <span className="font-mono font-bold text-stone-300 text-xs mt-0.5 block">
-                    {view.status.serverEndpoint ?? '127.0.0.1:51820'}
-                  </span>
-                </div>
-
-                {/* Line 2 */}
-                <div className="hidden sm:flex sm:col-span-1 items-center justify-center">
-                  <div className={`h-0.5 w-full rounded transition-colors ${
-                    view.status.state === 'connected' ? 'bg-emerald-500 shadow-sm shadow-emerald-400/50' : 'bg-stone-800'
-                  }`} />
-                </div>
-
-                {/* Node 3: Company Network */}
-                <div className="sm:col-span-3 rounded-2xl border border-white/5 bg-[#141311]/70 p-4 text-center">
-                  <span className="text-[11px] text-stone-400 block font-medium">เครือข่ายองค์กร</span>
-                  <span className="font-mono font-bold text-stone-300 text-xs mt-0.5 block">
-                    {view.status.allowedIps?.[0]
-                      ? `Subnet: ${view.status.allowedIps[0]}`
-                      : (userRole === 'STAFF' ? 'Subnet: 10.20.0.0/16' : 'Subnet: 10.30.1.0/24')}
-                  </span>
-                </div>
-              </div>
-            </div>
+            {/* Interactive Network Topology */}
+            <NetworkTopology
+              isConnected={view.status.state === 'connected'}
+              assignedIp={view.status.assignedIp}
+              serverEndpoint={view.status.serverEndpoint}
+              allowedIps={view.status.allowedIps}
+              publicKey={view.status.publicKey}
+              bytesReceived={view.status.bytesReceived}
+              bytesSent={view.status.bytesSent}
+              userRole={userRole}
+              activeProviderName={activeProviderName}
+            />
           </div>
 
           {/* Card Row 2: Telemetry Metric Cards */}
