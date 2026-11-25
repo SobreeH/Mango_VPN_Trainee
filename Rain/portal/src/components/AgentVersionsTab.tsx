@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertCircle, CheckCircle2, Download, Package, Shield, UploadCloud } from 'lucide-react';
 import type { AgentVersionDto, UpdateAgentVersionRequest } from '@mango/shared';
 import type { AuthRefreshContext } from '../api/auth';
 import {
@@ -70,14 +71,39 @@ export function AgentVersionsTab({ apiBaseUrl, accessToken, auth }: AgentVersion
 
   return (
     <section aria-label="Agent Versions" className="space-y-6">
+      {/* Header Info Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-white/5">
+        <div>
+          <div className="flex items-center gap-2">
+            <Package className="h-5 w-5 text-amber-400" />
+            <h2 className="text-lg font-bold text-stone-100 tracking-tight">
+              จัดการเวอร์ชัน Agent (Agent Versions Registry)
+            </h2>
+          </div>
+          <p className="text-xs text-stone-400 mt-1">
+            ควบคุมเวอร์ชันของไคลเอนต์ Windows Agent ที่อนุญาตให้เชื่อมต่อเข้าระบบ Zero-Trust
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-xs px-3 py-1 rounded-full bg-white/5 text-stone-300 border border-white/5">
+            ทั้งหมด {versions.length} เวอร์ชัน
+          </span>
+        </div>
+      </div>
+
+      {/* Publish Form Card */}
       <form
         onSubmit={handleSubmit}
-        className="rounded-lg border border-slate-800 bg-slate-950/60 p-4 space-y-4"
+        className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-6 shadow-2xl backdrop-blur-xl space-y-5"
       >
-        <h3 className="text-sm font-semibold text-slate-100">Publish Agent Version</h3>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div>
-            <label htmlFor="agent-version" className="block text-xs text-slate-400 mb-1">
+        <div className="flex items-center gap-2 text-sm font-bold text-stone-100">
+          <UploadCloud className="h-4 w-4 text-amber-400" />
+          <span>Publish Agent Version</span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <label htmlFor="agent-version" className="block text-xs font-medium text-stone-300">
               Version
             </label>
             <input
@@ -86,12 +112,13 @@ export function AgentVersionsTab({ apiBaseUrl, accessToken, auth }: AgentVersion
               required
               value={version}
               onChange={(e) => setVersion(e.target.value)}
-              placeholder="1.3.0"
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              placeholder="เช่น 2.0.0"
+              className="w-full h-10 rounded-xl border border-white/10 bg-[#262420]/70 px-3.5 text-xs text-stone-100 placeholder-stone-500 focus:border-amber-400 focus:outline-none transition-colors"
             />
           </div>
-          <div>
-            <label htmlFor="agent-platform" className="block text-xs text-slate-400 mb-1">
+
+          <div className="space-y-1.5">
+            <label htmlFor="agent-platform" className="block text-xs font-medium text-stone-300">
               Platform
             </label>
             <input
@@ -100,11 +127,12 @@ export function AgentVersionsTab({ apiBaseUrl, accessToken, auth }: AgentVersion
               required
               value={platform}
               onChange={(e) => setPlatform(e.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              className="w-full h-10 rounded-xl border border-white/10 bg-[#262420]/70 px-3.5 text-xs text-stone-100 placeholder-stone-500 focus:border-amber-400 focus:outline-none transition-colors"
             />
           </div>
-          <div>
-            <label htmlFor="agent-download-url" className="block text-xs text-slate-400 mb-1">
+
+          <div className="space-y-1.5">
+            <label htmlFor="agent-download-url" className="block text-xs font-medium text-stone-300">
               Download URL
             </label>
             <input
@@ -113,12 +141,13 @@ export function AgentVersionsTab({ apiBaseUrl, accessToken, auth }: AgentVersion
               required
               value={downloadUrl}
               onChange={(e) => setDownloadUrl(e.target.value)}
-              placeholder="https://downloads.mango.local/agent-1.3.0.msi"
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              placeholder="https://downloads.mango.local/agent-2.0.0.msi"
+              className="w-full h-10 rounded-xl border border-white/10 bg-[#262420]/70 px-3.5 text-xs text-stone-100 placeholder-stone-500 focus:border-amber-400 focus:outline-none transition-colors"
             />
           </div>
-          <div>
-            <label htmlFor="agent-checksum" className="block text-xs text-slate-400 mb-1">
+
+          <div className="space-y-1.5">
+            <label htmlFor="agent-checksum" className="block text-xs font-medium text-stone-300">
               SHA-256 Checksum
             </label>
             <input
@@ -128,110 +157,158 @@ export function AgentVersionsTab({ apiBaseUrl, accessToken, auth }: AgentVersion
               value={sha256Checksum}
               onChange={(e) => setSha256Checksum(e.target.value)}
               placeholder="64-character hex SHA-256"
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm font-mono text-slate-100"
+              className="w-full h-10 rounded-xl border border-white/10 bg-[#262420]/70 px-3.5 text-xs font-mono text-stone-100 placeholder-stone-500 focus:border-amber-400 focus:outline-none transition-colors"
             />
           </div>
         </div>
-        <div className="flex items-center justify-between">
-          <label className="flex items-center gap-2 text-sm text-slate-300">
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2 border-t border-white/5">
+          <label className="flex items-center gap-2.5 text-xs text-stone-300 cursor-pointer">
             <input
               type="checkbox"
               checked={isRequired}
               onChange={(e) => setIsRequired(e.target.checked)}
+              className="h-4 w-4 rounded border-white/10 bg-[#262420] text-amber-500 focus:ring-0 focus:ring-offset-0 cursor-pointer"
             />
-            Minimum required version
+            <span className="font-medium">Minimum required version</span>
+            <span className="text-stone-500 text-[11px]">(บังคับให้อุปกรณ์ต้องใช้เวอร์ชันนี้หรือใหม่กว่า)</span>
           </label>
+
           <button
             type="submit"
             disabled={createMutation.isPending}
-            className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400 disabled:opacity-50"
+            className="h-10 rounded-xl bg-[#f59e0b] hover:bg-[#d97706] px-5 text-xs font-bold text-stone-950 shadow-md shadow-amber-500/20 disabled:opacity-50 transition-colors"
           >
-            Publish Version
+            {createMutation.isPending ? 'Publishing...' : 'Publish Version'}
           </button>
         </div>
       </form>
 
+      {/* Error Alert */}
       {activeError && (
         <div
           role="alert"
-          className="rounded-lg border border-red-500/40 bg-red-950/50 px-4 py-3 text-sm text-red-200"
+          className="flex items-start gap-2.5 rounded-2xl border border-red-500/30 bg-red-950/30 p-4 text-xs text-red-200"
         >
-          {activeError instanceof Error ? activeError.message : 'Agent version operation failed'}
+          <AlertCircle className="h-4 w-4 shrink-0 text-red-400 mt-0.5" />
+          <span>{activeError instanceof Error ? activeError.message : 'Agent version operation failed'}</span>
         </div>
       )}
 
+      {/* Table / List View */}
       {listQuery.isLoading ? (
-        <p className="text-sm text-slate-400">Loading agent versions...</p>
+        <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-8 text-center text-xs text-stone-400">
+          Loading agent versions...
+        </div>
       ) : versions.length === 0 && !listQuery.error ? (
-        <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-6 text-center text-sm text-slate-400">
-          No agent versions registered.
+        <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-8 text-center space-y-2">
+          <Package className="h-8 w-8 text-stone-600 mx-auto mb-2" />
+          <p className="text-sm font-semibold text-stone-300">No agent versions registered.</p>
+          <p className="text-xs text-stone-500">ยังไม่มีประวัติการเผยแพร่เวอร์ชัน Agent ในระบบ</p>
         </div>
       ) : versions.length > 0 ? (
-        <div className="overflow-x-auto rounded-lg border border-slate-800">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-950 text-xs uppercase text-slate-400">
-              <tr>
-                <th className="px-4 py-3">Version</th>
-                <th className="px-4 py-3">Platform</th>
-                <th className="px-4 py-3">SHA-256</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800">
-              {versions.map((item) => (
-                <tr key={item.id} className="hover:bg-slate-800/40">
-                  <td className="px-4 py-3 font-mono font-semibold text-slate-100">{item.version}</td>
-                  <td className="px-4 py-3 text-slate-300">{item.platform}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-400" title={item.sha256Checksum}>
-                    {item.sha256Checksum.slice(0, 12)}...
-                  </td>
-                  <td className="px-4 py-3 space-x-2">
-                    <span
-                      className={`inline-block rounded px-2 py-0.5 text-xs ${
-                        item.isActive
-                          ? 'bg-emerald-500/15 text-emerald-300'
-                          : 'bg-slate-700/40 text-slate-400'
-                      }`}
-                    >
-                      {item.isActive ? 'Active' : 'Inactive'}
-                    </span>
-                    {item.isRequired && (
-                      <span className="inline-block rounded bg-amber-500/15 px-2 py-0.5 text-xs text-amber-300">
-                        Required
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right space-x-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateMutation.mutate({
-                          id: item.id,
-                          patch: { isActive: !item.isActive },
-                        })
-                      }
-                      className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:bg-slate-800"
-                    >
-                      {item.isActive ? 'Deactivate' : 'Activate'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateMutation.mutate({
-                          id: item.id,
-                          patch: { isRequired: !item.isRequired },
-                        })
-                      }
-                      className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:bg-slate-800"
-                    >
-                      {item.isRequired ? 'Mark Optional' : 'Mark Required'}
-                    </button>
-                  </td>
+        <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 shadow-2xl backdrop-blur-xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-[#141311]/80 text-[11px] uppercase tracking-wider text-stone-400 border-b border-white/5">
+                <tr>
+                  <th className="px-5 py-3.5 font-bold">Version</th>
+                  <th className="px-5 py-3.5 font-bold">Platform</th>
+                  <th className="px-5 py-3.5 font-bold">SHA-256</th>
+                  <th className="px-5 py-3.5 font-bold">Status</th>
+                  <th className="px-5 py-3.5 font-bold text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {versions.map((item) => (
+                  <tr key={item.id} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-stone-100 text-sm">{item.version}</span>
+                        {item.downloadUrl && (
+                          <a
+                            href={item.downloadUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Download Link"
+                            className="text-stone-500 hover:text-amber-400"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </a>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 text-stone-300 font-mono text-xs">
+                      <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/5">
+                        {item.platform}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 font-mono text-stone-400 text-xs" title={item.sha256Checksum}>
+                      <span className="bg-black/30 px-2 py-0.5 rounded border border-white/5">
+                        {item.sha256Checksum.slice(0, 12)}...
+                      </span>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${
+                            item.isActive
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                              : 'bg-stone-800/50 text-stone-400 border-stone-700/50'
+                          }`}
+                        >
+                          {item.isActive && <CheckCircle2 className="h-3 w-3" />}
+                          <span>{item.isActive ? 'Active' : 'Inactive'}</span>
+                        </span>
+                        {item.isRequired && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30 px-2.5 py-0.5 text-[11px] font-bold">
+                            <Shield className="h-3 w-3" />
+                            <span>Required</span>
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      <div className="inline-flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateMutation.mutate({
+                              id: item.id,
+                              patch: { isActive: !item.isActive },
+                            })
+                          }
+                          className={`rounded-xl px-3 py-1.5 text-xs font-semibold border transition-colors ${
+                            item.isActive
+                              ? 'border-white/10 bg-[#262420] text-stone-300 hover:bg-rose-950/60 hover:text-rose-200 hover:border-rose-900/50'
+                              : 'border-emerald-500/30 bg-emerald-950/30 text-emerald-300 hover:bg-emerald-900/50'
+                          }`}
+                        >
+                          {item.isActive ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateMutation.mutate({
+                              id: item.id,
+                              patch: { isRequired: !item.isRequired },
+                            })
+                          }
+                          className={`rounded-xl px-3 py-1.5 text-xs font-semibold border transition-colors ${
+                            item.isRequired
+                              ? 'border-white/10 bg-[#262420] text-stone-300 hover:text-white'
+                              : 'border-amber-500/30 bg-amber-950/30 text-amber-300 hover:bg-amber-900/50'
+                          }`}
+                        >
+                          {item.isRequired ? 'Mark Optional' : 'Mark Required'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : null}
     </section>

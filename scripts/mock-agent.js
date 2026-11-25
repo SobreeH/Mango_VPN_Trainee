@@ -16,6 +16,35 @@
 const http = require('http');
 const crypto = require('crypto');
 const os = require('os');
+const fs = require('fs');
+const path = require('path');
+
+function loadDotenvFallback() {
+  try {
+    const envPath = path.resolve(__dirname, '../.env');
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, 'utf8');
+      for (const line of content.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const eqIdx = trimmed.indexOf('=');
+        if (eqIdx > 0) {
+          const k = trimmed.slice(0, eqIdx).trim();
+          let v = trimmed.slice(eqIdx + 1).trim();
+          if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+            v = v.slice(1, -1);
+          }
+          if (!process.env[k]) {
+            process.env[k] = v;
+          }
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+loadDotenvFallback();
 
 function getenvFirst(...keys) {
   for (const key of keys) {
@@ -82,24 +111,37 @@ function generateX25519PublicKeyB64() {
   return spki.subarray(spki.length - 32).toString('base64');
 }
 
-const agentState = {
-  version: DEFAULT_VERSION,
-  state: 'disconnected', // 'disconnected' | 'connecting' | 'connected' | 'disconnecting' | 'error'
-  sessionId: null,
-  assignedIp: null,
-  serverEndpoint: null,
-  allowedIps: [],
-  publicKey: generateX25519PublicKeyB64(),
-  connectedSince: null,
-  bytesReceived: 0,
-  bytesSent: 0,
-  lastError: null,
-};
+const userStates = new Map();
+
+function getAgentState(userHint) {
+  const key = (userHint || 'default').toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'default';
+  if (!userStates.has(key)) {
+    userStates.set(key, {
+      version: DEFAULT_VERSION,
+      state: 'disconnected', // 'disconnected' | 'connecting' | 'connected' | 'disconnecting' | 'error'
+      sessionId: null,
+      assignedIp: null,
+      serverEndpoint: null,
+      allowedIps: [],
+      publicKey: generateX25519PublicKeyB64(),
+      connectedSince: null,
+      bytesReceived: 0,
+      bytesSent: 0,
+      lastError: null,
+      deviceFingerprint: null,
+    });
+  }
+  return userStates.get(key);
+}
+
+const agentState = getAgentState('default');
 
 setInterval(() => {
-  if (agentState.state === 'connected') {
-    agentState.bytesReceived += Math.floor(Math.random() * 8192) + 1024;
-    agentState.bytesSent += Math.floor(Math.random() * 4096) + 512;
+  for (const st of userStates.values()) {
+    if (st.state === 'connected') {
+      st.bytesReceived += Math.floor(Math.random() * 8192) + 1024;
+      st.bytesSent += Math.floor(Math.random() * 4096) + 512;
+    }
   }
 }, 1000).unref();
 
@@ -113,7 +155,7 @@ function setCorsAndPnaHeaders(req, res, origin) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'Content-Type, X-Mango-Agent-Token, Access-Control-Request-Private-Network',
+    'Content-Type, X-Mango-Agent-Token, X-Mango-Dev-User, Access-Control-Request-Private-Network',
   );
   if (
     req.method === 'OPTIONS' ||
@@ -215,18 +257,24 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && pathname === '/status') {
+      const userHint = (req.headers['x-mango-dev-user'] || '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, '');
+      const state = getAgentState(userHint);
       return sendJson(res, 200, {
-        state: agentState.state,
-        version: agentState.version,
-        publicKey: agentState.publicKey,
-        sessionId: agentState.sessionId,
-        assignedIp: agentState.assignedIp,
-        serverEndpoint: agentState.serverEndpoint,
-        allowedIps: agentState.allowedIps,
-        connectedSince: agentState.connectedSince,
-        bytesReceived: agentState.bytesReceived,
-        bytesSent: agentState.bytesSent,
-        lastError: agentState.lastError,
+        state: state.state,
+        version: state.version,
+        publicKey: state.publicKey,
+        sessionId: state.sessionId,
+        assignedIp: state.assignedIp,
+        serverEndpoint: state.serverEndpoint,
+        allowedIps: state.allowedIps,
+        connectedSince: state.connectedSince,
+        bytesReceived: state.bytesReceived,
+        bytesSent: state.bytesSent,
+        lastError: state.lastError,
       });
     }
 
@@ -250,8 +298,21 @@ const server = http.createServer(async (req, res) => {
         // ignore
       }
 
-      const activeFingerprint = DEVICE_FINGERPRINT + portSuffix;
-      const activeHostname = HOSTNAME + (portSuffix ? portSuffix : '');
+      // Support user role hint in dev mode to allow multi-user demo on a single link/port
+      const userHint = (
+        req.headers['x-mango-dev-user'] ||
+        body.userHint ||
+        ''
+      )
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, '');
+
+      const userSuffix = userHint ? `-${userHint}` : portSuffix;
+      const activeFingerprint = DEVICE_FINGERPRINT + userSuffix;
+      const activeHostname = HOSTNAME + (userSuffix ? userSuffix : '');
+      const agentState = getAgentState(userHint);
 
       agentState.publicKey = generateX25519PublicKeyB64();
       agentState.deviceFingerprint = activeFingerprint;
@@ -309,6 +370,18 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'POST' && pathname === '/disconnect') {
+      const body = await parseJsonBody(req).catch(() => ({}));
+      const userHint = (
+        req.headers['x-mango-dev-user'] ||
+        body.userHint ||
+        ''
+      )
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, '');
+      const agentState = getAgentState(userHint);
+
       if (agentState.state === 'connected') {
         try {
           await fetch(`${API_URL}/api/vpn/disconnect`, {
