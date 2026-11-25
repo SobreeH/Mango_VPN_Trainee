@@ -5,7 +5,9 @@
 
 ---
 
-MANGO VPN ออกแบบมาเพื่อ **"ขจัดความยุ่งยากในการส่งและจัดการไฟล์คอนฟิก `.conf`"** สำหรับการใช้งาน VPN ระดับองค์กร โดยผู้ใช้งานเพียงแค่ล็อกอินเข้าสู่ Web Portal ด้วยรหัสผ่านและรหัสยืนยันตัวตน 2 ชั้น (TOTP Authenticator) จากนั้นระบบควบคุม (Control Plane API) จะออก "ตั๋วเชื่อมต่อแบบใช้ครั้งเดียว" (One-Time Connect Ticket) ให้กับตัวโปรแกรม Agent บนเครื่อง (Windows Agent) ซึ่งจะทำการสุ่มสร้างคู่กุญแจ Curve25519 ขึ้นมาในหน่วยความจำ (In-Memory) และเปิดใช้งานอุโมงค์ WireGuard ให้อัตโนมัติ โดยที่ฝั่งเซิร์ฟเวอร์ Gateway (Linux) จะมี Daemon คอยควบคุม Firewall ด้วย `nftables` ตามบทบาท (Role) ของผู้ใช้แบบเรียลไทม์
+MANGO VPN ออกแบบมาเพื่อ **"ขจัดความยุ่งยากในการส่งและจัดการไฟล์คอนฟิก `.conf`"** สำหรับการใช้งาน VPN ระดับองค์กร โดยผู้ใช้งานเพียงแค่ล็อกอินเข้าสู่ Web Portal ด้วยรหัสผ่านและรหัสยืนยันตัวตน 2 ชั้น (TOTP Authenticator) จากนั้นระบบควบคุม (Control Plane API) จะออก "ตั๋วเชื่อมต่อแบบใช้ครั้งเดียว" (One-Time Connect Ticket) ให้กับตัวโปรแกรม Agent บนเครื่อง (`Sobree/agent-windows`) ซึ่งจะทำการสุ่มสร้างคู่กุญแจ Curve25519 ขึ้นมาในหน่วยความจำ (In-Memory) และเปิดใช้งานอุโมงค์ WireGuard ให้อัตโนมัติ โดยที่ฝั่งเซิร์ฟเวอร์ Gateway (Linux) จะมี Daemon คอยควบคุม Firewall ด้วย `nftables` ตามบทบาท (Role) ของผู้ใช้แบบเรียลไทม์
+
+ตัว Client Agent (`Sobree/agent-windows`) รองรับทั้งสองระบบปฏิบัติการ: บน **Windows** รันเป็น Windows Service หรือโหมด Console และเปิดอุโมงค์ด้วย `wireguard.exe /installtunnelservice` ส่วนบน **Linux** รันเป็นโหมด Console (ต้องใช้สิทธิ์ root หรือ `CAP_NET_ADMIN`) และเปิดอุโมงค์ด้วย `wg-quick up`
 
 ---
 
@@ -29,7 +31,7 @@ MANGO VPN ออกแบบมาเพื่อ **"ขจัดความย
 | **Control Plane API** (`@mango/api`) | **Node.js, Fastify 4, Prisma 5** | Authentication (bcryptjs, JWT, TOTP), IPAM จัดการ IP เครือข่าย VPN |
 | **Admin CRUD Plugin** (`@mango/rain-admin`) | **TypeScript, Fastify Plugin** | Endpoints จัดการ Users, Devices, Sessions, Policies และ DB Seeder |
 | **ฐานข้อมูล (Database)** | **PostgreSQL 16** | รันผ่าน Docker Compose (`postgres:16-alpine`) หรือแบบฝังตัวด้วย `npm run db:start` (Rain ไม่ต้องใช้ Docker) พอร์ต Host คือ `15432` |
-| **Windows Client Agent** | **Go 1.26** | รันเป็น Windows Service หรือ Console (`golang.org/x/sys/windows/svc`) พอร์ต `47821` |
+| **Client Agent (Windows / Linux)** | **Go 1.26** | บน Windows รันเป็น Windows Service หรือ Console (`golang.org/x/sys/windows/svc`) และเปิดอุโมงค์ด้วย `wireguard.exe`; บน Linux รันเป็น Console และเปิดอุโมงค์ด้วย `wg-quick` พอร์ต `47821` |
 | **Linux VPN Gateway Daemon** | **Go 1.22** | รันบน Linux จัดการ `wg` และกฎไฟร์วอลล์ `nftables` บนพอร์ต `:50051` |
 | **Shared Contracts** | **TypeScript** (`@mango/shared`) | ศูนย์กลางเก็บ DTOs, Enums และ Type สัญญากลางที่ใช้ร่วมกันทุกส่วน |
 
@@ -68,18 +70,21 @@ Mango_VPN_Trainee/
 │   │   ├── src/modules/auth/          # ระบบ Login, TOTP MFA, JWT Session Rotation, Rate Limiting
 │   │   ├── src/modules/vpn/           # การออก Connect Ticket, การเชื่อมต่อ และ IPAM (10.13.13.0/24)
 │   │   └── src/lib/vpn-daemon.ts      # HTTP Client คุยกับ Gateway Daemon (ผ่าน Bearer Token)
-│   ├── agent-windows/                 # Go Windows Agent (127.0.0.1:47821)
-│   │   ├── main.go                    # Loopback Server, ตรวจ PNA/Origin, สร้างกุญแจ Curve25519, สั่งเปิด WireGuard
+│   ├── agent-windows/                 # Go Client Agent (Windows Service/Console บน Windows; Console บน Linux) พอร์ต 127.0.0.1:47821
+│   │   ├── main.go                    # Loopback Server, ตรวจ PNA/Origin, สร้างกุญแจ Curve25519, สั่งเปิด WireGuard (wireguard.exe หรือ wg-quick)
 │   │   └── service_windows.go         # Wrapper รันแบบ Windows Service
 │   └── vpn-daemon/                    # Go Gateway Daemon (Linux)
 │       └── main.go                    # จัดการ WireGuard (wg set) และกฎไฟร์วอลล์ nftables พอร์ต :50051
 │
 ├── scripts/
-│   ├── mock-agent.js                  # 🧪 ตัวจำลอง Windows Agent สำหรับใช้รันทดสอบหน้าเว็บในเครื่อง
+│   ├── init-env.mjs                   # ตัวสร้าง .env และคู่กุญแจ WireGuard X25519 แบบข้ามแพลตฟอร์ม (`npm run env:init`)
+│   ├── mock-agent.js                  # 🧪 ตัวจำลอง Client Agent สำหรับใช้รันทดสอบหน้าเว็บในเครื่อง (ใน dev จะเติมพอร์ตต้นทางต่อท้าย device fingerprint)
 │   ├── mock-daemon.js                 # 🧪 ตัวจำลอง VPN Gateway Daemon สำหรับการพัฒนาเท่านั้น (127.0.0.1:50051, ไม่บังคับใช้ wg/nftables)
+│   ├── start-all-portals.mjs          # เปิด Vite dev ทั้ง 3 พอร์ทัลพร้อมกัน (Admin :3000, Staff :3001, Client :3002) ผ่าน `npm run dev:portal:all`
 │   ├── dev-db.mjs                     # ตัวรัน PostgreSQL 16 แบบฝังตัวโดยไม่ใช้ Docker (`npm run db:start` / `db:reset-local` ข้อมูลอยู่ที่ `.local/postgres`)
 │   ├── check-guardrails.mjs           # เครื่องมือตรวจจับ Secret หลุด และตรวจห้ามใช้ Mock ใน Production
-│   └── check-environment.ps1          # สคริปต์ตรวจความพร้อมของเครื่องมือในเครื่อง
+│   ├── check-environment.mjs          # ตรวจความพร้อมของเครื่องมือบน Linux, macOS และ Windows (`npm run check:env`)
+│   └── check-environment.ps1          # Wrapper สำหรับ Windows PowerShell ที่เรียกใช้ check-environment.mjs
 │
 ├── docker-compose.yml                 # คอนฟิกรัน postgres, vpn-gateway, api, portal
 ├── .env.example                       # เทมเพลตตัวแปรสภาพแวดล้อม
@@ -104,7 +109,7 @@ flowchart TD
 
     subgraph SobreeTeam["⚡ Sobree (Systems & Core Lead)"]
         api["Sobree/api<br/>(Control Plane & IPAM)"]
-        winAgent["Sobree/agent-windows<br/>(Go Windows Service)"]
+        winAgent["Sobree/agent-windows<br/>(Go Client Agent: Windows Service/Console, Linux Console)"]
         vpnDaemon["Sobree/vpn-daemon<br/>(Linux WireGuard & nftables)"]
     end
 
@@ -125,7 +130,7 @@ flowchart TD
 | **ระบบ Admin CRUD** | รับผิดชอบหลัก (`Rain/admin`) | ดูแลจุด Mount ปลั๊กอินใน `Sobree/api/src/app.ts` |
 | **Database Seeder** | พัฒนาและดูแล `Rain/admin/src/seed.ts` | ออกแบบ Prisma Schema และ Migrations |
 | **Core Backend & Auth** | ฝั่งเรียกใช้งาน (Consumes API) | พัฒนา `Sobree/api` (MFA, JWT, IPAM) |
-| **Windows Agent** | ใช้งาน `scripts/mock-agent.js` เพื่อทดสอบ UI | พัฒนา `Sobree/agent-windows` (Go) |
+| **Windows Agent** | ใช้งาน `scripts/mock-agent.js` เพื่อทดสอบ UI | พัฒนา `Sobree/agent-windows` (Go: Windows Service บน Windows หรือ Console บน Linux ด้วย `wg-quick`) |
 | **Linux VPN Gateway** | ไม่บังคับ: รัน `scripts/mock-daemon.js` (`npm run mock:daemon`) เพื่อทดสอบ UI/Policy/Connect ในเครื่องได้โดยไม่ใช้ Docker และไม่บังคับใช้ `wg`/`nftables` | พัฒนา `Sobree/vpn-daemon` (Go + `nftables`) |
 | **Shared Contracts** | ใช้งาน Types จาก `@mango/shared` | ออกแบบและดูแลสัญญาใน `@mango/shared` |
 
@@ -138,7 +143,7 @@ sequenceDiagram
     autonumber
     actor User as ผู้ใช้งาน
     participant Portal as Web Portal (:3000)
-    participant Agent as Windows Agent (:47821)
+    participant Agent as Client Agent (:47821)
     participant API as Control Plane API (:4000)
     participant DB as PostgreSQL (DB)
     participant Daemon as Linux VPN Gateway
@@ -179,6 +184,9 @@ sequenceDiagram
 Rain สามารถรันระบบทดสอบได้ **โดยไม่ต้องใช้ Docker** ต้องใช้แค่ Node.js และ Git เท่านั้น ไม่ต้องใช้เครื่อง Linux หรือลงโปรแกรม WireGuard จริง:
 
 ```powershell
+# Terminal 0: สร้าง .env พร้อมค่า Secret และคู่กุญแจ WireGuard X25519 (ข้ามแพลตฟอร์ม)
+npm run env:init
+
 # Terminal 1: PostgreSQL 16 แบบฝังตัวบน 127.0.0.1:15432 (ทิ้งไว้ระหว่างใช้งาน กด Ctrl+C เพื่อหยุด)
 npm run db:start
 
@@ -196,17 +204,24 @@ npm run mock:agent
 # Terminal 4: รัน Backend API (พอร์ต 4000)
 npm run dev:api
 
-# Terminal 5: รัน Frontend Web Portal (พอร์ต 3000)
-npm --workspace=@mango/portal run dev -- --port 3000
+# Terminal 5: รัน Frontend Web Portal เลือกได้ดังนี้:
+npm run dev:portal                   # Admin UI บน http://localhost:3000 (ค่าเริ่มต้น)
+npm run dev:portal:all               # เปิดทั้ง 3 พอร์ทัลพร้อมกัน (Admin :3000, Staff :3001, Client :3002)
+npm run dev:portal:admin             # Admin UI บน :3000
+npm run dev:portal:staff             # Staff UI บน :3001
+npm run dev:portal:client            # Client UI บน :3002
 ```
 
-ขั้นตอนนี้ไม่ต้องใช้ Docker `npm run mock:daemon` ช่วยไม่ให้เจอ `502 Bad Gateway` ตอน Connect, สร้าง Policy และเพิกถอน แต่ **ไม่ได้ตั้งค่า WireGuard หรือ `nftables` จริง** ใช้ Docker Compose เฉพาะเมื่อต้องการรันระบบเต็มรูปแบบ (Sobree / Track B และ C)
+- **สร้าง `.env` ข้ามแพลตฟอร์ม**: `npm run env:init` (`scripts/init-env.mjs`) จะสร้าง `POSTGRES_PASSWORD`, `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `DAEMON_SHARED_SECRET`, `TOTP_ENCRYPTION_KEY` และคู่กุญแจ X25519 `WG_PRIVATE_KEY` / `WG_SERVER_PUBLIC_KEY` ใช้ได้เหมือนกันบน Windows, Linux และ macOS เขียนไฟล์เป็น UTF-8 ไม่มี BOM และจะไม่แก้ `.env` ที่มีค่าครบแล้ว เว้นแต่สั่ง `npm run env:init -- --force` (หรือ `-- --wg-only` เพื่อสร้างเฉพาะกุญแจ WireGuard ใหม่) วิธีเดิมแบบ `copy`/`cp` + `openssl` ก็ยังใช้ได้
+- **ไม่ต้องใช้ Docker**: `npm run mock:daemon` ช่วยไม่ให้เจอ `502 Bad Gateway` ตอน Connect, สร้าง Policy และเพิกถอน แต่ **ไม่ได้ตั้งค่า WireGuard หรือ `nftables` จริง** ใช้ Docker Compose เฉพาะเมื่อต้องการรันระบบเต็มรูปแบบ (Sobree / Track B และ C)
+- **พอร์ทัลหลายบทบาท**: `npm run dev:portal:all` (`scripts/start-all-portals.mjs`) จะเปิด Admin บน `:3000`, Staff บน `:3001` และ Client บน `:3002` พร้อมกัน โดยมี Log นำหน้าด้วยสีตามบทบาท
+- **CORS และ Fingerprint แยกตามพอร์ต**: ในโหมด dev `Sobree/api` ยอมรับ `http://localhost:3000`–`http://localhost:3002` (และ `127.0.0.1` ที่เทียบเท่า) ส่วน `scripts/mock-agent.js` จะเติมพอร์ตของ Origin ต่อท้าย device fingerprint และ hostname ที่รายงาน (เช่น `mock-<hash>-3001`) การเปิด Admin, Staff และ Client พร้อมกันจึงได้อุปกรณ์ 3 รายการแยกกัน ไม่ชน fingerprint กัน
 > [!TIP]
 > เมื่อรัน `npm run mock:agent` ตัวจำลองจะพิมพ์ **PairingToken** ออกมา ให้นำโทเคนดังกล่าวไปใส่ในช่องเชื่อมต่อบนหน้าเว็บ Portal เพื่อทำการจับคู่ (Pairing)
 
 ---
 
-### ⚡ สำหรับ Sobree (เน้นพัฒนา Core API, Agent และ Gateway, ต้องใช้ Docker Desktop)
+### ⚡ สำหรับ Sobree (เน้นพัฒนา Core API, Agent และ Gateway, ต้องใช้ Docker Desktop / Docker Engine)
 
 ```powershell
 # 1. รัน Database
@@ -217,12 +232,30 @@ npm run db:migrate
 # 2. รัน Fastify API
 npm run dev:api
 
-# 3. รัน Windows Agent (โหมด Console)
+# 3. รัน Client Agent บน Windows (โหมด Console) — ใช้ Administrator PowerShell สำหรับอุโมงค์จริง
 cd Sobree/agent-windows
 go run .
 
-# 4. รัน Linux Gateway Daemon (บน Windows ให้รันผ่านคอนเทนเนอร์)
+# 4. รัน Gateway Daemon (บน Windows ให้รันผ่านคอนเทนเนอร์)
 docker compose up -d vpn-gateway
+```
+
+```bash
+# 1. รัน Database
+docker compose up -d postgres
+npm run db:generate
+npm run db:migrate
+
+# 2. รัน Fastify API
+npm run dev:api
+
+# 3. รัน Client Agent บน Linux (ต้องใช้ root หรือ CAP_NET_ADMIN และมี wg-quick)
+cd Sobree/agent-windows
+sudo -E go run .
+
+# 4. รัน Gateway Daemon บน Linux แบบ Native (ต้องใช้ root หรือ NET_ADMIN พร้อม ip, wg และ nft)
+cd Sobree/vpn-daemon
+sudo -E go run .
 ```
 
 ---
@@ -234,19 +267,27 @@ docker compose up -d vpn-gateway
 | `npm install` | ติดตั้ง Dependencies ทุกแพ็กเกจใน Monorepo |
 | `npm run build` | คอมไพล์ `@mango/shared` ก่อน แล้วจึงคอมไพล์ทุก Workspace ที่มีสคริปต์ build |
 | `npm test` | รันชุดทดสอบ Vitest ในทุก Workspace |
-| `npm run dev:portal` | เริ่มรันเซิร์ฟเวอร์ Dev ของหน้าเว็บ (`@mango/portal`) |
+| `npm run env:init` | สร้าง/อัปเดต `.env` ที่ Root พร้อมค่า Secret และคู่กุญแจ WireGuard X25519 (`scripts/init-env.mjs`; ใช้ `-- --force` หรือ `-- --wg-only` ได้) |
+| `npm run dev:portal` | เริ่มรันเซิร์ฟเวอร์ Dev ของหน้าเว็บ (`@mango/portal`) บนพอร์ต `:3000` (Admin) |
+| `npm run dev:portal:admin` | เริ่ม Admin Portal บนพอร์ต `:3000` |
+| `npm run dev:portal:staff` | เริ่ม Staff Portal บนพอร์ต `:3001` |
+| `npm run dev:portal:client` | เริ่ม Client Portal บนพอร์ต `:3002` |
+| `npm run dev:portal:all` | เปิดทั้ง 3 พอร์ทัลพร้อมกัน (Admin `:3000`, Staff `:3001`, Client `:3002`) ผ่าน `scripts/start-all-portals.mjs` |
 | `npm run dev:api` | เริ่มรันเซิร์ฟเวอร์ API (`@mango/api` พร้อม mount `@mango/rain-admin`) |
-| `npm run mock:agent` | รันตัวจำลอง Windows Agent บน `http://127.0.0.1:47821` |
+| `npm run mock:agent` | รันตัวจำลอง Client Agent บน `http://127.0.0.1:47821` (ใน dev จะแยก device fingerprint ตามพอร์ตของ Origin) |
 | `npm run mock:daemon` | รันตัวจำลอง VPN Gateway Daemon (`scripts/mock-daemon.js`) บน `http://127.0.0.1:50051` สำหรับการพัฒนาเท่านั้น จะพิมพ์ `[DEV MOCK DAEMON – no wg/nftables enforcement]` และไม่ได้ตั้งค่า WireGuard หรือ `nftables` จริง |
 | `npm run db:start` | เริ่ม PostgreSQL 16 แบบฝังตัวบน `127.0.0.1:15432` (`scripts/dev-db.mjs`) โดยไม่ใช้ Docker เก็บข้อมูลที่ `.local/postgres` และสร้าง `POSTGRES_DB` กับ `mangovpn_v2_test` ให้อัตโนมัติ กด Ctrl+C เพื่อหยุด |
 | `npm run db:reset-local` | ลบ `.local/postgres` (รันหลังจาก `npm run db:start` หยุดทำงานแล้วเท่านั้น) |
 | `npm run db:generate` | อัปเดต Prisma Client จากไฟล์ `schema.prisma` |
 | `npm run db:migrate` | รัน Migration โครงสร้างฐานข้อมูล |
 | `npm run db:seed` | ใส่ข้อมูลตั้งต้น Role และ Admin ลงฐานข้อมูล |
-| `npm run check:env` | ตรวจสอบความพร้อมของเครื่องมือในเครื่อง |
-| `npm run check:env -- -Role Rain` | ตรวจความพร้อมแบบ Rain ที่ไม่ใช้ Docker โดยกำหนดให้ Docker, Docker Compose, Docker Desktop และ Go เป็น `OPTIONAL` |
-| `npm run docker:up` / `down` | เริ่มหรือหยุดการทำงานของ Docker Compose ทั้งระบบ |
+| `npm run check:env` | ตรวจสอบความพร้อมของเครื่องมือในเครื่อง (`scripts/check-environment.mjs`, ใช้ได้ทั้ง Linux, macOS และ Windows; ค่าเริ่มต้น `--role All`) |
+| `npm run check:env -- --role Rain` | ตรวจความพร้อมแบบ Rain ที่ไม่ใช้ Docker โดยกำหนดให้ Docker, Docker Compose และ Go เป็น `OPTIONAL` |
+| `npm run check:env -- --role Sobree` | ตรวจความพร้อมแบบ Sobree เต็มรูปแบบ (จะ exit `1` หากขาด Docker, Docker Compose หรือ Go) |
+| `npm run docker:up` / `docker:down` / `docker:logs` | เริ่ม, หยุด หรือดู Log ของ Docker Compose ทั้งระบบ |
 | `node scripts/check-guardrails.mjs` | รันตัวสแกนความปลอดภัย ตรวจจับ Secret และ Mock หลอก |
+
+ภายใต้ `--role All` หากขาดเครื่องมือฝั่ง Sobree จะแสดงเพียง `[PARTIAL]` และยัง exit `0` เพื่อให้เครื่องที่พัฒนาเฉพาะ Rain และ CI ผ่านได้ เติม `--strict` หากต้องการให้กรณีนี้ถือว่าล้มเหลวด้วย บน Windows สามารถใช้ `scripts/check-environment.ps1 -Role Rain` ซึ่งเรียกตัวตรวจเดียวกัน ดูตัวเลือกทั้งหมดได้ที่ `npm run check:env -- --help`
 
 ---
 

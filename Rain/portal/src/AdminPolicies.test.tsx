@@ -252,4 +252,100 @@ describe('Portal Admin Policies Tab (fetch seam)', () => {
       expect(screen.getByText(/No policies configured/i)).toBeInTheDocument();
     });
   });
+
+  it('filters policies by search term, role, and action honestly', async () => {
+    const mockPolicies: VpnPolicyDto[] = [
+      {
+        id: 'pol-1',
+        name: 'Allow Internal Web',
+        role: RoleName.STAFF,
+        targetCidr: '10.20.0.0/16',
+        protocol: PolicyProtocol.TCP,
+        portRange: '80,443',
+        action: PolicyAction.ALLOW,
+        priority: 100,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 'pol-2',
+        name: 'Deny Database Direct',
+        role: RoleName.CLIENT,
+        targetCidr: '10.30.0.0/16',
+        protocol: PolicyProtocol.TCP,
+        portRange: '5432',
+        action: PolicyAction.DENY,
+        priority: 200,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+    ];
+
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/policies')) {
+        return new Response(JSON.stringify({ items: mockPolicies }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.includes('/api/audit-logs')) {
+        return new Response(
+          JSON.stringify({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 1 }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response(JSON.stringify({ message: 'Not found' }), { status: 404 });
+    });
+
+    renderWithQuery(
+      <App
+        initialSession={{
+          accessToken: 'admin-token',
+          user: {
+            id: 'u-admin',
+            username: 'admin.user',
+            email: 'admin@mango.local',
+            role: RoleName.ADMIN,
+            totpEnabled: true,
+          },
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: /^Policies$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Allow Internal Web')).toBeInTheDocument();
+      expect(screen.getByText('Deny Database Direct')).toBeInTheDocument();
+      expect(screen.getByText('2 / 2 Policies')).toBeInTheDocument();
+    });
+
+    // Test Search input
+    const searchInput = screen.getByLabelText(/Search policies/i);
+    fireEvent.change(searchInput, { target: { value: 'Internal' } });
+    expect(screen.getByText('Allow Internal Web')).toBeInTheDocument();
+    expect(screen.queryByText('Deny Database Direct')).not.toBeInTheDocument();
+    expect(screen.getByText('1 / 2 Policies')).toBeInTheDocument();
+
+    // Clear search
+    fireEvent.click(screen.getByLabelText(/Clear search/i));
+    expect(screen.getByText('Deny Database Direct')).toBeInTheDocument();
+
+    // Filter by Role: CLIENT
+    const roleSelect = screen.getByLabelText(/Role:/i);
+    fireEvent.change(roleSelect, { target: { value: RoleName.CLIENT } });
+    expect(screen.queryByText('Allow Internal Web')).not.toBeInTheDocument();
+    expect(screen.getByText('Deny Database Direct')).toBeInTheDocument();
+
+    // Filter by Action: ALLOW (no match for CLIENT + ALLOW)
+    const actionSelect = screen.getByLabelText(/Action:/i);
+    fireEvent.change(actionSelect, { target: { value: PolicyAction.ALLOW } });
+    expect(screen.getByText(/No policies match your search or filters/i)).toBeInTheDocument();
+
+    // Click Clear Filters button
+    fireEvent.click(screen.getByRole('button', { name: /Clear Filters/i }));
+    expect(screen.getByText('Allow Internal Web')).toBeInTheDocument();
+    expect(screen.getByText('Deny Database Direct')).toBeInTheDocument();
+  });
 });

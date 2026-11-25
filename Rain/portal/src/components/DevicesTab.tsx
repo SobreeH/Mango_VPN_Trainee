@@ -4,6 +4,7 @@ import { DeviceStatus, type DeviceDto } from '@mango/shared';
 import { X, ChevronDown } from 'lucide-react';
 import type { AuthRefreshContext } from '../api/auth';
 import { fetchDevices, revokeDevice } from '../lib/adminApi';
+import { useToast } from './Toast';
 import { ConfirmModal } from './ConfirmModal';
 
 interface DevicesTabProps {
@@ -14,6 +15,7 @@ interface DevicesTabProps {
 
 export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | DeviceStatus>('ALL');
   const [deviceToRevoke, setDeviceToRevoke] = useState<{
@@ -29,9 +31,21 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
 
   const revokeMutation = useMutation({
     mutationFn: (id: string) => revokeDevice(apiBaseUrl, accessToken, id, auth),
-    onSuccess: () => {
+    onSuccess: (revoked) => {
+      showToast({
+        type: 'warning',
+        title: 'Device Revoked',
+        message: `Device ${revoked.hostname} has been revoked. Active VPN keys invalidated.`,
+      });
       void queryClient.invalidateQueries({ queryKey: ['admin-devices', apiBaseUrl] });
       void queryClient.invalidateQueries({ queryKey: ['admin-sessions', apiBaseUrl] });
+    },
+    onError: (err) => {
+      showToast({
+        type: 'error',
+        title: 'Revocation Failed',
+        message: err instanceof Error ? err.message : 'Failed to revoke device',
+      });
     },
   });
 

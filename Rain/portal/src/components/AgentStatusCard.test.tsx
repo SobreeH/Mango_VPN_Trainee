@@ -416,9 +416,11 @@ describe('AgentStatusCard (fetch seam)', () => {
 
     const agentConnectCall = fetchMock.mock.calls[3]!;
     expect(agentConnectCall[0]).toBe('http://127.0.0.1:47821/connect');
-    expect(JSON.parse(String(agentConnectCall[1]?.body))).toEqual({
-      ticket: 'fg-ticket-1',
-      providerType: VpnProviderType.FORTINET,
-    });
+    expect(JSON.parse(String(agentConnectCall[1]?.body))).toEqual(
+      expect.objectContaining({
+        ticket: 'fg-ticket-1',
+        providerType: VpnProviderType.FORTINET,
+      }),
+    );
   });
 });

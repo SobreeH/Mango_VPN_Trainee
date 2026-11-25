@@ -50,12 +50,16 @@ export async function checkAgentHealth(): Promise<AgentHealthResponse> {
   return (await res.json()) as AgentHealthResponse;
 }
 
-export async function fetchAgentStatus(pairingToken: string): Promise<AgentStatusResponse> {
+export async function fetchAgentStatus(pairingToken: string, userHint?: string): Promise<AgentStatusResponse> {
+  const headers: Record<string, string> = {
+    'X-Mango-Agent-Token': pairingToken,
+  };
+  if (userHint) {
+    headers['X-Mango-Dev-User'] = userHint;
+  }
   const res = await fetch(`${getAgentBaseUrl()}/status`, {
     method: 'GET',
-    headers: {
-      'X-Mango-Agent-Token': pairingToken,
-    },
+    headers,
   });
   if (!res.ok) {
     throw await parseAgentError(res, `Agent status check failed (${res.status})`);
@@ -121,8 +125,16 @@ export async function requestConnectTicket(
 export async function connectAgent(
   pairingToken: string,
   ticket: string,
-  options?: { providerType?: VpnProviderType; gatewayId?: string },
+  options?: { providerType?: VpnProviderType; gatewayId?: string; userHint?: string },
 ): Promise<AgentConnectResponse> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Mango-Agent-Token': pairingToken,
+  };
+  if (options?.userHint) {
+    headers['X-Mango-Dev-User'] = options.userHint;
+  }
+
   const payload: Record<string, string> = { ticket };
   if (options?.providerType) {
     payload.providerType = options.providerType;
@@ -130,13 +142,13 @@ export async function connectAgent(
   if (options?.gatewayId) {
     payload.gatewayId = options.gatewayId;
   }
+  if (options?.userHint) {
+    payload.userHint = options.userHint;
+  }
 
   const res = await fetch(`${getAgentBaseUrl()}/connect`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Mango-Agent-Token': pairingToken,
-    },
+    headers,
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -145,12 +157,17 @@ export async function connectAgent(
   return (await res.json()) as AgentConnectResponse;
 }
 
-export async function disconnectAgent(pairingToken: string): Promise<AgentDisconnectResponse> {
+export async function disconnectAgent(pairingToken: string, userHint?: string): Promise<AgentDisconnectResponse> {
+  const headers: Record<string, string> = {
+    'X-Mango-Agent-Token': pairingToken,
+  };
+  if (userHint) {
+    headers['X-Mango-Dev-User'] = userHint;
+  }
   const res = await fetch(`${getAgentBaseUrl()}/disconnect`, {
     method: 'POST',
-    headers: {
-      'X-Mango-Agent-Token': pairingToken,
-    },
+    headers,
+    body: JSON.stringify({ userHint }),
   });
   if (!res.ok) {
     throw await parseAgentError(res, `Agent disconnect failed (${res.status})`);

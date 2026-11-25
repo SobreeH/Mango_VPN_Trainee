@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { AlertCircle, CheckCircle2, Key, Power, RefreshCw, ShieldCheck, WifiOff } from 'lucide-react';
+import {
+  Activity,
+  AlertCircle,
+  ArrowDown,
+  ArrowUp,
+  CheckCircle2,
+  Key,
+  Power,
+  RefreshCw,
+  ShieldCheck,
+  WifiOff,
+} from 'lucide-react';
 import {
   VpnProviderType,
   type AgentHealthResponse,
@@ -7,6 +18,13 @@ import {
   type RoleName,
   type VpnGatewayDto,
 } from '@mango/shared';
+
+function formatBytes(bytes?: number): string {
+  if (!bytes || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}
 import {
   AgentHttpError,
   checkAgentHealth,
@@ -27,6 +45,7 @@ type AgentViewState =
 export interface AgentStatusCardProps {
   accessToken?: string;
   userRole?: RoleName;
+  username?: string;
   auth?: AuthRefreshContext;
   gateways?: VpnGatewayDto[];
 }
@@ -43,14 +62,42 @@ function providerLabel(provider?: VpnProviderType): string {
   }
 }
 
+const LOCAL_STORAGE_TOKEN_KEY = 'mango_agent_pairing_token';
+
+function getSavedPairingToken(): string {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return localStorage.getItem(LOCAL_STORAGE_TOKEN_KEY) || '';
+    }
+  } catch {
+    // ignore
+  }
+  return '';
+}
+
+function savePairingToken(token: string): void {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      if (token) {
+        localStorage.setItem(LOCAL_STORAGE_TOKEN_KEY, token);
+      } else {
+        localStorage.removeItem(LOCAL_STORAGE_TOKEN_KEY);
+      }
+    }
+  } catch {
+    // ignore
+  }
+}
+
 export function AgentStatusCard({
   accessToken,
   userRole,
+  username,
   auth,
   gateways: initialGateways,
 }: AgentStatusCardProps) {
   const [view, setView] = useState<AgentViewState>({ kind: 'checking' });
-  const [pairingToken, setPairingToken] = useState('');
+  const [pairingToken, setPairingToken] = useState<string>(() => getSavedPairingToken());
   const [isPairing, setIsPairing] = useState(false);
   const [isTunnelBusy, setIsTunnelBusy] = useState(false);
   const [tunnelError, setTunnelError] = useState<string | null>(null);
@@ -64,6 +111,7 @@ export function AgentStatusCard({
   });
   const [isLoadingGateways, setIsLoadingGateways] = useState(false);
   const [showTechDetails, setShowTechDetails] = useState(false);
+  const [disconnectMessage, setDisconnectMessage] = useState<string | null>(null);
 
   const probeAgent = useCallback(async (tokenToCheck?: string) => {
     setView({ kind: 'checking' });
@@ -85,9 +133,14 @@ export function AgentStatusCard({
     }
 
     try {
-      const status = await fetchAgentStatus(activeToken);
+      const userHint = (username || userRole || '').toLowerCase();
+      const status = await fetchAgentStatus(activeToken, userHint);
+      savePairingToken(activeToken);
       setView({ kind: 'paired', health, status });
     } catch (err) {
+      if (err instanceof AgentHttpError && err.statusCode === 401) {
+        savePairingToken('');
+      }
       const message =
         err instanceof AgentHttpError
           ? err.message
@@ -96,10 +149,11 @@ export function AgentStatusCard({
             : 'Failed to pair with local agent';
       setView({ kind: 'unpaired', health, error: message });
     }
-  }, []);
+  }, [username, userRole]);
 
   useEffect(() => {
-    void probeAgent();
+    const saved = getSavedPairingToken();
+    void probeAgent(saved || undefined);
   }, [probeAgent]);
 
   async function handleLoadGateways() {
@@ -120,6 +174,60 @@ export function AgentStatusCard({
     }
   }
 
+  // Auto-retry polling when Agent is unreachable
+  useEffect(() => {
+    if (view.kind !== 'unreachable') return;
+
+    const timer = setInterval(() => {
+      void checkAgentHealth()
+        .then(() => {
+          const token = pairingToken.trim() || getSavedPairingToken();
+          void probeAgent(token || undefined);
+        })
+        .catch(() => {
+          // Still unreachable, wait for next tick
+        });
+    }, 4000);
+
+    return () => clearInterval(timer);
+  }, [view.kind, pairingToken, probeAgent]);
+
+  // Real-time telemetry poll when connected in live environment
+  useEffect(() => {
+    if (view.kind !== 'paired' || view.status.state !== 'connected') return;
+    const isTest = typeof process !== 'undefined' && process.env?.NODE_ENV === 'test';
+    if (isTest) return;
+
+    const token = pairingToken.trim() || getSavedPairingToken();
+    if (!token) return;
+
+    const timer = setInterval(() => {
+      const userHint = (username || userRole || '').toLowerCase();
+      void fetchAgentStatus(token, userHint)
+        .then((newStatus) => {
+          setView((prev) => {
+            if (prev.kind !== 'paired') return prev;
+            return {
+              ...prev,
+              status: {
+                ...prev.status,
+                bytesReceived: newStatus.bytesReceived,
+                bytesSent: newStatus.bytesSent,
+                state: newStatus.state,
+                assignedIp: newStatus.assignedIp ?? prev.status.assignedIp,
+                serverEndpoint: newStatus.serverEndpoint ?? prev.status.serverEndpoint,
+              },
+            };
+          });
+        })
+        .catch(() => {
+          // Ignore transient poll drops
+        });
+    }, 2500);
+
+    return () => clearInterval(timer);
+  }, [view.kind, view.kind === 'paired' ? view.status.state : null, pairingToken, username, userRole]);
+
   async function handlePairSubmit(e: FormEvent) {
     e.preventDefault();
     const trimmed = pairingToken.trim();
@@ -133,9 +241,14 @@ export function AgentStatusCard({
     try {
       if (view.kind === 'unpaired') {
         try {
-          const status = await fetchAgentStatus(trimmed);
+          const userHint = (username || userRole || '').toLowerCase();
+          const status = await fetchAgentStatus(trimmed, userHint);
+          savePairingToken(trimmed);
           setView({ kind: 'paired', health: view.health, status });
         } catch (err) {
+          if (err instanceof AgentHttpError && err.statusCode === 401) {
+            savePairingToken('');
+          }
           const message =
             err instanceof AgentHttpError
               ? err.message
@@ -155,8 +268,10 @@ export function AgentStatusCard({
   async function handleConnectVpn() {
     if (view.kind !== 'paired' || !accessToken) return;
     setTunnelError(null);
+    setDisconnectMessage(null);
     setIsTunnelBusy(true);
     try {
+      const userHint = (username || userRole || '').toLowerCase() || undefined;
       let ticketRes;
       let res;
       if (selectedGatewayKey.startsWith('gw:')) {
@@ -166,18 +281,23 @@ export function AgentStatusCard({
         res = await connectAgent(pairingToken.trim(), ticketRes.ticket, {
           providerType: selectedGw?.providerType,
           gatewayId: gwId,
+          userHint,
         });
       } else if (selectedGatewayKey !== `default:${VpnProviderType.WIREGUARD}`) {
         const providerType = selectedGatewayKey.slice('default:'.length) as VpnProviderType;
         ticketRes = await requestConnectTicket(accessToken, auth);
         res = await connectAgent(pairingToken.trim(), ticketRes.ticket, {
           providerType,
+          userHint,
         });
       } else {
         ticketRes = await requestConnectTicket(accessToken, auth);
-        res = await connectAgent(pairingToken.trim(), ticketRes.ticket);
+        res = await connectAgent(
+          pairingToken.trim(),
+          ticketRes.ticket,
+          userHint ? { userHint } : undefined,
+        );
       }
-
       setView({
         ...view,
         status: {
@@ -205,9 +325,12 @@ export function AgentStatusCard({
   async function handleDisconnectVpn() {
     if (view.kind !== 'paired') return;
     setTunnelError(null);
+    setDisconnectMessage(null);
     setIsTunnelBusy(true);
     try {
-      const res = await disconnectAgent(pairingToken.trim());
+      const userHint = (username || userRole || '').toLowerCase();
+      const res = await disconnectAgent(pairingToken.trim(), userHint);
+      setDisconnectMessage('ตัดการเชื่อมต่อ VPN เรียบร้อยแล้ว (Disconnected safely)');
       setView({
         ...view,
         status: {
@@ -242,23 +365,49 @@ export function AgentStatusCard({
       )}
 
       {view.kind === 'unreachable' && (
-        <div className="rounded-3xl border border-red-500/30 bg-red-950/20 p-6 space-y-3">
-          <div className="flex items-center gap-2 text-base font-bold text-red-300">
-            <WifiOff className="h-5 w-5 text-red-400" />
-            <span>Agent Unreachable</span>
+        <div className="rounded-3xl border border-red-500/30 bg-red-950/20 p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-base font-bold text-red-300">
+              <WifiOff className="h-5 w-5 text-red-400" />
+              <span>Agent Unreachable</span>
+            </div>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-red-500/10 text-red-400 border border-red-500/20">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+              </span>
+              Auto-reconnecting...
+            </span>
           </div>
-          <p className="text-xs sm:text-sm text-stone-400 leading-relaxed">
-            Start the local MANGO Endpoint Agent on 127.0.0.1:47821 ({view.reason}).
-          </p>
-          <div className="pt-2">
+          <div className="space-y-1">
+            <p className="text-xs sm:text-sm text-stone-300 font-medium">
+              ไม่สามารถเชื่อมต่อไปยัง Endpoint Agent (127.0.0.1:47821) ได้
+            </p>
+            <p className="text-xs text-stone-400 leading-relaxed font-mono">
+              Start the local MANGO Endpoint Agent on 127.0.0.1:47821 ({view.reason}).
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-white/5 bg-[#141311]/80 p-3.5 space-y-2">
+            <span className="text-[11px] font-semibold text-amber-300 block">
+              💡 วิธีเปิดใช้งาน Agent สำหรับทดสอบ:
+            </span>
+            <div className="flex items-center justify-between gap-2 bg-black/40 rounded-xl px-3 py-2 border border-white/5 font-mono text-xs text-stone-200">
+              <code>npm run mock:agent</code>
+              <span className="text-[10px] text-stone-400 font-sans">(รันใน Terminal เพื่อเปิด Agent)</span>
+            </div>
+          </div>
+
+          <div className="pt-1 flex flex-wrap items-center gap-3">
             <button
               type="button"
-              onClick={() => void probeAgent(pairingToken)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-[#262420] px-4 py-2 text-xs text-stone-200 hover:text-white"
+              onClick={() => void probeAgent(pairingToken || getSavedPairingToken())}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-[#262420] px-4 py-2 text-xs font-semibold text-stone-200 hover:text-white hover:bg-[#322f2a] transition-colors"
             >
               <RefreshCw className="h-3.5 w-3.5" />
               <span>Retry Connection</span>
             </button>
+            <span className="text-[11px] text-stone-400">ระบบจะลองเชื่อมต่อใหม่อัตโนมัติทุกๆ 4 วินาที</span>
           </div>
         </div>
       )}
@@ -370,7 +519,9 @@ export function AgentStatusCard({
                       ? (view.status.connectedSince
                           ? `เชื่อมต่อเมื่อ ${new Date(view.status.connectedSince).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · อุโมงค์ ${activeProviderName} ทำงานปกติ`
                           : `เชื่อมต่อแล้ว · อุโมงค์ ${activeProviderName} ทำงานปกติ`)
-                      : 'เลือกโปรโตคอลหรือเกตเวย์ แล้วกดปุ่มด้านขวาเพื่อเริ่มการเชื่อมต่อ'}
+                      : disconnectMessage
+                        ? `${disconnectMessage} · กดปุ่มด้านขวาเพื่อเริ่มการเชื่อมต่อใหม่`
+                        : 'เลือกโปรโตคอลหรือเกตเวย์ แล้วกดปุ่มด้านขวาเพื่อเริ่มการเชื่อมต่อ'}
                   </p>
                 </div>
               </div>
@@ -505,8 +656,8 @@ export function AgentStatusCard({
             </div>
           </div>
 
-          {/* Card Row 2: Three Telemetry Metric Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Card Row 2: Telemetry Metric Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-5 shadow-xl">
               <span className="text-stone-400 text-xs block font-medium">IP บน VPN ของคุณ</span>
               <span className="text-xl sm:text-2xl font-extrabold text-stone-100 font-mono mt-1.5 block">
@@ -531,6 +682,37 @@ export function AgentStatusCard({
               <span className="text-xl sm:text-2xl font-extrabold text-stone-100 font-mono mt-1.5 block">
                 {view.status.state === 'connected' ? activeProviderName : 'ไม่ได้เชื่อมต่อ'}
               </span>
+            </div>
+
+            {/* Card 4: Network Traffic / Data Usage Meter */}
+            <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-5 shadow-xl">
+              <div className="flex items-center justify-between">
+                <span className="text-stone-400 text-xs flex items-center gap-1.5 font-medium">
+                  <Activity className="h-3.5 w-3.5 text-amber-400" />
+                  ปริมาณข้อมูล
+                </span>
+                {view.status.state === 'connected' && (
+                  <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-mono">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    LIVE
+                  </span>
+                )}
+              </div>
+              <span className="text-xl sm:text-2xl font-extrabold text-amber-400 font-mono mt-1.5 block">
+                {view.status.state === 'connected'
+                  ? formatBytes((view.status.bytesReceived || 0) + (view.status.bytesSent || 0))
+                  : '0 B'}
+              </span>
+              <div className="flex items-center gap-3 mt-1.5 text-[11px] font-mono">
+                <span className="text-emerald-400 flex items-center gap-0.5">
+                  <ArrowDown className="h-3 w-3" />
+                  {formatBytes(view.status.bytesReceived)}
+                </span>
+                <span className="text-blue-400 flex items-center gap-0.5">
+                  <ArrowUp className="h-3 w-3" />
+                  {formatBytes(view.status.bytesSent)}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -600,12 +782,53 @@ export function AgentStatusCard({
               </div>
             </div>
 
-            {/* Right: Account Security Checklist */}
+            {/* Right: Account Security & Live Network Traffic */}
             <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-6 shadow-xl space-y-4">
               <div className="flex items-center justify-between border-b border-white/5 pb-3">
-                <span className="font-bold text-stone-100 text-sm">ความปลอดภัยของบัญชี</span>
+                <span className="font-bold text-stone-100 text-sm">ความปลอดภัย & การจราจรเครือข่าย</span>
                 <span className="text-xs font-mono text-emerald-400">Zero-Trust Active</span>
               </div>
+
+              {/* Live Traffic Meter Bars */}
+              {view.status.state === 'connected' && (
+                <div className="p-3.5 rounded-2xl bg-[#141311]/80 border border-white/5 space-y-2.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-stone-400 flex items-center gap-1.5 font-medium">
+                      <ArrowDown className="h-3.5 w-3.5 text-emerald-400" />
+                      ดาวน์โหลด (Received)
+                    </span>
+                    <span className="font-mono text-emerald-400 font-bold">
+                      {formatBytes(view.status.bytesReceived)}
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-stone-800 overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                      style={{
+                        width: `${Math.min(100, Math.max(8, ((view.status.bytesReceived || 0) % 1048576) / 10485.76))}%`,
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs pt-1">
+                    <span className="text-stone-400 flex items-center gap-1.5 font-medium">
+                      <ArrowUp className="h-3.5 w-3.5 text-blue-400" />
+                      อัปโหลด (Transmitted)
+                    </span>
+                    <span className="font-mono text-blue-400 font-bold">
+                      {formatBytes(view.status.bytesSent)}
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-stone-800 overflow-hidden">
+                    <div
+                      className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                      style={{
+                        width: `${Math.min(100, Math.max(8, ((view.status.bytesSent || 0) % 524288) / 5242.88))}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-3 text-xs">
                 <div className="flex items-center gap-2.5 text-stone-300">
@@ -618,7 +841,7 @@ export function AgentStatusCard({
                 </div>
                 <div className="flex items-center gap-2.5 text-stone-300">
                   <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                  <span>อุปกรณ์นี้ลงทะเบียนแล้วในระบบ</span>
+                  <span>อุโมงค์เข้ารหัส Curve25519 X25519 แข็งแกร่ง</span>
                 </div>
               </div>
             </div>

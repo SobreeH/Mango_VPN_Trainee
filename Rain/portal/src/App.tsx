@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   KeyRound,
   LogOut,
@@ -7,6 +8,8 @@ import {
   Moon,
   Lock,
   User,
+  Users,
+  Laptop,
   Eye,
   EyeOff,
   Power,
@@ -19,7 +22,8 @@ import QRCode from 'qrcode';
 import { RoleName, type AuthTokensResponse, type AuthUserDto, type LoginResponse } from '@mango/shared';
 import { loginUser, logoutUser, verifyOtpCode, type AuthRefreshContext } from './api/auth';
 import { AgentStatusCard } from './components/AgentStatusCard';
-import { DEFAULT_API_URL } from './lib/adminApi';
+import { DEFAULT_API_URL, fetchUsers, fetchDevices, fetchSessions } from './lib/adminApi';
+import { ToastProvider } from './components/Toast';
 import { AuditLogsTab } from './components/AuditLogsTab';
 import { AgentVersionsTab } from './components/AgentVersionsTab';
 import { UsersTab } from './components/UsersTab';
@@ -62,20 +66,58 @@ type AuthStep =
   | { kind: 'mfa'; challenge: LoginResponse }
   | { kind: 'authenticated'; session: AuthTokensResponse };
 
-export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppProps) {
-  const [step, setStep] = useState<AuthStep>(
-    initialSession
-      ? {
-          kind: 'authenticated',
-          session: {
-            accessToken: initialSession.accessToken,
-            refreshToken: initialSession.refreshToken ?? '',
-            expiresIn: 900,
-            user: initialSession.user,
-          },
+const SESSION_STORAGE_KEY = 'mango_vpn_auth_session';
+
+function getStoredSession(): AuthTokensResponse | null {
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      const data = sessionStorage.getItem(SESSION_STORAGE_KEY);
+      if (data) {
+        const parsed = JSON.parse(data) as AuthTokensResponse;
+        if (parsed?.accessToken && parsed?.user) {
+          return parsed;
         }
-      : { kind: 'login' },
-  );
+      }
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return null;
+}
+
+function saveStoredSession(session: AuthTokensResponse | null): void {
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      if (session) {
+        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+      } else {
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      }
+    }
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppProps) {
+  const [step, setStep] = useState<AuthStep>(() => {
+    if (initialSession) {
+      return {
+        kind: 'authenticated',
+        session: {
+          accessToken: initialSession.accessToken,
+          refreshToken: initialSession.refreshToken ?? '',
+          expiresIn: 900,
+          user: initialSession.user,
+        },
+      };
+    }
+    const stored = getStoredSession();
+    if (stored) {
+      return { kind: 'authenticated', session: stored };
+    }
+    return { kind: 'login' };
+  });
   const [activeTab, setActiveTab] = useState<AdminTab>('audit-logs');
   const [clientTab, setClientTab] = useState<'connection' | 'profile' | 'help'>('connection');
   const [username, setUsername] = useState('');
@@ -99,16 +141,6 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
   const [showPassword, setShowPassword] = useState(false);
   const [showSetupKey, setShowSetupKey] = useState(false);
   const [showVpnPanel, setShowVpnPanel] = useState(false);
-
-  const currentPort = typeof window !== 'undefined' ? window.location.port : '';
-  const portRole =
-    currentPort === '3000'
-      ? { label: 'Admin Portal (:3000)', role: 'ADMIN', badge: '🛡️ Admin' }
-      : currentPort === '3001'
-        ? { label: 'Staff Portal (:3001)', role: 'STAFF', badge: '💼 Staff' }
-        : currentPort === '3002'
-          ? { label: 'Client Portal (:3002)', role: 'CLIENT', badge: '🌐 Client' }
-          : null;
 
   useEffect(() => {
     try {
@@ -186,6 +218,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
       });
       setPassword('');
       setOtpCode('');
+      saveStoredSession(session);
       setStep({ kind: 'authenticated', session });
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'OTP verification failed');
@@ -195,6 +228,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
   }
 
   function clearLocalSession(nextError: string | null = null) {
+    saveStoredSession(null);
     setUsername('');
     setPassword('');
     setOtpCode('');
@@ -219,13 +253,51 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
       ? {
           refreshToken: step.session.refreshToken,
           apiBaseUrl,
-          onSessionUpdate: (newSession) => setStep({ kind: 'authenticated', session: newSession }),
-          onAuthExpired: (message) => clearLocalSession(message),
+          onSessionUpdate: (newSession) => {
+            saveStoredSession(newSession);
+            setStep({ kind: 'authenticated', session: newSession });
+          },
+          onAuthExpired: (message) => {
+            clearLocalSession(
+              message ||
+                (lang === 'th'
+                  ? 'เซสชันของคุณหมดอายุ กรุณาเข้าสู่ระบบใหม่อีกครั้ง'
+                  : 'Session expired. Please sign in again.'),
+            );
+          },
         }
       : undefined;
 
+  const isAdmin = step.kind === 'authenticated' && step.session.user.role === RoleName.ADMIN;
+  const currentToken = step.kind === 'authenticated' ? step.session.accessToken : '';
+
+  const kpiUsersQuery = useQuery({
+    queryKey: ['admin-kpi-users', apiBaseUrl],
+    queryFn: () => fetchUsers(apiBaseUrl, currentToken, authContext),
+    enabled: isAdmin && Boolean(currentToken),
+    staleTime: 30000,
+  });
+
+  const kpiDevicesQuery = useQuery({
+    queryKey: ['admin-kpi-devices', apiBaseUrl],
+    queryFn: () => fetchDevices(apiBaseUrl, currentToken, authContext),
+    enabled: isAdmin && Boolean(currentToken),
+    staleTime: 30000,
+  });
+
+  const kpiSessionsQuery = useQuery({
+    queryKey: ['admin-kpi-sessions', apiBaseUrl],
+    queryFn: () => fetchSessions(apiBaseUrl, currentToken, authContext),
+    enabled: isAdmin && Boolean(currentToken),
+    staleTime: 15000,
+  });
+
+  const totalUsers = kpiUsersQuery.data?.items?.length ?? 0;
+  const totalDevices = kpiDevicesQuery.data?.items?.length ?? 0;
+  const activeSessions = kpiSessionsQuery.data?.items?.filter((s) => s.status === 'ACTIVE').length ?? 0;
+
   if (step.kind === 'authenticated') {
-    const isAdmin = step.session.user.role === RoleName.ADMIN;
+    const isClient = step.session.user.role === RoleName.CLIENT;
 
     return (
       <main className={`min-h-screen p-4 sm:p-6 lg:p-8 relative overflow-hidden transition-colors duration-300 ${
@@ -407,16 +479,6 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
 
                 {/* Top Right Utility Controls matching Reference Mockup */}
                 <div className="flex items-center gap-3">
-                  {/* Current Port Badge */}
-                  {currentPort && (
-                    <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono font-bold border transition-colors ${
-                      isDark ? 'bg-[#1e1d1a]/85 border-white/5 text-amber-400' : 'bg-white border-stone-200 text-amber-600'
-                    }`}>
-                      <span className="text-[10px] text-stone-400 font-normal">PORT:</span>
-                      <span>{currentPort}</span>
-                    </div>
-                  )}
-
                   {/* Collapsible VPN Toggle Button */}
                   <button
                     type="button"
@@ -498,11 +560,107 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                 </div>
               </header>
 
+              {/* Admin Overview KPI Summary Cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+                {/* Total Users */}
+                <div className={`p-4 rounded-3xl border transition-all ${
+                  isDark
+                    ? 'bg-[#1e1d1a]/85 border-white/5 shadow-xl hover:border-amber-500/20'
+                    : 'bg-white border-stone-200 shadow-md'
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-semibold tracking-wider uppercase text-stone-400">
+                      {lang === 'th' ? 'ผู้ใช้งานทั้งหมด' : 'Total Users'}
+                    </span>
+                    <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
+                      <Users className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-black text-stone-100">
+                    {kpiUsersQuery.isLoading ? '...' : totalUsers}
+                  </div>
+                  <p className="text-[11px] text-stone-500 mt-1">
+                    {lang === 'th' ? 'บัญชีในระบบ' : 'Registered accounts'}
+                  </p>
+                </div>
+
+                {/* Registered Devices */}
+                <div className={`p-4 rounded-3xl border transition-all ${
+                  isDark
+                    ? 'bg-[#1e1d1a]/85 border-white/5 shadow-xl hover:border-amber-500/20'
+                    : 'bg-white border-stone-200 shadow-md'
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-semibold tracking-wider uppercase text-stone-400">
+                      {lang === 'th' ? 'อุปกรณ์ที่ลงทะเบียน' : 'Devices'}
+                    </span>
+                    <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
+                      <Laptop className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-black text-stone-100">
+                    {kpiDevicesQuery.isLoading ? '...' : totalDevices}
+                  </div>
+                  <p className="text-[11px] text-stone-500 mt-1">
+                    {lang === 'th' ? 'ผูกสิทธิ์ Zero-Trust' : 'Trusted endpoints'}
+                  </p>
+                </div>
+
+                {/* Active Sessions */}
+                <div className={`p-4 rounded-3xl border transition-all ${
+                  isDark
+                    ? 'bg-[#1e1d1a]/85 border-white/5 shadow-xl hover:border-amber-500/20'
+                    : 'bg-white border-stone-200 shadow-md'
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-semibold tracking-wider uppercase text-stone-400">
+                      {lang === 'th' ? 'VPN ที่เชื่อมต่ออยู่' : 'Active Sessions'}
+                    </span>
+                    <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+                      <Activity className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-black text-emerald-400 flex items-center gap-2">
+                    {kpiSessionsQuery.isLoading ? '...' : activeSessions}
+                    {activeSessions > 0 && (
+                      <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                    )}
+                  </div>
+                  <p className="text-[11px] text-stone-500 mt-1">
+                    {lang === 'th' ? 'ออนไลน์แบบเรียลไทม์' : 'Live tunnels'}
+                  </p>
+                </div>
+
+                {/* Security Posture */}
+                <div className={`p-4 rounded-3xl border transition-all ${
+                  isDark
+                    ? 'bg-[#1e1d1a]/85 border-white/5 shadow-xl hover:border-amber-500/20'
+                    : 'bg-white border-stone-200 shadow-md'
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-semibold tracking-wider uppercase text-stone-400">
+                      {lang === 'th' ? 'สถานะความปลอดภัย' : 'Security Posture'}
+                    </span>
+                    <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
+                      <ShieldCheck className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <div className="text-sm font-bold text-emerald-400 flex items-center gap-1.5 mt-1">
+                    <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />
+                    Zero-Trust Active
+                  </div>
+                  <p className="text-[11px] text-stone-500 mt-1">
+                    WireGuard + TOTP MFA
+                  </p>
+                </div>
+              </div>
+
               {/* Collapsible VPN Agent Status Card for Admin */}
               <div className={`transition-all duration-300 ${showVpnPanel ? 'block pb-2' : 'hidden'}`}>
                 <AgentStatusCard
                   accessToken={step.session.accessToken}
                   userRole={step.session.user.role}
+                  username={step.session.user.username}
                   auth={authContext}
                 />
               </div>
@@ -561,8 +719,137 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
               </div>
             </section>
           </div>
+        ) : isClient ? (
+          /* Client Focused Clean Portal - Simple, 1-Click VPN Access without Clutter */
+          <div className="max-w-5xl mx-auto w-full space-y-6 relative z-10 py-2 sm:py-4">
+            {/* Top Navbar */}
+            <header className={`rounded-3xl border shadow-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 backdrop-blur-xl transition-colors ${
+              isDark ? 'border-white/5 bg-[#1e1d1a]/85 shadow-black/80' : 'border-stone-200/90 bg-white/95 shadow-stone-200/60'
+            }`}>
+              {/* Brand & User Role */}
+              <div className="flex items-center gap-3">
+                <span className="text-3xl" role="img" aria-label="Mango">🥭</span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h1 className={`text-base font-bold tracking-tight ${isDark ? 'text-stone-100' : 'text-slate-900'}`}>
+                      MANGO VPN
+                    </h1>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border bg-emerald-500/10 border-emerald-500/30 text-emerald-400">
+                      CLIENT PORTAL
+                    </span>
+                  </div>
+                  <p className={`text-[10px] font-medium ${isDark ? 'text-stone-400' : 'text-amber-700'}`}>
+                    Mango Consultant Co., Ltd.
+                  </p>
+                </div>
+              </div>
+
+              {/* Utility Controls & Logout */}
+              <div className="flex items-center gap-3 flex-wrap">
+                {/* Language Switcher */}
+                <div className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
+                  isDark ? 'bg-[#141311] border-white/5' : 'bg-white border-stone-200'
+                }`}>
+                  <button
+                    type="button"
+                    onClick={() => setLang('th')}
+                    className={`px-3 py-1 rounded-full transition-colors ${
+                      lang === 'th'
+                        ? 'bg-[#f59e0b] text-stone-950 shadow-sm font-bold'
+                        : isDark ? 'text-stone-400 hover:text-stone-200' : 'text-stone-500 hover:text-stone-800'
+                    }`}
+                  >
+                    TH
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLang('en')}
+                    className={`px-3 py-1 rounded-full transition-colors ${
+                      lang === 'en'
+                        ? 'bg-[#f59e0b] text-stone-950 shadow-sm font-bold'
+                        : isDark ? 'text-stone-400 hover:text-stone-200' : 'text-stone-500 hover:text-stone-800'
+                    }`}
+                  >
+                    EN
+                  </button>
+                </div>
+
+                {/* Theme Switcher */}
+                <div
+                  role="group"
+                  aria-label="Toggle theme"
+                  className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
+                    isDark ? 'bg-[#141311] border-white/5' : 'bg-white border-stone-200'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setIsDark(false)}
+                    aria-label="Light mode"
+                    className={`p-1.5 rounded-full transition-colors ${
+                      !isDark
+                        ? 'bg-[#f59e0b] text-stone-950 shadow-sm font-bold'
+                        : 'text-stone-400 hover:text-stone-200'
+                    }`}
+                  >
+                    <Sun className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsDark(true)}
+                    aria-label="Dark mode"
+                    className={`p-1.5 rounded-full transition-colors ${
+                      isDark
+                        ? 'bg-[#f59e0b] text-stone-950 shadow-sm font-bold'
+                        : 'text-stone-400 hover:text-stone-200'
+                    }`}
+                  >
+                    <Moon className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                {/* User Info & Logout Button */}
+                <div className="flex items-center gap-2 pl-2 border-l border-white/10">
+                  <span className={`text-xs font-semibold hidden md:inline ${isDark ? 'text-stone-200' : 'text-slate-800'}`}>
+                    {step.session.user.username}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    aria-label="Log Out"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border border-white/10 bg-[#262420] text-stone-300 hover:bg-rose-950/60 hover:text-rose-200 hover:border-rose-900/50 transition-colors shadow-sm"
+                  >
+                    <LogOut className="h-3.5 w-3.5 text-rose-400" />
+                    <span>{lang === 'th' ? 'ออกจากระบบ' : 'Log Out'}</span>
+                  </button>
+                </div>
+              </div>
+            </header>
+
+            {/* Client Greeting Header */}
+            <div>
+              <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${isDark ? 'text-stone-100' : 'text-slate-900'}`}>
+                {lang === 'th' ? `ยินดีต้อนรับ, ${step.session.user.username}` : `Welcome, ${step.session.user.username}`}
+              </h2>
+              <p className={`text-xs font-medium mt-1 ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
+                {lang === 'th'
+                  ? 'ระบบเครือข่ายระยะไกลความปลอดภัยสูง (สิทธิ์การเข้าถึงสำหรับลูกค้า)'
+                  : 'Zero-Trust Secure Remote Access (Client Access Privilege)'}
+              </p>
+            </div>
+
+            {/* Direct VPN Connection Card - 100% Focused */}
+            <div className="w-full">
+              <AgentStatusCard
+                accessToken={step.session.accessToken}
+                userRole={step.session.user.role}
+                username={step.session.user.username}
+                auth={authContext}
+              />
+            </div>
+          </div>
         ) : (
-          /* Non-Admin User Portal (Staff / Client) - Full-Screen Sidebar Dashboard matching Mockup */
+          /* Staff User Portal - Full-Screen Sidebar Dashboard matching Mockup */
           <div className="w-full flex-1 flex flex-col md:flex-row gap-6 relative z-10 items-stretch">
             {/* Left Sidebar */}
             <aside className={`w-full md:w-64 lg:w-72 shrink-0 rounded-3xl border shadow-2xl p-6 flex flex-col justify-between backdrop-blur-xl transition-colors min-h-[calc(100vh-6rem)] ${
@@ -657,16 +944,6 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
 
                 {/* Top Right Controls: Language & Theme Capsules */}
                 <div className="flex items-center gap-3">
-                  {/* Current Port Badge */}
-                  {currentPort && (
-                    <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono font-bold border transition-colors ${
-                      isDark ? 'bg-[#1e1d1a]/85 border-white/5 text-amber-400' : 'bg-white border-stone-200 text-amber-600'
-                    }`}>
-                      <span className="text-[10px] text-stone-400 font-normal">PORT:</span>
-                      <span>{currentPort}</span>
-                    </div>
-                  )}
-
                   {/* Language Switcher */}
                   <div className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
                     isDark ? 'bg-[#1e1d1a]/85 border-white/5' : 'bg-white border-stone-200'
@@ -737,6 +1014,7 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                   <AgentStatusCard
                     accessToken={step.session.accessToken}
                     userRole={step.session.user.role}
+                    username={step.session.user.username}
                     auth={authContext}
                   />
                 </div>
@@ -901,20 +1179,11 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
 
           {/* Center Greeting & Tagline */}
           <div className="my-8 md:my-0 space-y-3 relative z-10">
-            <div className="space-y-1">
-              <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight leading-snug ${
-                isDark ? 'text-stone-100' : 'text-stone-900'
-              }`}>
-                {lang === 'th' ? 'ยินดีต้อนรับกลับมา' : 'Welcome back'}
-              </h2>
-              {portRole && (
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border bg-amber-500/10 border-amber-500/30 text-amber-300">
-                  <span>{portRole.badge} Portal</span>
-                  <span className="text-stone-500 font-normal">|</span>
-                  <span className="font-mono text-[10px]">:{currentPort}</span>
-                </div>
-              )}
-            </div>
+            <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight leading-snug ${
+              isDark ? 'text-stone-100' : 'text-stone-900'
+            }`}>
+              {lang === 'th' ? 'ยินดีต้อนรับกลับมา' : 'Welcome back'}
+            </h2>
             <p className={`text-xs sm:text-sm leading-relaxed ${
               isDark ? 'text-stone-300/90' : 'text-stone-600'
             }`}>
@@ -922,40 +1191,6 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                 ? 'เข้าสู่ระบบเพื่อใช้งานเครือข่ายองค์กรของคุณ'
                 : 'Sign in to access your company network'}
             </p>
-
-            {/* Role Port Switcher Pills */}
-            <div className="pt-2 space-y-1.5">
-              <span className="text-[10px] text-stone-400 font-medium block">
-                {lang === 'th' ? 'สลับพอร์ตตามบทบาท:' : 'Switch Role Port:'}
-              </span>
-              <div className="flex flex-wrap items-center gap-1.5">
-                {[
-                  { port: '3000', label: 'Admin :3000', icon: '🛡️' },
-                  { port: '3001', label: 'Staff :3001', icon: '💼' },
-                  { port: '3002', label: 'Client :3002', icon: '🌐' },
-                ].map((p) => {
-                  const isCurrent = currentPort === p.port;
-                  return (
-                    <a
-                      key={p.port}
-                      href={`http://localhost:${p.port}`}
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-semibold transition-all border ${
-                        isCurrent
-                          ? isDark
-                            ? 'bg-[#7a4918] text-amber-200 border-amber-500/40 shadow-sm'
-                            : 'bg-[#f59e0b] text-stone-950 border-amber-600/40 shadow-sm'
-                          : isDark
-                            ? 'border-white/5 bg-[#141311]/60 text-stone-400 hover:text-stone-200 hover:bg-[#262420]'
-                            : 'border-stone-200 bg-stone-50 text-stone-600 hover:text-stone-900 hover:bg-stone-100'
-                      }`}
-                    >
-                      <span>{p.icon}</span>
-                      <span>{p.label}</span>
-                    </a>
-                  );
-                })}
-              </div>
-            </div>
           </div>
 
           {/* Bottom Copyright Footer */}
@@ -1069,14 +1304,16 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
             </p>
           </div>
 
-          {/* Error Banner */}
+          {/* Error / Notification Banner */}
           {errorMessage && (
             <div
               role="alert"
-              className={`rounded-2xl border p-3.5 text-xs text-red-200 space-y-1 shadow-inner ${
-                step.kind === 'mfa'
-                  ? 'border-red-900/60 bg-red-950/60 text-center'
-                  : 'flex items-start gap-2 border-red-500/40 bg-red-950/50'
+              className={`rounded-2xl border p-3.5 text-xs shadow-inner ${
+                errorMessage.includes('เซสชัน') || errorMessage.toLowerCase().includes('session')
+                  ? 'border-amber-500/30 bg-amber-950/30 text-amber-200 flex items-start gap-2.5'
+                  : step.kind === 'mfa'
+                    ? 'border-red-900/60 bg-red-950/60 text-center text-red-200 space-y-1'
+                    : 'flex items-start gap-2 border-red-500/40 bg-red-950/50 text-red-200'
               }`}
             >
               {step.kind === 'mfa' ? (
@@ -1097,7 +1334,11 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
                 </>
               ) : (
                 <>
-                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-red-400" />
+                  <AlertCircle className={`h-4 w-4 mt-0.5 shrink-0 ${
+                    errorMessage.includes('เซสชัน') || errorMessage.toLowerCase().includes('session')
+                      ? 'text-amber-400'
+                      : 'text-red-400'
+                  }`} />
                   <span>{errorMessage}</span>
                 </>
               )}
@@ -1351,6 +1592,14 @@ export function App({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: App
         </div>
       </section>
     </main>
+  );
+}
+
+export function App(props: AppProps) {
+  return (
+    <ToastProvider>
+      <AppPortal {...props} />
+    </ToastProvider>
   );
 }
 
