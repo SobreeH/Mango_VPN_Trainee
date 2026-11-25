@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
+import { getThemeClasses } from '../lib/theme';
 
 export interface ConfirmModalProps {
   isOpen: boolean;
@@ -8,6 +9,7 @@ export interface ConfirmModalProps {
   cancelLabel?: string;
   confirmVariant?: 'danger' | 'warning' | 'primary';
   isLoading?: boolean;
+  isDark?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -20,9 +22,11 @@ export function ConfirmModal({
   cancelLabel = 'Cancel',
   confirmVariant = 'danger',
   isLoading = false,
+  isDark = true,
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
+  const t = getThemeClasses(isDark);
   useEffect(() => {
     if (!isOpen) return;
 
@@ -51,19 +55,20 @@ export function ConfirmModal({
       aria-labelledby="confirm-modal-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-[#141311]/85 p-4 backdrop-blur-md animate-in fade-in duration-150"
     >
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#1e1d1a] p-6 shadow-2xl space-y-4">
-        <h3 id="confirm-modal-title" className="text-base font-semibold text-stone-100">
+      <div className={`w-full max-w-md rounded-2xl border p-6 shadow-2xl space-y-4 ${t.modal}`}>
+        <h3 id="confirm-modal-title" className={`text-base font-semibold ${t.heading}`}>
           {title}
         </h3>
-        <div className="text-sm text-stone-300 leading-relaxed">
+        <div className={`text-sm leading-relaxed ${t.text}`}>
           {message}
         </div>
         <div className="flex justify-end gap-3 pt-2">
           <button
             type="button"
+            aria-label="Cancel"
             disabled={isLoading}
             onClick={onCancel}
-            className="rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-stone-300 hover:bg-white/5 disabled:opacity-50"
+            className={`rounded-xl border px-4 py-2 text-sm font-medium disabled:opacity-50 ${t.secondaryBtn}`}
           >
             {cancelLabel}
           </button>

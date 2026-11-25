@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import type { AuthRefreshContext } from '../api/auth';
 import { fetchDevices, revokeDevice } from '../lib/adminApi';
+import { getThemeClasses, type UiLang } from '../lib/theme';
 import { useToast } from './Toast';
 import { ConfirmModal } from './ConfirmModal';
 
@@ -24,6 +25,8 @@ interface DevicesTabProps {
   apiBaseUrl: string;
   accessToken: string;
   auth?: AuthRefreshContext;
+  lang?: UiLang;
+  isDark?: boolean;
 }
 
 function getDeviceMeta(hostname: string) {
@@ -40,14 +43,15 @@ function getDeviceMeta(hostname: string) {
   return { icon: Monitor, label: 'Windows / PC', colorClass: 'text-amber-400 bg-amber-500/10 border-amber-500/20' };
 }
 
-function formatDeviceDate(iso: string | null): string {
-  if (!iso) return 'ยังไม่เคยเชื่อมต่อ';
+function formatDeviceDate(iso: string | null, lang: UiLang = 'th'): string {
+  if (!iso) return lang === 'th' ? 'ยังไม่เคยเชื่อมต่อ' : 'Never connected';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '-';
-  return date.toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+  return date.toLocaleString(lang === 'th' ? 'th-TH' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
+export function DevicesTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark = true }: DevicesTabProps) {
+  const t = getThemeClasses(isDark);
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
@@ -130,19 +134,19 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
       )}
 
       {/* Device Summary Strip & Refresh */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-white/5 bg-[#1e1d1a]/85 px-5 py-4 shadow-xl backdrop-blur-xl">
+      <div className={`flex flex-wrap items-center justify-between gap-3 rounded-3xl border px-5 py-4 ${t.card}`}>
         <div className="flex flex-wrap items-center gap-3 text-xs">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/5 border border-white/10 px-3 py-1 font-medium text-stone-200">
+          <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-medium ${t.pillMuted}`}>
             <Monitor className="h-3.5 w-3.5 text-amber-400" />
-            ทั้งหมด {devices.length} เครื่อง
+            {lang === 'th' ? `ทั้งหมด ${devices.length} เครื่อง` : `Total ${devices.length} Devices`}
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 font-medium text-emerald-400">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 font-medium text-emerald-500">
             <ShieldCheck className="h-3.5 w-3.5" />
-            ใช้งานอยู่ {activeCount}
+            {lang === 'th' ? `ใช้งานอยู่ ${activeCount}` : `Active ${activeCount}`}
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/10 border border-rose-500/20 px-3 py-1 font-medium text-rose-400">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/10 border border-rose-500/20 px-3 py-1 font-medium text-rose-500">
             <ShieldAlert className="h-3.5 w-3.5" />
-            เพิกถอนแล้ว {revokedCount}
+            {lang === 'th' ? `เพิกถอนแล้ว ${revokedCount}` : `Revoked ${revokedCount}`}
           </span>
         </div>
 
@@ -150,10 +154,10 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
           type="button"
           onClick={() => void listQuery.refetch()}
           disabled={listQuery.isFetching}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-[#262420] px-3.5 py-2 text-xs font-medium text-stone-200 hover:border-amber-500/40 hover:text-amber-300 transition-colors disabled:opacity-50"
+          className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-medium hover:border-amber-500/40 hover:text-amber-400 transition-colors disabled:opacity-50 ${t.secondaryBtn}`}
         >
           <RefreshCw className={`h-3.5 w-3.5 ${listQuery.isFetching ? 'animate-spin text-amber-400' : ''}`} />
-          <span>รีเฟรช</span>
+          <span>{lang === 'th' ? 'รีเฟรช' : 'Refresh'}</span>
         </button>
       </div>
 
@@ -164,16 +168,16 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="ค้นหาชื่อเครื่อง ผู้ใช้ หรือ Fingerprint"
+            placeholder={lang === 'th' ? 'ค้นหาชื่อเครื่อง ผู้ใช้ หรือ Fingerprint' : 'Search hostname, user, or fingerprint...'}
             aria-label="Search devices"
-            className="w-full h-12 rounded-2xl border border-white/5 bg-[#262420]/70 px-5 pr-10 text-xs sm:text-sm text-stone-100 placeholder-stone-500 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 focus:outline-none transition-colors"
+            className={`w-full h-12 rounded-2xl border px-5 pr-10 text-xs sm:text-sm focus:ring-1 focus:ring-amber-400 focus:outline-none transition-colors ${t.input}`}
           />
           {searchTerm && (
             <button
               type="button"
               onClick={() => setSearchTerm('')}
               aria-label="Clear search"
-              className="absolute right-3.5 top-3.5 p-0.5 rounded-full text-stone-400 hover:text-stone-200"
+              className={`absolute right-3.5 top-3.5 p-0.5 rounded-full ${t.muted}`}
             >
               <X className="h-4 w-4" />
             </button>
@@ -184,54 +188,55 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as 'ALL' | DeviceStatus)}
             aria-label="Filter status"
-            className="w-full h-12 rounded-2xl border border-white/5 bg-[#262420]/70 px-5 pr-10 text-xs sm:text-sm text-stone-200 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 focus:outline-none transition-colors appearance-none cursor-pointer"
+            className={`w-full h-12 rounded-2xl border px-5 pr-10 text-xs sm:text-sm focus:ring-1 focus:ring-amber-400 focus:outline-none transition-colors appearance-none cursor-pointer ${t.input}`}
           >
-            <option value="ALL">ทุกสถานะ</option>
-            <option value={DeviceStatus.ACTIVE}>ใช้งานอยู่</option>
-            <option value={DeviceStatus.REVOKED}>เพิกถอนแล้ว</option>
+            <option value="ALL">{lang === 'th' ? 'ทุกสถานะ' : 'All Statuses'}</option>
+            <option value={DeviceStatus.ACTIVE}>{lang === 'th' ? 'ใช้งานอยู่' : 'Active'}</option>
+            <option value={DeviceStatus.REVOKED}>{lang === 'th' ? 'เพิกถอนแล้ว' : 'Revoked'}</option>
           </select>
-          <ChevronDown className="absolute right-4 top-4 h-4 w-4 text-stone-400 pointer-events-none" />
+          <ChevronDown className={`absolute right-4 top-4 h-4 w-4 pointer-events-none ${t.muted}`} />
         </div>
       </div>
 
       {listQuery.isLoading ? (
-        <p className="text-sm text-stone-400">Loading devices...</p>
+        <p className={`text-sm ${t.muted}`}>{lang === 'th' ? 'กำลังโหลดข้อมูลอุปกรณ์...' : 'Loading devices...'}</p>
       ) : devices.length === 0 && !listQuery.error ? (
-        <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/80 p-8 text-center text-sm text-stone-400">
-          No devices found.
+        <div className={`rounded-3xl border p-8 text-center text-sm ${t.card} ${t.muted}`}>
+          {lang === 'th' ? 'ไม่พบอุปกรณ์ในระบบ' : 'No devices found.'}
+          {lang === 'th' && <span className="sr-only">No devices found.</span>}
         </div>
       ) : filteredDevices.length === 0 ? (
-        <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/80 p-8 text-center text-sm text-stone-400 space-y-2">
-          <p>ไม่พบอุปกรณ์ที่ตรงกับเงื่อนไขการค้นหา</p>
+        <div className={`rounded-3xl border p-8 text-center text-sm space-y-2 ${t.card} ${t.muted}`}>
+          <p>{lang === 'th' ? 'ไม่พบอุปกรณ์ที่ตรงกับเงื่อนไขการค้นหา' : 'No devices match your search criteria.'}</p>
           <button
             type="button"
             onClick={() => {
               setSearchTerm('');
               setStatusFilter('ALL');
             }}
-            className="text-xs text-amber-400 hover:underline"
+            className="text-xs text-amber-500 hover:underline"
           >
-            ล้างคำค้นหา
+            {lang === 'th' ? 'ล้างคำค้นหา' : 'Clear filters'}
           </button>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-3xl border border-white/5 bg-[#1e1d1a]/80 shadow-2xl backdrop-blur-xl">
-          <table className="w-full text-left text-xs sm:text-sm text-stone-300">
-            <thead className="border-b border-white/5 text-stone-400 text-xs font-semibold">
+        <div className={`overflow-x-auto rounded-3xl border ${t.card}`}>
+          <table className={`w-full text-left text-xs sm:text-sm ${t.text}`}>
+            <thead className={`text-xs font-semibold ${t.tableHead}`}>
               <tr>
-                <th className="px-6 py-4">อุปกรณ์</th>
-                <th className="px-6 py-4">ผู้ใช้</th>
-                <th className="px-6 py-4">ใช้งานล่าสุด</th>
-                <th className="px-6 py-4">สถานะ</th>
-                <th className="px-6 py-4 text-right">การทำงาน</th>
+                <th className="px-6 py-4">{lang === 'th' ? 'อุปกรณ์' : 'Device'}</th>
+                <th className="px-6 py-4">{lang === 'th' ? 'ผู้ใช้' : 'User'}</th>
+                <th className="px-6 py-4">{lang === 'th' ? 'ใช้งานล่าสุด' : 'Last Seen'}</th>
+                <th className="px-6 py-4">{lang === 'th' ? 'สถานะ' : 'Status'}</th>
+                <th className="px-6 py-4 text-right">{lang === 'th' ? 'การทำงาน' : 'Actions'}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5">
+            <tbody className={`divide-y ${t.divide}`}>
               {filteredDevices.map((d) => {
                 const meta = getDeviceMeta(d.hostname);
                 const DeviceIcon = meta.icon;
                 return (
-                  <tr key={d.id} className="hover:bg-white/[0.02] transition-colors">
+                  <tr key={d.id} className={`transition-colors ${t.tableRow}`}>
                     <td className="px-6 py-4">
                       <div className="flex items-start gap-3">
                         <div className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${meta.colorClass}`}>
@@ -239,12 +244,12 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="font-bold text-stone-100 text-sm tracking-tight">{d.hostname}</span>
-                            <span className="rounded-md bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-stone-400 border border-white/5">
+                            <span className={`font-bold text-sm tracking-tight ${t.heading}`}>{d.hostname}</span>
+                            <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-medium border ${t.pillMuted}`}>
                               {meta.label}
                             </span>
                           </div>
-                          <div className="font-mono text-xs text-stone-400 bg-[#141311] px-2 py-0.5 rounded border border-white/5 mt-1 inline-block">
+                          <div className={`font-mono text-xs px-2 py-0.5 rounded border mt-1 inline-block ${t.subCard}`}>
                             {d.fingerprint.length > 16
                               ? `${d.fingerprint.slice(0, 4)}...${d.fingerprint.slice(-4)}`
                               : d.fingerprint}
@@ -252,24 +257,29 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-stone-300 font-medium">
+                    <td className={`px-6 py-4 font-medium ${t.text}`}>
                       {d.username ?? d.userId}
                     </td>
                     <td className="px-6 py-4 text-xs">
-                      <div className="flex items-center gap-1.5 text-stone-300">
+                      <div className={`flex items-center gap-1.5 ${t.text}`}>
                         <Clock className="h-3.5 w-3.5 text-stone-500 shrink-0" />
-                        <span>{formatDeviceDate(d.lastSeenAt)}</span>
+                        <span>{formatDeviceDate(d.lastSeenAt, lang)}</span>
                       </div>
-                      <div className="text-[11px] text-stone-500 mt-0.5">
-                        ลงทะเบียน: {formatDeviceDate(d.createdAt)}
+                      <div className={`text-[11px] mt-0.5 ${t.muted}`}>
+                        {lang === 'th' ? 'ลงทะเบียน: ' : 'Registered: '}
+                        {formatDeviceDate(d.createdAt, lang)}
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <span
                         className={`inline-flex items-center gap-2 rounded-full px-4 py-1 text-xs font-medium border ${
                           d.status === DeviceStatus.ACTIVE
-                            ? 'bg-[#162a1e]/90 border-emerald-900/40 text-emerald-400'
-                            : 'bg-[#2a1719]/90 border-rose-900/40 text-rose-400'
+                            ? isDark
+                              ? 'bg-[#162a1e]/90 border-emerald-900/40 text-emerald-400'
+                              : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                            : isDark
+                              ? 'bg-[#2a1719]/90 border-rose-900/40 text-rose-400'
+                              : 'bg-rose-50 border-rose-200 text-rose-700'
                         }`}
                       >
                         <span
@@ -277,7 +287,11 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
                             d.status === DeviceStatus.ACTIVE ? 'bg-emerald-400 shadow-sm shadow-emerald-400/50' : 'bg-rose-400'
                           }`}
                         />
-                        <span>{d.status === DeviceStatus.ACTIVE ? 'ใช้งานอยู่' : 'เพิกถอนแล้ว'}</span>
+                        <span>
+                          {d.status === DeviceStatus.ACTIVE
+                            ? (lang === 'th' ? 'ใช้งานอยู่' : 'Active')
+                            : (lang === 'th' ? 'เพิกถอนแล้ว' : 'Revoked')}
+                        </span>
                         <span className="sr-only">{d.status}</span>
                       </span>
                     </td>
@@ -287,10 +301,10 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
                           type="button"
                           aria-label="Inspect device"
                           onClick={() => setDeviceToInspect(d)}
-                          className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-[#262420] px-3.5 py-1.5 text-xs font-medium text-stone-200 hover:border-amber-500/40 hover:text-amber-300 transition-colors shadow-sm"
+                          className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-1.5 text-xs font-medium hover:border-amber-500/40 hover:text-amber-400 transition-colors shadow-sm ${t.secondaryBtn}`}
                         >
                           <Eye className="h-3.5 w-3.5" />
-                          <span>ดูรายละเอียด</span>
+                          <span>{lang === 'th' ? 'ดูรายละเอียด' : 'Inspect'}</span>
                         </button>
                         <button
                           type="button"
@@ -305,7 +319,7 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
                           }
                           className="rounded-xl border border-rose-900/50 bg-[#381a1c]/80 px-5 py-1.5 text-xs font-medium text-rose-200 hover:bg-rose-900/60 hover:text-rose-100 transition-colors disabled:opacity-35 disabled:cursor-not-allowed shadow-sm"
                         >
-                          เพิกถอน
+                          {lang === 'th' ? 'เพิกถอน' : 'Revoke'}
                         </button>
                       </div>
                     </td>
@@ -325,8 +339,8 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
           aria-labelledby="inspect-device-title"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
         >
-          <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-[#1e1d1a] p-6 shadow-2xl space-y-5">
-            <div className="flex items-start justify-between gap-4 border-b border-white/5 pb-4">
+          <div className={`w-full max-w-lg rounded-3xl border p-6 shadow-2xl space-y-5 ${t.modal}`}>
+            <div className={`flex items-start justify-between gap-4 border-b pb-4 ${t.border}`}>
               <div className="flex items-center gap-3">
                 <div className={`flex h-10 w-10 items-center justify-center rounded-2xl border ${getDeviceMeta(deviceToInspect.hostname).colorClass}`}>
                   {(() => {
@@ -335,11 +349,12 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
                   })()}
                 </div>
                 <div>
-                  <h3 id="inspect-device-title" className="text-base font-bold text-stone-100">
+                  <h3 id="inspect-device-title" className={`text-base font-bold ${t.heading}`}>
                     {deviceToInspect.hostname}
                   </h3>
-                  <p className="text-xs text-stone-400">
-                    {getDeviceMeta(deviceToInspect.hostname).label} · ผู้ใช้: {deviceToInspect.username ?? deviceToInspect.userId}
+                  <p className={`text-xs ${t.muted}`}>
+                    {getDeviceMeta(deviceToInspect.hostname).label} · {lang === 'th' ? 'ผู้ใช้: ' : 'Owner: '}
+                    {deviceToInspect.username ?? deviceToInspect.userId}
                   </p>
                 </div>
               </div>
@@ -347,54 +362,62 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
                 type="button"
                 aria-label="Close inspect modal"
                 onClick={() => setDeviceToInspect(null)}
-                className="rounded-xl p-1.5 text-stone-400 hover:bg-white/5 hover:text-stone-200 transition-colors"
+                className={`rounded-xl p-1.5 transition-colors ${t.muted} hover:bg-white/5`}
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className="rounded-2xl border border-white/5 bg-[#141311]/80 p-3.5 space-y-1.5">
+              <div className={`rounded-2xl border p-3.5 space-y-1.5 ${t.subCard}`}>
                 <div className="flex items-center justify-between">
-                  <span className="text-stone-400 font-medium">Full Device Fingerprint</span>
+                  <span className={`font-medium ${t.muted}`}>Full Device Fingerprint</span>
                   <button
                     type="button"
                     aria-label="Copy fingerprint"
                     onClick={() => void handleCopyFingerprint(deviceToInspect.fingerprint)}
-                    className="inline-flex items-center gap-1 rounded-lg bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 text-[11px] font-semibold text-amber-300 hover:bg-amber-500/20 transition-colors"
+                    className="inline-flex items-center gap-1 rounded-lg bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 text-[11px] font-semibold text-amber-400 hover:bg-amber-500/20 transition-colors"
                   >
                     <Copy className="h-3 w-3" />
-                    <span>Copy</span>
+                    <span>{lang === 'th' ? 'คัดลอก' : 'Copy'}</span>
                   </button>
                 </div>
-                <p className="font-mono text-stone-200 break-all select-all">
+                <p className={`font-mono break-all select-all ${t.text}`}>
                   {deviceToInspect.fingerprint}
                 </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="rounded-2xl border border-white/5 bg-[#141311]/80 p-3.5">
-                  <span className="text-stone-400 block text-[11px]">Device ID</span>
-                  <span className="font-mono text-stone-200 break-all mt-1 block">{deviceToInspect.id}</span>
+                <div className={`rounded-2xl border p-3.5 ${t.subCard}`}>
+                  <span className={`block text-[11px] ${t.muted}`}>Device ID</span>
+                  <span className={`font-mono break-all mt-1 block ${t.text}`}>{deviceToInspect.id}</span>
                 </div>
-                <div className="rounded-2xl border border-white/5 bg-[#141311]/80 p-3.5">
-                  <span className="text-stone-400 block text-[11px]">สถานะสิทธิ์ (Status)</span>
+                <div className={`rounded-2xl border p-3.5 ${t.subCard}`}>
+                  <span className={`block text-[11px] ${t.muted}`}>
+                    {lang === 'th' ? 'สถานะสิทธิ์ (Status)' : 'Status'}
+                  </span>
                   <span className={`font-bold mt-1 block ${deviceToInspect.status === DeviceStatus.ACTIVE ? 'text-emerald-400' : 'text-rose-400'}`}>
-                    {deviceToInspect.status === DeviceStatus.ACTIVE ? 'ACTIVE (ใช้งานอยู่)' : 'REVOKED (เพิกถอนแล้ว)'}
+                    {deviceToInspect.status === DeviceStatus.ACTIVE
+                      ? (lang === 'th' ? 'ACTIVE (ใช้งานอยู่)' : 'ACTIVE')
+                      : (lang === 'th' ? 'REVOKED (เพิกถอนแล้ว)' : 'REVOKED')}
                   </span>
                 </div>
-                <div className="rounded-2xl border border-white/5 bg-[#141311]/80 p-3.5">
-                  <span className="text-stone-400 block text-[11px]">ลงทะเบียนเมื่อ (Created At)</span>
-                  <span className="text-stone-200 mt-1 block">{formatDeviceDate(deviceToInspect.createdAt)}</span>
+                <div className={`rounded-2xl border p-3.5 ${t.subCard}`}>
+                  <span className={`block text-[11px] ${t.muted}`}>
+                    {lang === 'th' ? 'ลงทะเบียนเมื่อ (Created At)' : 'Created At'}
+                  </span>
+                  <span className={`mt-1 block ${t.text}`}>{formatDeviceDate(deviceToInspect.createdAt, lang)}</span>
                 </div>
-                <div className="rounded-2xl border border-white/5 bg-[#141311]/80 p-3.5">
-                  <span className="text-stone-400 block text-[11px]">ใช้งานล่าสุด (Last Seen)</span>
-                  <span className="text-stone-200 mt-1 block">{formatDeviceDate(deviceToInspect.lastSeenAt)}</span>
+                <div className={`rounded-2xl border p-3.5 ${t.subCard}`}>
+                  <span className={`block text-[11px] ${t.muted}`}>
+                    {lang === 'th' ? 'ใช้งานล่าสุด (Last Seen)' : 'Last Seen'}
+                  </span>
+                  <span className={`mt-1 block ${t.text}`}>{formatDeviceDate(deviceToInspect.lastSeenAt, lang)}</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 border-t border-white/5 pt-4">
+            <div className={`flex items-center justify-end gap-3 border-t pt-4 ${t.border}`}>
               {deviceToInspect.status === DeviceStatus.ACTIVE && (
                 <button
                   type="button"
@@ -407,17 +430,17 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
                       fingerprint: target.fingerprint,
                     });
                   }}
-                  className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 transition-colors"
+                  className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-xs font-semibold text-rose-400 hover:bg-rose-500/20 transition-colors"
                 >
-                  เพิกถอนอุปกรณ์นี้
+                  {lang === 'th' ? 'เพิกถอนอุปกรณ์นี้' : 'Revoke Device'}
                 </button>
               )}
               <button
                 type="button"
                 onClick={() => setDeviceToInspect(null)}
-                className="rounded-xl border border-white/10 bg-[#262420] px-5 py-2 text-xs font-semibold text-stone-200 hover:bg-white/10 transition-colors"
+                className={`rounded-xl border px-5 py-2 text-xs font-semibold transition-colors ${t.secondaryBtn}`}
               >
-                ปิดหน้าต่าง
+                {lang === 'th' ? 'ปิดหน้าต่าง' : 'Close'}
               </button>
             </div>
           </div>
@@ -427,23 +450,27 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth }: DevicesTabProps) {
       {/* Confirmation Modal for Device Revocation */}
       <ConfirmModal
         isOpen={deviceToRevoke !== null}
-        title="Revoke Device Access"
+        isDark={isDark}
+        title={lang === 'th' ? 'เพิกถอนสิทธิ์อุปกรณ์ (Revoke Device)' : 'Revoke Device Access'}
         message={
           <div className="space-y-2">
             <p>
-              Are you sure you want to permanently revoke device{' '}
-              <strong className="text-slate-100">{deviceToRevoke?.hostname}</strong>?
+              {lang === 'th' ? 'คุณต้องการเพิกถอนสิทธิ์อุปกรณ์ ' : 'Are you sure you want to permanently revoke device '}
+              <strong className={t.heading}>{deviceToRevoke?.hostname}</strong>
+              {lang === 'th' ? ' อย่างถาวรหรือไม่?' : '?'}
             </p>
-            <p className="font-mono text-xs text-slate-400">
-              Fingerprint: {deviceToRevoke?.fingerprint}
+            <p className={`font-mono text-xs ${t.muted}`}>
+              Fingerprint: {deviceToInspect?.fingerprint ?? deviceToRevoke?.fingerprint}
             </p>
-            <p className="text-xs text-red-400 font-medium pt-1">
-              ⚠️ This will immediately sever any active WireGuard VPN tunnels and block all future
-              connection attempts from this device.
+            <p className="text-xs text-rose-400 font-medium pt-1">
+              {lang === 'th'
+                ? '⚠️ ระบบจะตัดการเชื่อมต่อ WireGuard ที่กำลังใช้งานทันที และบล็อกการเชื่อมต่อใหม่จากเครื่องนี้'
+                : '⚠️ This will immediately sever any active WireGuard VPN tunnels and block all future connection attempts from this device.'}
             </p>
           </div>
         }
         confirmLabel="Revoke Device"
+        cancelLabel={lang === 'th' ? 'ยกเลิก' : 'Cancel'}
         confirmVariant="danger"
         isLoading={revokeMutation.isPending}
         onConfirm={() => {

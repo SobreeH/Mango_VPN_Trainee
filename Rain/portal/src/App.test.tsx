@@ -21,11 +21,15 @@ describe('Portal Auth + TOTP Flow (fetch seam)', () => {
   beforeEach(() => {
     fetchMock.mockReset();
     vi.stubGlobal('fetch', fetchMock);
+    try { window.localStorage?.clear?.(); } catch {}
+    try { window.sessionStorage?.clear?.(); } catch {}
   });
 
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    try { window.localStorage?.clear?.(); } catch {}
+    try { window.sessionStorage?.clear?.(); } catch {}
   });
 
   it('validates login fields with Zod before calling fetch and has no pre-filled password', () => {

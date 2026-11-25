@@ -4,6 +4,7 @@ import { Activity, Download, Filter, PowerOff, RefreshCw, Search, ShieldAlert, W
 import { SessionStatus, VpnProviderType, type VpnSessionDto } from '@mango/shared';
 import type { AuthRefreshContext } from '../api/auth';
 import { disconnectAllSessions, disconnectSession, fetchSessions } from '../lib/adminApi';
+import { getThemeClasses, type UiLang } from '../lib/theme';
 import { useToast } from './Toast';
 import { ConfirmModal } from './ConfirmModal';
 
@@ -11,6 +12,8 @@ interface SessionsTabProps {
   apiBaseUrl: string;
   accessToken: string;
   auth?: AuthRefreshContext;
+  lang?: UiLang;
+  isDark?: boolean;
 }
 
 function escapeCsv(val: unknown): string {
@@ -51,7 +54,8 @@ function exportSessionsToCsv(sessionsToExport: VpnSessionDto[]) {
   URL.revokeObjectURL(url);
 }
 
-export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps) {
+export function SessionsTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark = true }: SessionsTabProps) {
+  const t = getThemeClasses(isDark);
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
@@ -131,22 +135,28 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps)
   return (
     <section aria-label="Sessions" className="space-y-6">
       {/* Header Card with Export CSV & Emergency Terminate All */}
-      <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-6 backdrop-blur-xl shadow-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className={`rounded-3xl border p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4 ${t.card}`}>
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-2xl bg-amber-500/10 text-amber-400">
             <Wifi className="h-5 w-5" />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-sm font-bold text-stone-100">Active & Historical VPN Sessions</h2>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 text-[11px] font-mono font-semibold text-emerald-400">
+              <h2 className={`text-sm font-bold ${t.heading}`}>
+                {lang === 'th' ? 'เซสชัน VPN ที่ใช้งานอยู่และประวัติ' : 'Active & Historical VPN Sessions'}
+              </h2>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 text-[11px] font-mono font-semibold text-emerald-500">
                 {activeSessionsCount > 0 && (
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 )}
                 {activeSessionsCount} Active
               </span>
             </div>
-            <p className="text-[11px] text-stone-400">Live WireGuard cryptographic tunnels and real-time IPAM tracking</p>
+            <p className={`text-[11px] ${t.muted}`}>
+              {lang === 'th'
+                ? 'ติดตามอุโมงค์เชื่อมต่อที่เข้ารหัสและไอพี IPAM แบบเรียลไทม์'
+                : 'Live WireGuard cryptographic tunnels and real-time IPAM tracking'}
+            </p>
           </div>
         </div>
 
@@ -155,10 +165,10 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps)
             type="button"
             onClick={() => void listQuery.refetch()}
             disabled={listQuery.isFetching}
-            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-[#262420] px-3.5 py-2 text-xs font-medium text-stone-200 hover:border-amber-500/40 hover:text-amber-300 transition-colors disabled:opacity-50"
+            className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-medium hover:border-amber-500/40 hover:text-amber-400 transition-colors disabled:opacity-50 ${t.secondaryBtn}`}
           >
             <RefreshCw className={`h-3.5 w-3.5 ${listQuery.isFetching ? 'animate-spin text-amber-400' : ''}`} />
-            <span>Refresh</span>
+            <span>{lang === 'th' ? 'รีเฟรช' : 'Refresh'}</span>
           </button>
 
           <button
@@ -172,67 +182,68 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps)
               });
             }}
             disabled={filteredSessions.length === 0}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 px-4 py-2 text-xs font-semibold shadow-sm transition-all disabled:opacity-40"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 px-4 py-2 text-xs font-semibold shadow-sm transition-all disabled:opacity-40"
           >
             <Download className="h-3.5 w-3.5" />
-            <span>Export CSV</span>
+            <span>{lang === 'th' ? 'ส่งออก CSV' : 'Export CSV'}</span>
           </button>
 
           <button
             type="button"
+            aria-label="Terminate All Active"
             disabled={activeSessionsCount === 0 || disconnectAllMutation.isPending}
             onClick={() => setConfirmTerminateAll(true)}
             className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-500/40 bg-rose-950/60 hover:bg-rose-900/70 text-rose-200 px-4 py-2 text-xs font-bold shadow-sm transition-all disabled:opacity-35 disabled:cursor-not-allowed"
           >
             <PowerOff className="h-3.5 w-3.5 text-rose-400" />
-            <span>Terminate All Active</span>
+            <span>{lang === 'th' ? 'ตัดการเชื่อมต่อทั้งหมด' : 'Terminate All Active'}</span>
           </button>
         </div>
       </div>
 
       {/* Quick Search & Status Filter Bar */}
       {sessions.length > 0 && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-4 sm:p-5 shadow-xl backdrop-blur-xl">
+        <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-3xl border p-4 sm:p-5 ${t.card}`}>
           <div className="flex-1 flex items-center gap-3">
             <div className="relative flex-1 sm:max-w-xs">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-stone-500" />
               <input
                 type="text"
                 aria-label="Search sessions"
-                placeholder="Search by user, device, IP..."
+                placeholder={lang === 'th' ? 'ค้นหาชื่อผู้ใช้ อุปกรณ์ หรือ IP...' : 'Search by user, device, IP...'}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full h-10 rounded-xl border border-white/10 bg-[#262420]/70 pl-9 pr-8 text-xs text-stone-100 placeholder-stone-500 focus:border-amber-400 focus:outline-none transition-colors"
+                className={`w-full h-10 rounded-xl border pl-9 pr-8 text-xs focus:outline-none transition-colors ${t.input}`}
               />
               {searchTerm && (
                 <button
                   type="button"
                   onClick={() => setSearchTerm('')}
                   aria-label="Clear search"
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-500 hover:text-stone-300"
+                  className={`absolute right-2.5 top-1/2 -translate-y-1/2 ${t.muted}`}
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
               )}
             </div>
-            <span className="text-[11px] font-mono text-stone-400 bg-white/5 px-2.5 py-1.5 rounded-lg border border-white/5 whitespace-nowrap">
+            <span className={`text-[11px] font-mono px-2.5 py-1.5 rounded-lg border whitespace-nowrap ${t.pillMuted}`}>
               {filteredSessions.length} / {sessions.length} Sessions
             </span>
           </div>
 
           <div className="flex items-center gap-2">
-            <label htmlFor="filter-session-status" className="text-xs text-stone-400 flex items-center gap-1">
+            <label htmlFor="filter-session-status" className={`text-xs flex items-center gap-1 ${t.muted}`}>
               <Filter className="h-3 w-3 text-stone-500" />
-              Status:
+              {lang === 'th' ? 'สถานะ:' : 'Status:'}
             </label>
             <select
               id="filter-session-status"
               aria-label="Filter session status"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as 'ALL' | SessionStatus)}
-              className="h-10 rounded-xl border border-white/10 bg-[#262420]/70 px-3 text-xs text-stone-100 focus:border-amber-400 focus:outline-none cursor-pointer"
+              className={`h-10 rounded-xl border px-3 text-xs focus:outline-none cursor-pointer ${t.input}`}
             >
-              <option value="ALL">All Statuses</option>
+              <option value="ALL">{lang === 'th' ? 'ทุกสถานะ' : 'All Statuses'}</option>
               <option value={SessionStatus.ACTIVE}>ACTIVE</option>
               <option value={SessionStatus.DISCONNECTED}>DISCONNECTED</option>
               <option value={SessionStatus.EXPIRED}>EXPIRED</option>
@@ -244,7 +255,7 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps)
       {activeError && (
         <div
           role="alert"
-          className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-xs font-medium text-rose-300 flex items-center gap-2 shadow-lg"
+          className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-xs font-medium text-rose-400 flex items-center gap-2 shadow-lg"
         >
           <ShieldAlert className="h-4 w-4 text-rose-400 shrink-0" />
           <span>{activeError instanceof Error ? activeError.message : 'Session request failed'}</span>
@@ -252,73 +263,84 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps)
       )}
 
       {listQuery.isLoading ? (
-        <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-8 text-center text-xs text-stone-400 shadow-xl">
-          Loading VPN sessions...
+        <div className={`rounded-3xl border p-8 text-center text-xs ${t.card} ${t.muted}`}>
+          {lang === 'th' ? 'กำลังโหลดข้อมูลเซสชัน VPN...' : 'Loading VPN sessions...'}
         </div>
       ) : sessions.length === 0 && !listQuery.error ? (
-        <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-12 text-center text-xs text-stone-400 shadow-xl space-y-2">
-          <Activity className="h-8 w-8 text-stone-600 mx-auto" />
-          <p className="text-stone-300 font-medium">No VPN sessions found.</p>
-          <p className="text-[11px] text-stone-500">Connected peers and tunnel states will appear here in real-time.</p>
+        <div className={`rounded-3xl border p-12 text-center text-xs space-y-2 ${t.card} ${t.muted}`}>
+          <Activity className="h-8 w-8 text-stone-500 mx-auto" />
+          <p className={`font-medium ${t.text}`}>
+            {lang === 'th' ? 'ยังไม่มีเซสชัน VPN ในระบบ' : 'No VPN sessions found.'}
+          </p>
+          {lang === 'th' && <span className="sr-only">No VPN sessions found.</span>}
+          <p className={`text-[11px] ${t.muted}`}>
+            {lang === 'th'
+              ? 'เมื่อมีผู้ใช้เชื่อมต่อ VPN สถานะและ IP ที่ได้รับจะแสดงที่นี่แบบเรียลไทม์'
+              : 'Connected peers and tunnel states will appear here in real-time.'}
+          </p>
         </div>
       ) : sessions.length > 0 && filteredSessions.length === 0 ? (
-        <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-8 text-center text-xs text-stone-400 shadow-xl space-y-3">
+        <div className={`rounded-3xl border p-8 text-center text-xs space-y-3 ${t.card} ${t.muted}`}>
           <ShieldAlert className="h-7 w-7 text-stone-500 mx-auto" />
-          <p className="text-stone-300 font-medium">No sessions match your search or filter.</p>
+          <p className={`font-medium ${t.text}`}>
+            {lang === 'th' ? 'ไม่พบเซสชันที่ตรงกับเงื่อนไขการค้นหา' : 'No sessions match your search or filter.'}
+          </p>
+          {lang === 'th' && <span className="sr-only">No sessions match your search or filter.</span>}
           <button
             type="button"
+            aria-label="Clear Filters"
             onClick={() => {
               setSearchTerm('');
               setStatusFilter('ALL');
             }}
-            className="rounded-xl border border-white/10 bg-[#262420] px-4 py-2 text-xs font-semibold text-amber-400 hover:bg-[#2e2a24] transition-colors"
+            className={`rounded-xl border px-4 py-2 text-xs font-semibold text-amber-500 transition-colors ${t.secondaryBtn}`}
           >
-            Clear Filters
+            {lang === 'th' ? 'ล้างตัวกรอง' : 'Clear Filters'}
           </button>
         </div>
       ) : filteredSessions.length > 0 ? (
-        <div className="overflow-hidden rounded-3xl border border-white/5 bg-[#1e1d1a]/85 shadow-2xl backdrop-blur-xl">
+        <div className={`overflow-hidden rounded-3xl border ${t.card}`}>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-[#141311]/80 text-[11px] uppercase tracking-wider text-stone-400 border-b border-white/5">
+              <thead className={`text-[11px] uppercase tracking-wider ${t.tableHead}`}>
                 <tr>
-                  <th className="px-4 py-3.5">User / Device</th>
-                  <th className="px-4 py-3.5">Provider / Gateway</th>
-                  <th className="px-4 py-3.5">Assigned IP</th>
-                  <th className="px-4 py-3.5">Status</th>
-                  <th className="px-4 py-3.5 text-right">Actions</th>
+                  <th className="px-4 py-3.5">{lang === 'th' ? 'ผู้ใช้ / อุปกรณ์' : 'User / Device'}</th>
+                  <th className="px-4 py-3.5">{lang === 'th' ? 'ผู้ให้บริการ / เกตเวย์' : 'Provider / Gateway'}</th>
+                  <th className="px-4 py-3.5">{lang === 'th' ? 'ไอพีที่ได้รับ' : 'Assigned IP'}</th>
+                  <th className="px-4 py-3.5">{lang === 'th' ? 'สถานะ' : 'Status'}</th>
+                  <th className="px-4 py-3.5 text-right">{lang === 'th' ? 'การทำงาน' : 'Actions'}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
+              <tbody className={`divide-y ${t.divide}`}>
                 {filteredSessions.map((s) => {
                   const provider = s.providerType ?? VpnProviderType.WIREGUARD;
                   const providerBadgeClass =
                     provider === VpnProviderType.FORTINET
-                      ? 'bg-rose-500/10 text-rose-300 border border-rose-500/30'
+                      ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
                       : provider === VpnProviderType.CISCO
-                        ? 'bg-sky-500/10 text-sky-300 border border-sky-500/30'
-                        : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30';
+                        ? 'bg-sky-500/10 text-sky-400 border border-sky-500/30'
+                        : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/30';
                   return (
-                    <tr key={s.id} className="hover:bg-white/[0.02] transition-colors">
+                    <tr key={s.id} className={`transition-colors ${t.tableRow}`}>
                       <td className="px-4 py-3.5">
-                        <div className="font-semibold text-stone-200">{s.username ?? s.userId}</div>
-                        <div className="text-[11px] text-stone-500 font-mono">{s.hostname ?? s.deviceId}</div>
+                        <div className={`font-semibold ${t.text}`}>{s.username ?? s.userId}</div>
+                        <div className={`text-[11px] font-mono ${t.muted}`}>{s.hostname ?? s.deviceId}</div>
                       </td>
                       <td className="px-4 py-3.5">
                         <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wider ${providerBadgeClass}`}>
                           {provider}
                         </span>
                         {s.gatewayName && (
-                          <div className="text-[11px] text-stone-400 mt-1">{s.gatewayName}</div>
+                          <div className={`text-[11px] mt-1 ${t.muted}`}>{s.gatewayName}</div>
                         )}
                       </td>
-                      <td className="px-4 py-3.5 font-mono text-[11px] text-emerald-400 font-semibold">{s.assignedIp}</td>
+                      <td className="px-4 py-3.5 font-mono text-[11px] text-emerald-500 font-semibold">{s.assignedIp}</td>
                       <td className="px-4 py-3.5">
                         <span
-                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wider ${
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wider border ${
                             s.status === SessionStatus.ACTIVE
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                              : 'bg-stone-800 text-stone-400 border border-white/5'
+                              ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30'
+                              : t.pillMuted
                           }`}
                         >
                           {s.status === SessionStatus.ACTIVE && (
@@ -330,6 +352,7 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps)
                       <td className="px-4 py-3.5 text-right">
                         <button
                           type="button"
+                          aria-label="Disconnect"
                           disabled={s.status !== SessionStatus.ACTIVE || disconnectMutation.isPending}
                           onClick={() =>
                             setSessionToDisconnect({
@@ -338,9 +361,9 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps)
                               assignedIp: s.assignedIp,
                             })
                           }
-                          className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/20 disabled:opacity-30 transition-colors shadow-sm"
+                          className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-400 hover:bg-rose-500/20 disabled:opacity-30 transition-colors shadow-sm"
                         >
-                          Disconnect
+                          {lang === 'th' ? 'ตัดการเชื่อมต่อ' : 'Disconnect'}
                         </button>
                       </td>
                     </tr>
@@ -355,23 +378,28 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps)
       {/* Confirmation Modal for Disconnect Session */}
       <ConfirmModal
         isOpen={sessionToDisconnect !== null}
-        title="Disconnect Active VPN Session"
+        isDark={isDark}
+        title={lang === 'th' ? 'ตัดการเชื่อมต่อเซสชัน VPN' : 'Disconnect Active VPN Session'}
         message={
-          <div className="space-y-2 text-stone-300">
+          <div className={`space-y-2 ${t.text}`}>
             <p>
-              Are you sure you want to force disconnect the session for user{' '}
-              <strong className="text-amber-400">{sessionToDisconnect?.username}</strong>?
+              {lang === 'th'
+                ? 'คุณแน่ใจหรือไม่ว่าต้องการบังคับตัดการเชื่อมต่อของ '
+                : 'Are you sure you want to force disconnect the session for user '}
+              <strong className="text-amber-500">{sessionToDisconnect?.username}</strong>?
             </p>
-            <p className="font-mono text-xs text-emerald-400 bg-emerald-500/10 p-2 rounded-xl border border-emerald-500/20">
+            <p className="font-mono text-xs text-emerald-500 bg-emerald-500/10 p-2 rounded-xl border border-emerald-500/20">
               Assigned IP: {sessionToDisconnect?.assignedIp}
             </p>
-            <p className="text-xs text-amber-400 font-medium pt-1">
-              ⚠️ The VPN peer/session will be immediately removed from the gateway daemon, terminating
-              active network access.
+            <p className="text-xs text-amber-500 font-medium pt-1">
+              {lang === 'th'
+                ? '⚠️ ระบบจะถอด peer ออกจาก VPN Gateway ทันที ทำให้ผู้ใช้นี้หลุดจากการเชื่อมต่อเครือข่าย'
+                : '⚠️ The VPN peer/session will be immediately removed from the gateway daemon, terminating active network access.'}
             </p>
           </div>
         }
         confirmLabel="Disconnect Session"
+        cancelLabel={lang === 'th' ? 'ยกเลิก' : 'Cancel'}
         confirmVariant="danger"
         isLoading={disconnectMutation.isPending}
         onConfirm={() => {
@@ -387,20 +415,26 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth }: SessionsTabProps)
       {/* Confirmation Modal for Emergency Terminate All Active Sessions */}
       <ConfirmModal
         isOpen={confirmTerminateAll}
+        isDark={isDark}
         title="Terminate All Active VPN Sessions"
         message={
-          <div className="space-y-2 text-stone-300">
+          <div className={`space-y-2 ${t.text}`}>
             <p>
-              Are you sure you want to immediately terminate all{' '}
-              <strong className="text-rose-400">{activeSessionsCount} active VPN session(s)</strong>?
+              {lang === 'th' ? 'คุณแน่ใจหรือไม่ว่าต้องการตัดการเชื่อมต่อที่กำลังออนไลน์อยู่ทั้งหมด ' : 'Are you sure you want to immediately terminate all '}
+              <strong className="text-rose-500">
+                {activeSessionsCount} {lang === 'th' ? 'เซสชัน' : 'active VPN session(s)'}
+              </strong>
+              ?
             </p>
-            <p className="text-xs text-amber-400 font-medium pt-1">
-              ⚠️ All active peers across connected gateways will be torn down immediately, severing
-              network access for all currently connected users.
+            <p className="text-xs text-amber-500 font-medium pt-1">
+              {lang === 'th'
+                ? '⚠️ ผู้ใช้ทุกคนที่กำลังเชื่อมต่อ VPN อยู่ในขณะนี้จะถูกตัดการเชื่อมต่อพร้อมกันทันที'
+                : '⚠️ All active peers across connected gateways will be torn down immediately, severing network access for all currently connected users.'}
             </p>
           </div>
         }
         confirmLabel="Terminate All Sessions"
+        cancelLabel={lang === 'th' ? 'ยกเลิก' : 'Cancel'}
         confirmVariant="danger"
         isLoading={disconnectAllMutation.isPending}
         onConfirm={() => disconnectAllMutation.mutate()}

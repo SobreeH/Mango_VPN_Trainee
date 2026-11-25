@@ -20,11 +20,15 @@ describe('Portal Admin Audit Logs & Agent Versions (fetch seam)', () => {
   beforeEach(() => {
     fetchMock.mockReset();
     vi.stubGlobal('fetch', fetchMock);
+    try { window.localStorage?.clear?.(); } catch {}
+    try { window.sessionStorage?.clear?.(); } catch {}
   });
 
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    try { window.localStorage?.clear?.(); } catch {}
+    try { window.sessionStorage?.clear?.(); } catch {}
   });
 
   it('does not render Admin Audit Logs or Agent Versions tabs for STAFF or CLIENT', () => {

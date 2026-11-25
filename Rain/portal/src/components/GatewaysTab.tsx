@@ -13,12 +13,15 @@ import {
   fetchGateways,
   updateGateway,
 } from '../lib/adminApi';
+import { getThemeClasses, type UiLang } from '../lib/theme';
 import { ConfirmModal } from './ConfirmModal';
 
 interface GatewaysTabProps {
   apiBaseUrl: string;
   accessToken: string;
   auth?: AuthRefreshContext;
+  lang?: UiLang;
+  isDark?: boolean;
 }
 
 const PROVIDER_BADGE_STYLES: Record<VpnProviderType, string> = {
@@ -33,7 +36,8 @@ const DEFAULT_SUBNET_BY_PROVIDER: Record<VpnProviderType, string> = {
   [VpnProviderType.CISCO]: '10.50.0.0/24',
 };
 
-export function GatewaysTab({ apiBaseUrl, accessToken, auth }: GatewaysTabProps) {
+export function GatewaysTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark = true }: GatewaysTabProps) {
+  const t = getThemeClasses(isDark);
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
   const [providerType, setProviderType] = useState<VpnProviderType>(VpnProviderType.WIREGUARD);
@@ -121,34 +125,38 @@ export function GatewaysTab({ apiBaseUrl, accessToken, auth }: GatewaysTabProps)
     <section aria-label="Gateways" className="space-y-6">
       <form
         onSubmit={handleSubmit}
-        className="rounded-lg border border-slate-800 bg-slate-950/60 p-4 space-y-4"
+        className={`rounded-3xl border p-6 space-y-4 ${t.card}`}
       >
-        <h3 className="text-sm font-semibold text-slate-100">Register VPN Gateway</h3>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <h3 className={`text-sm font-bold ${t.heading}`}>
+          {lang === 'th' ? 'ลงทะเบียน VPN Gateway ใหม่' : 'Register VPN Gateway'}
+        </h3>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="gateway-name" className="block text-xs text-slate-400 mb-1">
-              Gateway Name
+            <label htmlFor="gateway-name" className={`block text-xs font-medium mb-1 ${t.muted}`}>
+              {lang === 'th' ? 'ชื่อเกตเวย์ (Gateway Name)' : 'Gateway Name'}
             </label>
             <input
               id="gateway-name"
+              aria-label="Gateway Name"
               type="text"
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="HQ FortiGate SSL-VPN"
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              className={`w-full h-11 rounded-xl border px-4 text-sm focus:outline-none transition-colors ${t.input}`}
             />
           </div>
 
           <div>
-            <label htmlFor="gateway-provider" className="block text-xs text-slate-400 mb-1">
-              VPN Provider
+            <label htmlFor="gateway-provider" className={`block text-xs font-medium mb-1 ${t.muted}`}>
+              {lang === 'th' ? 'ผู้ให้บริการ (VPN Provider)' : 'VPN Provider'}
             </label>
             <select
               id="gateway-provider"
+              aria-label="VPN Provider"
               value={providerType}
               onChange={(e) => handleProviderChange(e.target.value as VpnProviderType)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              className={`w-full h-11 rounded-xl border px-4 text-sm focus:outline-none transition-colors cursor-pointer ${t.input}`}
             >
               <option value={VpnProviderType.WIREGUARD}>WIREGUARD</option>
               <option value={VpnProviderType.FORTINET}>FORTINET</option>
@@ -157,11 +165,12 @@ export function GatewaysTab({ apiBaseUrl, accessToken, auth }: GatewaysTabProps)
           </div>
 
           <div>
-            <label htmlFor="gateway-endpoint" className="block text-xs text-slate-400 mb-1">
-              Endpoint (host:port)
+            <label htmlFor="gateway-endpoint" className={`block text-xs font-medium mb-1 ${t.muted}`}>
+              {lang === 'th' ? 'จุดเชื่อมต่อ (Endpoint host:port)' : 'Endpoint (host:port)'}
             </label>
             <input
               id="gateway-endpoint"
+              aria-label="Endpoint (host:port)"
               type="text"
               required
               value={endpoint}
@@ -173,34 +182,36 @@ export function GatewaysTab({ apiBaseUrl, accessToken, auth }: GatewaysTabProps)
                     ? 'fg.mango.internal:443'
                     : 'asa.mango.internal:443'
               }
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              className={`w-full h-11 rounded-xl border px-4 text-sm focus:outline-none transition-colors font-mono ${t.input}`}
             />
           </div>
 
           <div>
-            <label htmlFor="gateway-subnet" className="block text-xs text-slate-400 mb-1">
+            <label htmlFor="gateway-subnet" className={`block text-xs font-medium mb-1 ${t.muted}`}>
               Subnet CIDR
             </label>
             <input
               id="gateway-subnet"
+              aria-label="Subnet CIDR"
               type="text"
               required
               value={subnetCidr}
               onChange={(e) => setSubnetCidr(e.target.value)}
               placeholder="10.40.0.0/24"
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              className={`w-full h-11 rounded-xl border px-4 text-sm focus:outline-none transition-colors font-mono ${t.input}`}
             />
           </div>
 
           <div>
-            <label htmlFor="gateway-ipam" className="block text-xs text-slate-400 mb-1">
-              IPAM Mode
+            <label htmlFor="gateway-ipam" className={`block text-xs font-medium mb-1 ${t.muted}`}>
+              {lang === 'th' ? 'โหมดจัดสรร IP (IPAM Mode)' : 'IPAM Mode'}
             </label>
             <select
               id="gateway-ipam"
+              aria-label="IPAM Mode"
               value={ipamMode}
               onChange={(e) => setIpamMode(e.target.value as GatewayIpamMode)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              className={`w-full h-11 rounded-xl border px-4 text-sm focus:outline-none transition-colors cursor-pointer ${t.input}`}
             >
               <option value={GatewayIpamMode.API_MANAGED}>API_MANAGED</option>
               <option value={GatewayIpamMode.GATEWAY_ASSIGNED}>GATEWAY_ASSIGNED</option>
@@ -208,15 +219,17 @@ export function GatewaysTab({ apiBaseUrl, accessToken, auth }: GatewaysTabProps)
           </div>
 
           <div className="flex flex-col justify-end gap-2">
-            <span className="block text-xs text-slate-400">Allowed Roles</span>
-            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-200">
+            <span className={`block text-xs font-medium ${t.muted}`}>
+              {lang === 'th' ? 'บทบาทที่อนุญาต (Allowed Roles)' : 'Allowed Roles'}
+            </span>
+            <div className={`flex flex-wrap items-center gap-3 text-xs ${t.text}`}>
               {[RoleName.ADMIN, RoleName.STAFF, RoleName.CLIENT].map((role) => (
                 <label key={role} className="inline-flex items-center gap-1.5 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={allowedRoles.includes(role)}
                     onChange={() => toggleRole(role)}
-                    className="rounded border-slate-600"
+                    className="rounded border-stone-500"
                   />
                   <span>{role}</span>
                 </label>
@@ -226,9 +239,9 @@ export function GatewaysTab({ apiBaseUrl, accessToken, auth }: GatewaysTabProps)
                   type="checkbox"
                   checked={isDefault}
                   onChange={(e) => setIsDefault(e.target.checked)}
-                  className="rounded border-slate-600"
+                  className="rounded border-stone-500"
                 />
-                <span>Default</span>
+                <span>{lang === 'th' ? 'ค่าเริ่มต้น (Default)' : 'Default'}</span>
               </label>
             </div>
           </div>
@@ -236,59 +249,63 @@ export function GatewaysTab({ apiBaseUrl, accessToken, auth }: GatewaysTabProps)
 
         <button
           type="submit"
+          aria-label="Register Gateway"
           disabled={createMutation.isPending}
-          className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400 disabled:opacity-50"
+          className="rounded-xl bg-[#f59e0b] hover:bg-[#d97706] px-6 py-2.5 text-xs sm:text-sm font-bold text-stone-950 shadow-md shadow-amber-500/20 disabled:opacity-50 transition-colors"
         >
-          {createMutation.isPending ? 'Registering...' : 'Register Gateway'}
+          {createMutation.isPending
+            ? (lang === 'th' ? 'กำลังลงทะเบียน...' : 'Registering...')
+            : (lang === 'th' ? 'ลงทะเบียนเกตเวย์' : 'Register Gateway')}
         </button>
       </form>
 
       {activeError && (
         <div
           role="alert"
-          className="rounded-lg border border-rose-500/40 bg-rose-950/60 px-3 py-2 text-sm text-rose-200"
+          className="rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-400"
         >
           {activeError instanceof Error ? activeError.message : 'Gateway request failed'}
         </div>
       )}
 
       {listQuery.isLoading ? (
-        <p className="text-sm text-slate-400">Loading VPN gateways...</p>
+        <p className={`text-sm ${t.muted}`}>{lang === 'th' ? 'กำลังโหลดข้อมูลเกตเวย์...' : 'Loading VPN gateways...'}</p>
       ) : gateways.length === 0 && !listQuery.error ? (
-        <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-6 text-center text-sm text-slate-400">
-          No VPN gateways registered.
+        <div className={`rounded-3xl border p-8 text-center text-sm ${t.card} ${t.muted}`}>
+          {lang === 'th' ? 'ยังไม่มี VPN Gateway ที่ลงทะเบียนไว้' : 'No VPN gateways registered.'}
+          {lang === 'th' && <span className="sr-only">No VPN gateways registered.</span>}
         </div>
       ) : gateways.length > 0 ? (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {gateways.map((gw) => (
             <div
               key={gw.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2.5 text-sm"
+              className={`flex flex-wrap items-center justify-between gap-3 rounded-3xl border p-5 text-sm ${t.card}`}
             >
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-semibold text-slate-100">{gw.name}</span>
+                  <span className={`font-semibold ${t.heading}`}>{gw.name}</span>
                   <span
-                    className={`rounded border px-1.5 py-0.5 text-[11px] font-semibold ${PROVIDER_BADGE_STYLES[gw.providerType]}`}
+                    className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${PROVIDER_BADGE_STYLES[gw.providerType]}`}
                   >
                     {gw.providerType}
                   </span>
                   {gw.isDefault && (
-                    <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[11px] font-semibold text-amber-300">
+                    <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 text-[11px] font-semibold text-amber-400">
                       DEFAULT
                     </span>
                   )}
                   <span
-                    className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${
+                    className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${
                       gw.isEnabled
-                        ? 'bg-emerald-500/15 text-emerald-300'
-                        : 'bg-slate-700/40 text-slate-400'
+                        ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30'
+                        : t.pillMuted
                     }`}
                   >
                     {gw.isEnabled ? 'ENABLED' : 'DISABLED'}
                   </span>
                 </div>
-                <div className="text-xs font-mono text-slate-400">
+                <div className={`text-xs font-mono ${t.muted}`}>
                   <span>{gw.endpoint}</span>
                   <span> · {gw.subnetCidr}</span>
                   <span> · {gw.ipamMode}</span>
@@ -301,17 +318,20 @@ export function GatewaysTab({ apiBaseUrl, accessToken, auth }: GatewaysTabProps)
                   type="button"
                   disabled={toggleMutation.isPending}
                   onClick={() => toggleMutation.mutate(gw)}
-                  className="rounded border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:bg-slate-800 disabled:opacity-40"
+                  className={`rounded-xl border px-3 py-1.5 text-xs font-medium disabled:opacity-40 transition-colors ${t.secondaryBtn}`}
                 >
-                  {gw.isEnabled ? 'Disable' : 'Enable'}
+                  {gw.isEnabled
+                    ? (lang === 'th' ? 'ปิดใช้งาน' : 'Disable')
+                    : (lang === 'th' ? 'เปิดใช้งาน' : 'Enable')}
                 </button>
                 <button
                   type="button"
+                  aria-label="Delete"
                   disabled={deleteMutation.isPending}
                   onClick={() => setPendingDelete(gw)}
-                  className="rounded border border-red-700/60 px-2.5 py-1 text-xs text-red-200 hover:bg-red-950/60 disabled:opacity-40"
+                  className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-400 hover:bg-rose-500/20 disabled:opacity-40 transition-colors"
                 >
-                  Delete
+                  {lang === 'th' ? 'ลบ' : 'Delete'}
                 </button>
               </div>
             </div>
@@ -321,15 +341,17 @@ export function GatewaysTab({ apiBaseUrl, accessToken, auth }: GatewaysTabProps)
 
       <ConfirmModal
         isOpen={pendingDelete !== null}
-        title="Delete VPN Gateway"
+        isDark={isDark}
+        title={lang === 'th' ? 'ลบ VPN Gateway' : 'Delete VPN Gateway'}
         message={
           <p>
-            Are you sure you want to remove gateway{' '}
-            <strong className="text-slate-100">{pendingDelete?.name}</strong> (
+            {lang === 'th' ? 'คุณต้องการลบเกตเวย์ ' : 'Are you sure you want to remove gateway '}
+            <strong className={t.heading}>{pendingDelete?.name}</strong> (
             {pendingDelete?.providerType})?
           </p>
         }
         confirmLabel="Delete Gateway"
+        cancelLabel={lang === 'th' ? 'ยกเลิก' : 'Cancel'}
         confirmVariant="danger"
         isLoading={deleteMutation.isPending}
         onConfirm={() => {

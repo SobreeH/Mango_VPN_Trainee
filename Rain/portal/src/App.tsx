@@ -576,7 +576,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                       <Users className="h-4 w-4" />
                     </div>
                   </div>
-                  <div className="text-2xl font-black text-stone-100">
+                  <div className={`text-2xl font-black ${isDark ? 'text-stone-100' : 'text-stone-900'}`}>
                     {kpiUsersQuery.isLoading ? '...' : totalUsers}
                   </div>
                   <p className="text-[11px] text-stone-500 mt-1">
@@ -598,7 +598,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                       <Laptop className="h-4 w-4" />
                     </div>
                   </div>
-                  <div className="text-2xl font-black text-stone-100">
+                  <div className={`text-2xl font-black ${isDark ? 'text-stone-100' : 'text-stone-900'}`}>
                     {kpiDevicesQuery.isLoading ? '...' : totalDevices}
                   </div>
                   <p className="text-[11px] text-stone-500 mt-1">
@@ -672,6 +672,8 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                     apiBaseUrl={apiBaseUrl}
                     accessToken={step.session.accessToken}
                     auth={authContext}
+                    lang={lang}
+                    isDark={isDark}
                   />
                 )}
                 {activeTab === 'agent-versions' && (
@@ -679,6 +681,8 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                     apiBaseUrl={apiBaseUrl}
                     accessToken={step.session.accessToken}
                     auth={authContext}
+                    lang={lang}
+                    isDark={isDark}
                   />
                 )}
                 {activeTab === 'users' && (
@@ -686,6 +690,8 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                     apiBaseUrl={apiBaseUrl}
                     accessToken={step.session.accessToken}
                     auth={authContext}
+                    lang={lang}
+                    isDark={isDark}
                   />
                 )}
                 {activeTab === 'devices' && (
@@ -693,6 +699,8 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                     apiBaseUrl={apiBaseUrl}
                     accessToken={step.session.accessToken}
                     auth={authContext}
+                    lang={lang}
+                    isDark={isDark}
                   />
                 )}
                 {activeTab === 'sessions' && (
@@ -700,6 +708,8 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                     apiBaseUrl={apiBaseUrl}
                     accessToken={step.session.accessToken}
                     auth={authContext}
+                    lang={lang}
+                    isDark={isDark}
                   />
                 )}
                 {activeTab === 'policies' && (
@@ -707,6 +717,8 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                     apiBaseUrl={apiBaseUrl}
                     accessToken={step.session.accessToken}
                     auth={authContext}
+                    lang={lang}
+                    isDark={isDark}
                   />
                 )}
                 {activeTab === 'gateways' && (
@@ -714,6 +726,8 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                     apiBaseUrl={apiBaseUrl}
                     accessToken={step.session.accessToken}
                     auth={authContext}
+                    lang={lang}
+                    isDark={isDark}
                   />
                 )}
               </div>
