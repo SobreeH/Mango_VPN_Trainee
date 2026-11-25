@@ -490,4 +490,58 @@ describe('AgentStatusCard (fetch seam)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Close node details/i }));
     expect(screen.queryByRole('region', { name: /Topology node details/i })).not.toBeInTheDocument();
   });
+
+  it('supports English language (lang="en") and Light mode (isDark={false}) in AgentStatusCard and NetworkTopology', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            status: 'ok',
+            service: 'mango-agent-windows',
+            version: '2.0.0',
+            tunnelActive: false,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            state: 'disconnected',
+            version: '2.0.0',
+            publicKey: 'PUBKEY1234567890ABCDEF',
+            assignedIp: null,
+            serverEndpoint: null,
+            allowedIps: [],
+            connectedSince: null,
+            bytesReceived: 0,
+            bytesSent: 0,
+            lastError: null,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+
+    render(
+      <AgentStatusCard
+        accessToken="jwt-token"
+        userRole={RoleName.CLIENT}
+        lang="en"
+        isDark={false}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/agent pairing token/i)).toBeInTheDocument();
+    });
+    fireEvent.change(screen.getByLabelText(/agent pairing token/i), {
+      target: { value: 'valid-pairing-token' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /pair agent/i }));
+
+    expect(await screen.findByText('Ready to Connect VPN')).toBeInTheDocument();
+    expect(screen.getByText('Your Device')).toBeInTheDocument();
+    expect(screen.getByText('Corporate Network')).toBeInTheDocument();
+    expect(screen.getByText('Permitted Networks')).toBeInTheDocument();
+  });
 });

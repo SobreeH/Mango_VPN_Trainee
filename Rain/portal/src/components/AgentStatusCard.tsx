@@ -35,6 +35,7 @@ import {
   requestConnectTicket,
 } from '../api/agent';
 import type { AuthRefreshContext } from '../api/auth';
+import { getThemeClasses, type UiLang } from '../lib/theme';
 import { NetworkTopology } from './NetworkTopology';
 
 type AgentViewState =
@@ -49,6 +50,8 @@ export interface AgentStatusCardProps {
   username?: string;
   auth?: AuthRefreshContext;
   gateways?: VpnGatewayDto[];
+  lang?: UiLang;
+  isDark?: boolean;
 }
 
 function providerLabel(provider?: VpnProviderType): string {
@@ -96,7 +99,10 @@ export function AgentStatusCard({
   username,
   auth,
   gateways: initialGateways,
+  lang = 'th',
+  isDark = true,
 }: AgentStatusCardProps) {
+  const t = getThemeClasses(isDark);
   const [view, setView] = useState<AgentViewState>({ kind: 'checking' });
   const [pairingToken, setPairingToken] = useState<string>(() => getSavedPairingToken());
   const [isPairing, setIsPairing] = useState(false);
@@ -360,15 +366,15 @@ export function AgentStatusCard({
   return (
     <div className="w-full space-y-6">
       {view.kind === 'checking' && (
-        <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-6 text-center text-sm text-stone-400">
-          Checking local Windows Agent...
+        <div className={`rounded-3xl border p-6 text-center text-sm ${t.card} ${t.muted}`}>
+          {lang === 'th' ? 'กำลังตรวจสอบ Windows Agent ในเครื่อง...' : 'Checking local Windows Agent...'}
         </div>
       )}
 
       {view.kind === 'unreachable' && (
-        <div className="rounded-3xl border border-red-500/30 bg-red-950/20 p-6 space-y-4">
+        <div className={`rounded-3xl border border-red-500/30 p-6 space-y-4 ${isDark ? 'bg-red-950/20' : 'bg-red-50/90'}`}>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-base font-bold text-red-300">
+            <div className="flex items-center gap-2 text-base font-bold text-red-400">
               <WifiOff className="h-5 w-5 text-red-400" />
               <span>Agent Unreachable</span>
             </div>
@@ -381,21 +387,25 @@ export function AgentStatusCard({
             </span>
           </div>
           <div className="space-y-1">
-            <p className="text-xs sm:text-sm text-stone-300 font-medium">
-              ไม่สามารถเชื่อมต่อไปยัง Endpoint Agent (127.0.0.1:47821) ได้
+            <p className={`text-xs sm:text-sm font-medium ${t.text}`}>
+              {lang === 'th'
+                ? 'ไม่สามารถเชื่อมต่อไปยัง Endpoint Agent (127.0.0.1:47821) ได้'
+                : 'Cannot connect to the local Endpoint Agent (127.0.0.1:47821).'}
             </p>
-            <p className="text-xs text-stone-400 leading-relaxed font-mono">
+            <p className={`text-xs leading-relaxed font-mono ${t.muted}`}>
               Start the local MANGO Endpoint Agent on 127.0.0.1:47821 ({view.reason}).
             </p>
           </div>
 
-          <div className="rounded-2xl border border-white/5 bg-[#141311]/80 p-3.5 space-y-2">
-            <span className="text-[11px] font-semibold text-amber-300 block">
-              💡 วิธีเปิดใช้งาน Agent สำหรับทดสอบ:
+          <div className={`rounded-2xl border p-3.5 space-y-2 ${t.subCard}`}>
+            <span className="text-[11px] font-semibold text-amber-500 block">
+              {lang === 'th' ? '💡 วิธีเปิดใช้งาน Agent สำหรับทดสอบ:' : '💡 How to start the dev test Agent:'}
             </span>
-            <div className="flex items-center justify-between gap-2 bg-black/40 rounded-xl px-3 py-2 border border-white/5 font-mono text-xs text-stone-200">
+            <div className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2 border font-mono text-xs ${t.card}`}>
               <code>npm run mock:agent</code>
-              <span className="text-[10px] text-stone-400 font-sans">(รันใน Terminal เพื่อเปิด Agent)</span>
+              <span className={`text-[10px] font-sans ${t.muted}`}>
+                {lang === 'th' ? '(รันใน Terminal เพื่อเปิด Agent)' : '(Run in Terminal)'}
+              </span>
             </div>
           </div>
 
@@ -403,24 +413,28 @@ export function AgentStatusCard({
             <button
               type="button"
               onClick={() => void probeAgent(pairingToken || getSavedPairingToken())}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-[#262420] px-4 py-2 text-xs font-semibold text-stone-200 hover:text-white hover:bg-[#322f2a] transition-colors"
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 text-xs font-semibold transition-colors ${t.secondaryBtn}`}
             >
               <RefreshCw className="h-3.5 w-3.5" />
-              <span>Retry Connection</span>
+              <span>{lang === 'th' ? 'ลองเชื่อมต่อใหม่' : 'Retry Connection'}</span>
             </button>
-            <span className="text-[11px] text-stone-400">ระบบจะลองเชื่อมต่อใหม่อัตโนมัติทุกๆ 4 วินาที</span>
+            <span className={`text-[11px] ${t.muted}`}>
+              {lang === 'th'
+                ? 'ระบบจะลองเชื่อมต่อใหม่อัตโนมัติทุกๆ 4 วินาที'
+                : 'Automatically retrying every 4 seconds'}
+            </span>
           </div>
         </div>
       )}
 
       {view.kind === 'unpaired' && (
-        <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-6 shadow-2xl backdrop-blur-xl space-y-4">
+        <div className={`rounded-3xl border p-6 space-y-4 ${t.card}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
+              <span className="text-xs font-bold uppercase tracking-wider text-amber-500">
                 ENDPOINT AGENT
               </span>
-              <span className="font-mono text-[11px] px-2 py-0.5 rounded-full bg-white/5 text-stone-400 border border-white/5">
+              <span className={`font-mono text-[11px] px-2 py-0.5 rounded-full border ${t.pillMuted}`}>
                 v{view.health.version}
               </span>
             </div>
@@ -428,14 +442,14 @@ export function AgentStatusCard({
               type="button"
               onClick={() => void probeAgent(pairingToken)}
               aria-label="Refresh Agent Status"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-[#262420]/70 px-3 py-1.5 text-xs text-stone-300 hover:text-stone-100"
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs ${t.secondaryBtn}`}
             >
               <RefreshCw className="h-3 w-3" />
-              <span>Refresh</span>
+              <span>{lang === 'th' ? 'รีเฟรช' : 'Refresh'}</span>
             </button>
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-semibold text-amber-300">
+          <div className="flex items-center gap-2 text-xs font-semibold text-amber-500">
             <Key className="h-4 w-4" />
             <span>Agent Reachable (Unpaired)</span>
           </div>
@@ -443,7 +457,7 @@ export function AgentStatusCard({
           {view.error && (
             <div
               role="alert"
-              className="flex items-start gap-2 rounded-2xl border border-red-500/30 bg-red-950/30 p-3 text-xs text-red-200"
+              className="flex items-start gap-2 rounded-2xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400"
             >
               <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-red-400" />
               <span>{view.error}</span>
@@ -453,7 +467,7 @@ export function AgentStatusCard({
           <form onSubmit={handlePairSubmit} className="space-y-3" noValidate>
             <label
               htmlFor="agent-pairing-token"
-              className="block text-xs font-medium text-stone-300"
+              className={`block text-xs font-medium ${t.text}`}
             >
               Agent Pairing Token
             </label>
@@ -464,7 +478,7 @@ export function AgentStatusCard({
                 value={pairingToken}
                 onChange={(e) => setPairingToken(e.target.value)}
                 placeholder="Paste X-Mango-Agent-Token"
-                className="flex-1 h-11 rounded-xl border border-white/10 bg-[#262420]/70 px-4 text-xs text-stone-100 placeholder-stone-500 focus:border-amber-400 focus:outline-none"
+                className={`flex-1 h-11 rounded-xl border px-4 text-xs focus:outline-none ${t.input}`}
               />
               <button
                 type="submit"
@@ -481,17 +495,19 @@ export function AgentStatusCard({
       {view.kind === 'paired' && (
         <div className="space-y-6">
           {/* Card 1: Hero Connection Status Card */}
-          <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-6 sm:p-8 shadow-2xl backdrop-blur-xl space-y-6">
+          <div className={`rounded-3xl border p-6 sm:p-8 space-y-6 ${t.card}`}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               {/* Left Side: Status Icon & Text */}
               <div className="flex items-center gap-4">
                 <div className={`w-14 h-14 rounded-full flex items-center justify-center shrink-0 border-2 transition-all ${
                   view.status.state === 'connected'
-                    ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-400 shadow-lg shadow-emerald-950/50'
-                    : 'bg-stone-800/80 border-white/10 text-stone-400'
+                    ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-500 shadow-lg shadow-emerald-950/20'
+                    : isDark
+                      ? 'bg-stone-800/80 border-white/10 text-stone-400'
+                      : 'bg-stone-100 border-stone-300 text-stone-500'
                 }`}>
                   {view.status.state === 'connected' ? (
-                    <CheckCircle2 className="h-7 w-7 text-emerald-400" />
+                    <CheckCircle2 className="h-7 w-7 text-emerald-500" />
                   ) : (
                     <ShieldCheck className="h-7 w-7 text-stone-400" />
                   )}
@@ -499,30 +515,38 @@ export function AgentStatusCard({
 
                 <div>
                   <div className="flex flex-wrap items-center gap-2.5">
-                    <h3 className="text-xl sm:text-2xl font-extrabold text-stone-100 tracking-tight">
-                      {view.status.state === 'connected' ? 'เชื่อมต่อ VPN แล้ว' : 'พร้อมเชื่อมต่อ VPN'}
+                    <h3 className={`text-xl sm:text-2xl font-extrabold tracking-tight ${t.heading}`}>
+                      {view.status.state === 'connected'
+                        ? (lang === 'th' ? 'เชื่อมต่อ VPN แล้ว' : 'VPN Connected')
+                        : (lang === 'th' ? 'พร้อมเชื่อมต่อ VPN' : 'Ready to Connect VPN')}
                     </h3>
                     <span className="sr-only">
                       {view.status.state === 'connected' ? 'connected' : 'disconnected'}
                     </span>
-                    <span className="text-[10px] font-mono text-stone-500 bg-white/5 px-2 py-0.5 rounded border border-white/5">
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${t.pillMuted}`}>
                       Agent Paired &amp; Ready · v{view.health.version}
                     </span>
                     {view.status.state === 'connected' && (
-                      <span className="text-[10px] font-mono text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
+                      <span className="text-[10px] font-mono text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
                         {activeProviderName}
                       </span>
                     )}
                   </div>
 
-                  <p className="text-xs text-stone-400 mt-1">
+                  <p className={`text-xs mt-1 ${t.muted}`}>
                     {view.status.state === 'connected'
                       ? (view.status.connectedSince
-                          ? `เชื่อมต่อเมื่อ ${new Date(view.status.connectedSince).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · อุโมงค์ ${activeProviderName} ทำงานปกติ`
-                          : `เชื่อมต่อแล้ว · อุโมงค์ ${activeProviderName} ทำงานปกติ`)
+                          ? (lang === 'th'
+                              ? `เชื่อมต่อเมื่อ ${new Date(view.status.connectedSince).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · อุโมงค์ ${activeProviderName} ทำงานปกติ`
+                              : `Connected at ${new Date(view.status.connectedSince).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · ${activeProviderName} tunnel active`)
+                          : (lang === 'th'
+                              ? `เชื่อมต่อแล้ว · อุโมงค์ ${activeProviderName} ทำงานปกติ`
+                              : `Connected · ${activeProviderName} tunnel active`))
                       : disconnectMessage
-                        ? `${disconnectMessage} · กดปุ่มด้านขวาเพื่อเริ่มการเชื่อมต่อใหม่`
-                        : 'เลือกโปรโตคอลหรือเกตเวย์ แล้วกดปุ่มด้านขวาเพื่อเริ่มการเชื่อมต่อ'}
+                        ? `${disconnectMessage} · ${lang === 'th' ? 'กดปุ่มด้านขวาเพื่อเริ่มการเชื่อมต่อใหม่' : 'Click the button on the right to reconnect'}`
+                        : (lang === 'th'
+                            ? 'เลือกโปรโตคอลหรือเกตเวย์ แล้วกดปุ่มด้านขวาเพื่อเริ่มการเชื่อมต่อ'
+                            : 'Select a provider or gateway and click Connect VPN to start')}
                   </p>
                 </div>
               </div>
@@ -536,7 +560,7 @@ export function AgentStatusCard({
                       disabled={isTunnelBusy}
                       value={selectedGatewayKey}
                       onChange={(e) => setSelectedGatewayKey(e.target.value)}
-                      className="h-10 rounded-xl border border-white/10 bg-[#262420] px-3 text-xs text-stone-200 focus:border-amber-400 focus:outline-none disabled:opacity-50"
+                      className={`h-10 rounded-xl border px-3 text-xs focus:outline-none disabled:opacity-50 ${t.input}`}
                     >
                       {gateways.length > 0 ? (
                         gateways.map((gw) => (
@@ -564,7 +588,7 @@ export function AgentStatusCard({
                       onClick={() => void handleLoadGateways()}
                       title="Load registered VPN gateways"
                       aria-label="Load Gateways"
-                      className="h-10 rounded-xl border border-white/10 bg-[#262420] px-2.5 text-xs text-stone-300 hover:text-white disabled:opacity-50"
+                      className={`h-10 rounded-xl border px-2.5 text-xs disabled:opacity-50 ${t.secondaryBtn}`}
                     >
                       <RefreshCw className={`h-3.5 w-3.5 ${isLoadingGateways ? 'animate-spin' : ''}`} />
                     </button>
@@ -576,10 +600,14 @@ export function AgentStatusCard({
                     type="button"
                     disabled={isTunnelBusy}
                     onClick={() => void handleDisconnectVpn()}
-                    className="rounded-2xl border border-white/10 bg-[#262420] px-6 py-2.5 text-xs sm:text-sm font-semibold text-stone-200 hover:bg-rose-950/60 hover:text-rose-200 hover:border-rose-900/50 transition-colors shadow-sm disabled:opacity-50"
+                    className={`rounded-2xl border px-6 py-2.5 text-xs sm:text-sm font-semibold hover:bg-rose-950/60 hover:text-rose-200 hover:border-rose-900/50 transition-colors shadow-sm disabled:opacity-50 ${t.secondaryBtn}`}
                   >
                     <Power className="h-4 w-4 inline mr-1.5 text-rose-400" />
-                    <span>{isTunnelBusy ? 'กำลังตัดการเชื่อมต่อ...' : 'ตัดการเชื่อมต่อ'}</span>
+                    <span>
+                      {isTunnelBusy
+                        ? (lang === 'th' ? 'กำลังตัดการเชื่อมต่อ...' : 'Disconnecting...')
+                        : (lang === 'th' ? 'ตัดการเชื่อมต่อ' : 'Disconnect')}
+                    </span>
                     <span className="sr-only">Disconnect VPN</span>
                   </button>
                 ) : (
@@ -591,7 +619,11 @@ export function AgentStatusCard({
                       className="rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-7 py-2.5 text-xs sm:text-sm shadow-lg shadow-emerald-950/40 border border-emerald-500/40 transition-all hover:scale-[1.02] disabled:opacity-50"
                     >
                       <ShieldCheck className="h-4 w-4 inline mr-1.5" />
-                      <span>{isTunnelBusy ? 'กำลังเชื่อมต่อ...' : 'เชื่อมต่อ VPN'}</span>
+                      <span>
+                        {isTunnelBusy
+                          ? (lang === 'th' ? 'กำลังเชื่อมต่อ...' : 'Connecting...')
+                          : (lang === 'th' ? 'เชื่อมต่อ VPN' : 'Connect VPN')}
+                      </span>
                       <span className="sr-only">Connect VPN</span>
                     </button>
                   )
@@ -602,7 +634,7 @@ export function AgentStatusCard({
             {tunnelError && (
               <div
                 role="alert"
-                className="flex items-start gap-2 rounded-2xl border border-red-500/30 bg-red-950/30 p-3 text-xs text-red-200"
+                className="flex items-start gap-2 rounded-2xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400"
               >
                 <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0 text-red-400" />
                 <span>{tunnelError}</span>
@@ -620,62 +652,70 @@ export function AgentStatusCard({
               bytesSent={view.status.bytesSent}
               userRole={userRole}
               activeProviderName={activeProviderName}
+              lang={lang}
+              isDark={isDark}
             />
           </div>
 
           {/* Card Row 2: Telemetry Metric Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-5 shadow-xl">
-              <span className="text-stone-400 text-xs block font-medium">IP บน VPN ของคุณ</span>
-              <span className="text-xl sm:text-2xl font-extrabold text-stone-100 font-mono mt-1.5 block">
+            <div className={`rounded-3xl border p-5 ${t.card}`}>
+              <span className={`text-xs block font-medium ${t.muted}`}>
+                {lang === 'th' ? 'IP บน VPN ของคุณ' : 'Assigned VPN IP'}
+              </span>
+              <span className={`text-xl sm:text-2xl font-extrabold font-mono mt-1.5 block ${t.heading}`}>
                 {view.status.assignedIp ?? '-'}
               </span>
             </div>
 
-            <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-5 shadow-xl">
-              <span className="text-stone-400 text-xs block font-medium">
-                บทบาทที่ใช้เชื่อมต่อ
+            <div className={`rounded-3xl border p-5 ${t.card}`}>
+              <span className={`text-xs block font-medium ${t.muted}`}>
+                {lang === 'th' ? 'บทบาทที่ใช้เชื่อมต่อ' : 'Active Role'}
                 {view.status.state === 'connected' && (
                   <span className="sr-only">Connected Role</span>
                 )}
               </span>
-              <span className="text-xl sm:text-2xl font-extrabold text-stone-100 font-mono mt-1.5 block">
+              <span className={`text-xl sm:text-2xl font-extrabold font-mono mt-1.5 block ${t.heading}`}>
                 {userRole ?? 'STAFF'}
               </span>
             </div>
 
-            <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-5 shadow-xl">
-              <span className="text-stone-400 text-xs block font-medium">สถานะโปรโตคอล</span>
-              <span className="text-xl sm:text-2xl font-extrabold text-stone-100 font-mono mt-1.5 block">
-                {view.status.state === 'connected' ? activeProviderName : 'ไม่ได้เชื่อมต่อ'}
+            <div className={`rounded-3xl border p-5 ${t.card}`}>
+              <span className={`text-xs block font-medium ${t.muted}`}>
+                {lang === 'th' ? 'สถานะโปรโตคอล' : 'Protocol Status'}
+              </span>
+              <span className={`text-xl sm:text-2xl font-extrabold font-mono mt-1.5 block ${t.heading}`}>
+                {view.status.state === 'connected'
+                  ? activeProviderName
+                  : (lang === 'th' ? 'ไม่ได้เชื่อมต่อ' : 'Disconnected')}
               </span>
             </div>
 
             {/* Card 4: Network Traffic / Data Usage Meter */}
-            <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-5 shadow-xl">
+            <div className={`rounded-3xl border p-5 ${t.card}`}>
               <div className="flex items-center justify-between">
-                <span className="text-stone-400 text-xs flex items-center gap-1.5 font-medium">
-                  <Activity className="h-3.5 w-3.5 text-amber-400" />
-                  ปริมาณข้อมูล
+                <span className={`text-xs flex items-center gap-1.5 font-medium ${t.muted}`}>
+                  <Activity className="h-3.5 w-3.5 text-amber-500" />
+                  {lang === 'th' ? 'ปริมาณข้อมูล' : 'Data Usage'}
                 </span>
                 {view.status.state === 'connected' && (
-                  <span className="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-mono">
+                  <span className="inline-flex items-center gap-1 text-[10px] text-emerald-500 font-mono">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     LIVE
                   </span>
                 )}
               </div>
-              <span className="text-xl sm:text-2xl font-extrabold text-amber-400 font-mono mt-1.5 block">
+              <span className="text-xl sm:text-2xl font-extrabold text-amber-500 font-mono mt-1.5 block">
                 {view.status.state === 'connected'
                   ? formatBytes((view.status.bytesReceived || 0) + (view.status.bytesSent || 0))
                   : '0 B'}
               </span>
               <div className="flex items-center gap-3 mt-1.5 text-[11px] font-mono">
-                <span className="text-emerald-400 flex items-center gap-0.5">
+                <span className="text-emerald-500 flex items-center gap-0.5">
                   <ArrowDown className="h-3 w-3" />
                   {formatBytes(view.status.bytesReceived)}
                 </span>
-                <span className="text-blue-400 flex items-center gap-0.5">
+                <span className="text-blue-500 flex items-center gap-0.5">
                   <ArrowUp className="h-3 w-3" />
                   {formatBytes(view.status.bytesSent)}
                 </span>
@@ -686,27 +726,27 @@ export function AgentStatusCard({
           {/* Card Row 3: Two Information Cards */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Left: Permitted Networks */}
-            <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-6 shadow-xl space-y-4">
-              <div className="flex items-center justify-between border-b border-white/5 pb-3">
-                <span className="font-bold text-stone-100 text-sm">
-                  เครือข่ายที่เข้าถึงได้ (Permitted Networks)
+            <div className={`rounded-3xl border p-6 space-y-4 ${t.card}`}>
+              <div className={`flex items-center justify-between border-b pb-3 ${t.border}`}>
+                <span className={`font-bold text-sm ${t.heading}`}>
+                  {lang === 'th' ? 'เครือข่ายที่เข้าถึงได้ (Permitted Networks)' : 'Permitted Networks'}
                 </span>
-                <span className="text-xs font-mono text-emerald-400">
+                <span className="text-xs font-mono text-emerald-500">
                   {view.status.allowedIps?.length ?? 2} Subnets
                 </span>
               </div>
 
               <div className="space-y-2 text-xs">
-                <div className="flex items-center justify-between py-1.5 border-b border-white/5">
-                  <span className="font-mono text-stone-200 font-bold">10.13.13.0/24</span>
-                  <span className="text-stone-400">เครือข่าย VPN</span>
+                <div className={`flex items-center justify-between py-1.5 border-b ${t.border}`}>
+                  <span className={`font-mono font-bold ${t.heading}`}>10.13.13.0/24</span>
+                  <span className={t.muted}>{lang === 'th' ? 'เครือข่าย VPN' : 'VPN Tunnel Subnet'}</span>
                 </div>
-                <div className="flex items-center justify-between py-1.5 border-b border-white/5">
-                  <span className="font-mono text-stone-200 font-bold">
+                <div className={`flex items-center justify-between py-1.5 border-b ${t.border}`}>
+                  <span className={`font-mono font-bold ${t.heading}`}>
                     {view.status.allowedIps?.[0] ?? (userRole === 'STAFF' ? '10.20.0.0/16' : '10.30.1.0/24')}
                   </span>
-                  <span className="text-stone-400">
-                    เครือข่ายตามนโยบาย {userRole ?? 'STAFF'}
+                  <span className={t.muted}>
+                    {lang === 'th' ? `เครือข่ายตามนโยบาย ${userRole ?? 'STAFF'}` : `Policy Subnet (${userRole ?? 'STAFF'})`}
                   </span>
                 </div>
               </div>
@@ -715,28 +755,30 @@ export function AgentStatusCard({
                 <button
                   type="button"
                   onClick={() => setShowTechDetails(!showTechDetails)}
-                  className="text-xs text-stone-400 hover:text-amber-400 underline transition-colors"
+                  className={`text-xs hover:text-amber-500 underline transition-colors ${t.muted}`}
                 >
-                  {showTechDetails ? 'ซ่อนรายละเอียดทางเทคนิค' : 'รายละเอียดทางเทคนิค'}
+                  {showTechDetails
+                    ? (lang === 'th' ? 'ซ่อนรายละเอียดทางเทคนิค' : 'Hide Technical Details')
+                    : (lang === 'th' ? 'รายละเอียดทางเทคนิค' : 'Technical Details')}
                 </button>
 
                 {showTechDetails && (
-                  <div className="mt-3 p-3 rounded-2xl border border-white/5 bg-[#141311]/70 space-y-2 text-xs">
-                    <div className="flex items-center justify-between text-stone-400">
+                  <div className={`mt-3 p-3 rounded-2xl border space-y-2 text-xs ${t.subCard}`}>
+                    <div className={`flex items-center justify-between ${t.muted}`}>
                       <span>
                         {activeProvider === VpnProviderType.WIREGUARD || !activeProvider
                           ? 'Curve25519 Key'
                           : 'Peer Identity'}
                       </span>
-                      <span className="font-mono text-stone-200">
+                      <span className={`font-mono ${t.text}`}>
                         {(view.status.peerIdentity ?? view.status.publicKey)
                           ? `${(view.status.peerIdentity ?? view.status.publicKey).slice(0, 12)}...`
                           : '-'}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between text-stone-400">
+                    <div className={`flex items-center justify-between ${t.muted}`}>
                       <span>Protocol</span>
-                      <span className="font-mono text-stone-200">
+                      <span className={`font-mono ${t.text}`}>
                         {activeProvider === VpnProviderType.FORTINET
                           ? 'Fortinet SSL-VPN (OpenConnect)'
                           : activeProvider === VpnProviderType.CISCO
@@ -750,25 +792,27 @@ export function AgentStatusCard({
             </div>
 
             {/* Right: Account Security & Live Network Traffic */}
-            <div className="rounded-3xl border border-white/5 bg-[#1e1d1a]/85 p-6 shadow-xl space-y-4">
-              <div className="flex items-center justify-between border-b border-white/5 pb-3">
-                <span className="font-bold text-stone-100 text-sm">ความปลอดภัย & การจราจรเครือข่าย</span>
-                <span className="text-xs font-mono text-emerald-400">Zero-Trust Active</span>
+            <div className={`rounded-3xl border p-6 space-y-4 ${t.card}`}>
+              <div className={`flex items-center justify-between border-b pb-3 ${t.border}`}>
+                <span className={`font-bold text-sm ${t.heading}`}>
+                  {lang === 'th' ? 'ความปลอดภัย & การจราจรเครือข่าย' : 'Security & Live Network Traffic'}
+                </span>
+                <span className="text-xs font-mono text-emerald-500">Zero-Trust Active</span>
               </div>
 
               {/* Live Traffic Meter Bars */}
               {view.status.state === 'connected' && (
-                <div className="p-3.5 rounded-2xl bg-[#141311]/80 border border-white/5 space-y-2.5">
+                <div className={`p-3.5 rounded-2xl border space-y-2.5 ${t.subCard}`}>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-stone-400 flex items-center gap-1.5 font-medium">
-                      <ArrowDown className="h-3.5 w-3.5 text-emerald-400" />
-                      ดาวน์โหลด (Received)
+                    <span className={`flex items-center gap-1.5 font-medium ${t.muted}`}>
+                      <ArrowDown className="h-3.5 w-3.5 text-emerald-500" />
+                      {lang === 'th' ? 'ดาวน์โหลด (Received)' : 'Download (Received)'}
                     </span>
-                    <span className="font-mono text-emerald-400 font-bold">
+                    <span className="font-mono text-emerald-500 font-bold">
                       {formatBytes(view.status.bytesReceived)}
                     </span>
                   </div>
-                  <div className="w-full h-1.5 rounded-full bg-stone-800 overflow-hidden">
+                  <div className={`w-full h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-stone-800' : 'bg-stone-200'}`}>
                     <div
                       className="h-full bg-emerald-500 rounded-full transition-all duration-500"
                       style={{
@@ -778,15 +822,15 @@ export function AgentStatusCard({
                   </div>
 
                   <div className="flex items-center justify-between text-xs pt-1">
-                    <span className="text-stone-400 flex items-center gap-1.5 font-medium">
-                      <ArrowUp className="h-3.5 w-3.5 text-blue-400" />
-                      อัปโหลด (Transmitted)
+                    <span className={`flex items-center gap-1.5 font-medium ${t.muted}`}>
+                      <ArrowUp className="h-3.5 w-3.5 text-blue-500" />
+                      {lang === 'th' ? 'อัปโหลด (Transmitted)' : 'Upload (Transmitted)'}
                     </span>
-                    <span className="font-mono text-blue-400 font-bold">
+                    <span className="font-mono text-blue-500 font-bold">
                       {formatBytes(view.status.bytesSent)}
                     </span>
                   </div>
-                  <div className="w-full h-1.5 rounded-full bg-stone-800 overflow-hidden">
+                  <div className={`w-full h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-stone-800' : 'bg-stone-200'}`}>
                     <div
                       className="h-full bg-blue-500 rounded-full transition-all duration-500"
                       style={{
@@ -798,17 +842,29 @@ export function AgentStatusCard({
               )}
 
               <div className="space-y-3 text-xs">
-                <div className="flex items-center gap-2.5 text-stone-300">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                  <span>ยืนยันตัวตน 2 ชั้น เปิดอยู่ (2FA Verified)</span>
+                <div className={`flex items-center gap-2.5 ${t.text}`}>
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                  <span>
+                    {lang === 'th'
+                      ? 'ยืนยันตัวตน 2 ชั้น เปิดอยู่ (2FA Verified)'
+                      : 'Two-Factor Authentication Verified (2FA)'}
+                  </span>
                 </div>
-                <div className="flex items-center gap-2.5 text-stone-300">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                  <span>Endpoint Agent จับคู่แล้ว · v{view.health.version}</span>
+                <div className={`flex items-center gap-2.5 ${t.text}`}>
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                  <span>
+                    {lang === 'th'
+                      ? `Endpoint Agent จับคู่แล้ว · v${view.health.version}`
+                      : `Endpoint Agent Paired · v${view.health.version}`}
+                  </span>
                 </div>
-                <div className="flex items-center gap-2.5 text-stone-300">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                  <span>อุโมงค์เข้ารหัส Curve25519 X25519 แข็งแกร่ง</span>
+                <div className={`flex items-center gap-2.5 ${t.text}`}>
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                  <span>
+                    {lang === 'th'
+                      ? 'อุโมงค์เข้ารหัส Curve25519 X25519 แข็งแกร่ง'
+                      : 'Strong Curve25519 X25519 Encrypted Tunnel'}
+                  </span>
                 </div>
               </div>
             </div>

@@ -662,6 +662,8 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                   userRole={step.session.user.role}
                   username={step.session.user.username}
                   auth={authContext}
+                  lang={lang}
+                  isDark={isDark}
                 />
               </div>
 
@@ -859,6 +861,8 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                 userRole={step.session.user.role}
                 username={step.session.user.username}
                 auth={authContext}
+                lang={lang}
+                isDark={isDark}
               />
             </div>
           </div>
@@ -1030,6 +1034,8 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                     userRole={step.session.user.role}
                     username={step.session.user.username}
                     auth={authContext}
+                    lang={lang}
+                    isDark={isDark}
                   />
                 </div>
               )}
