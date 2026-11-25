@@ -347,8 +347,8 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                   {[
                     {
                       key: 'monitoring',
-                      titleTh: '1. การเชื่อมต่อ & ติดตามสด',
-                      titleEn: '1. VPN & Live Monitoring',
+                      titleTh: 'การเชื่อมต่อ & ติดตามสด',
+                      titleEn: 'VPN & Live Monitoring',
                       items: [
                         { id: 'vpn-connect', labelTh: 'เชื่อมต่อ VPN', labelEn: 'VPN Connect' },
                         { id: 'sessions', labelTh: 'เซสชัน', labelEn: 'Sessions' },
@@ -356,8 +356,8 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                     },
                     {
                       key: 'management',
-                      titleTh: '2. จัดการสิทธิ์ & เครือข่าย',
-                      titleEn: '2. Management',
+                      titleTh: 'จัดการสิทธิ์ & เครือข่าย',
+                      titleEn: 'Management',
                       items: [
                         { id: 'users', labelTh: 'ผู้ใช้', labelEn: 'Users' },
                         { id: 'devices', labelTh: 'อุปกรณ์', labelEn: 'Devices' },
@@ -367,8 +367,8 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                     },
                     {
                       key: 'audit',
-                      titleTh: '3. ตรวจสอบ & ระบบ',
-                      titleEn: '3. Audit & System',
+                      titleTh: 'ตรวจสอบ & ระบบ',
+                      titleEn: 'Audit & System',
                       items: [
                         { id: 'audit-logs', labelTh: 'บันทึกการใช้งาน', labelEn: 'Audit Logs' },
                         { id: 'agent-versions', labelTh: 'เวอร์ชัน Agent', labelEn: 'Agent Versions' },

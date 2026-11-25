@@ -698,7 +698,7 @@ describe('Portal Admin Users, Devices & Sessions Tabs (fetch seam)', () => {
     renderWithQuery(<App initialSession={adminSession} />);
 
     // Management group starts expanded
-    const mgmtToggle = screen.getByRole('button', { name: /2\. Management/i });
+    const mgmtToggle = screen.getByRole('button', { name: /^Management$/i });
     expect(mgmtToggle).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('tab', { name: /Users/i })).toBeInTheDocument();
 
