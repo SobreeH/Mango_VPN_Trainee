@@ -499,4 +499,78 @@ describe('Admin Users, Devices, Sessions & Real-time Revocation (app.inject agai
     expect(delRes.statusCode).toBe(200);
     expect(delRes.json().success).toBe(true);
   });
+
+  it('disconnects all active sessions atomically via POST /api/sessions/disconnect-all and records audit log', async () => {
+    const dev = await prisma.device.create({
+      data: {
+        userId: staffUserId,
+        hostname: 'staff-kill-pc',
+        fingerprint: 'fp-kill-all-1',
+        status: DeviceStatus.ACTIVE,
+      },
+    });
+    const peer1 = await prisma.vpnPeer.create({
+      data: {
+        userId: staffUserId,
+        deviceId: dev.id,
+        publicKey: 'kill-all-pubkey-1',
+        assignedIp: '10.13.13.31',
+        isActive: true,
+      },
+    });
+    const peer2 = await prisma.vpnPeer.create({
+      data: {
+        userId: clientUserId,
+        deviceId: dev.id,
+        publicKey: 'kill-all-pubkey-2',
+        assignedIp: '10.13.13.32',
+        isActive: true,
+      },
+    });
+    await prisma.vpnSession.createMany({
+      data: [
+        {
+          userId: staffUserId,
+          deviceId: dev.id,
+          peerId: peer1.id,
+          assignedIp: '10.13.13.31',
+          status: SessionStatus.ACTIVE,
+        },
+        {
+          userId: clientUserId,
+          deviceId: dev.id,
+          peerId: peer2.id,
+          assignedIp: '10.13.13.32',
+          status: SessionStatus.ACTIVE,
+        },
+      ],
+    });
+
+    const staffRes = await app.inject({
+      method: 'POST',
+      url: '/api/sessions/disconnect-all',
+      headers: { authorization: `Bearer ${staffToken}` },
+    });
+    expect(staffRes.statusCode).toBe(403);
+
+    const okRes = await app.inject({
+      method: 'POST',
+      url: '/api/sessions/disconnect-all',
+      headers: { authorization: `Bearer ${adminToken}` },
+    });
+    expect(okRes.statusCode).toBe(200);
+    expect(okRes.json()).toEqual({ success: true, disconnectedCount: 2 });
+    expect(removePeerMock).toHaveBeenCalledWith({ publicKey: 'kill-all-pubkey-1' });
+    expect(removePeerMock).toHaveBeenCalledWith({ publicKey: 'kill-all-pubkey-2' });
+
+    const remainingActive = await prisma.vpnSession.count({
+      where: { status: SessionStatus.ACTIVE },
+    });
+    expect(remainingActive).toBe(0);
+
+    const audit = await prisma.auditLog.findFirst({
+      where: { action: 'SESSION_FORCE_DISCONNECTED_ALL' },
+    });
+    expect(audit).not.toBeNull();
+  });
 });

@@ -160,6 +160,11 @@ export interface VpnSessionListResponse {
   items: VpnSessionDto[];
 }
 
+export interface DisconnectAllSessionsResponse {
+  success: boolean;
+  disconnectedCount: number;
+}
+
 export interface VpnPolicyDto {
   id: string;
   role: RoleName;

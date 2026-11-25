@@ -503,4 +503,102 @@ describe('Portal Admin Users, Devices & Sessions Tabs (fetch seam)', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
   });
+
+  it('supports searching, status filtering, and emergency Terminate All Active in Sessions tab', async () => {
+    const sessions = [
+      {
+        id: 'sess-active-1',
+        userId: 'u-1',
+        username: 'alice.staff',
+        deviceId: 'dev-1',
+        hostname: 'alice-win-pc',
+        assignedIp: '10.13.13.10',
+        status: SessionStatus.ACTIVE,
+        connectedAt: '2026-11-25T02:00:00.000Z',
+        disconnectedAt: null,
+      },
+      {
+        id: 'sess-closed-2',
+        userId: 'u-2',
+        username: 'bob.client',
+        deviceId: 'dev-2',
+        hostname: 'bob-linux-pc',
+        assignedIp: '10.13.13.11',
+        status: SessionStatus.DISCONNECTED,
+        connectedAt: '2026-11-24T10:00:00.000Z',
+        disconnectedAt: '2026-11-24T12:00:00.000Z',
+      },
+    ];
+
+    let disconnectAllCalled = false;
+
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/api/audit-logs')) {
+        return new Response(
+          JSON.stringify({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 1 }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (url.endsWith('/api/sessions') && (!init?.method || init.method === 'GET')) {
+        return new Response(JSON.stringify({ items: sessions }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.endsWith('/api/sessions/disconnect-all') && init?.method === 'POST') {
+        disconnectAllCalled = true;
+        sessions[0] = {
+          ...sessions[0]!,
+          status: SessionStatus.DISCONNECTED,
+          disconnectedAt: '2026-11-25T04:00:00.000Z',
+        };
+        return new Response(JSON.stringify({ success: true, disconnectedCount: 1 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify({ message: 'Not found' }), { status: 404 });
+    });
+
+    renderWithQuery(<App initialSession={adminSession} />);
+
+    fireEvent.click(screen.getByRole('tab', { name: /Sessions/i }));
+    expect(await screen.findByText('alice.staff')).toBeInTheDocument();
+    expect(screen.getByText('bob.client')).toBeInTheDocument();
+    expect(screen.getByText('2 / 2 Sessions')).toBeInTheDocument();
+    expect(screen.getByText('1 Active')).toBeInTheDocument();
+
+    // Search by IP
+    fireEvent.change(screen.getByLabelText(/Search sessions/i), { target: { value: '10.13.13.11' } });
+    expect(screen.queryByText('alice.staff')).not.toBeInTheDocument();
+    expect(screen.getByText('bob.client')).toBeInTheDocument();
+    expect(screen.getByText('1 / 2 Sessions')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText(/Clear search/i));
+    expect(screen.getByText('alice.staff')).toBeInTheDocument();
+
+    // Filter by Status
+    fireEvent.change(screen.getByLabelText(/Filter session status/i), {
+      target: { value: SessionStatus.ACTIVE },
+    });
+    expect(screen.getByText('alice.staff')).toBeInTheDocument();
+    expect(screen.queryByText('bob.client')).not.toBeInTheDocument();
+
+    // Search mismatch + Clear Filters button
+    fireEvent.change(screen.getByLabelText(/Search sessions/i), { target: { value: 'nomatch' } });
+    expect(screen.getByText(/No sessions match your search or filter/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Clear Filters/i }));
+    expect(screen.getByText('bob.client')).toBeInTheDocument();
+
+    // Trigger Emergency Terminate All Active
+    fireEvent.click(screen.getByRole('button', { name: /Terminate All Active/i }));
+    expect(await screen.findByText('Terminate All Active VPN Sessions')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Terminate All Sessions/i }));
+
+    await waitFor(() => {
+      expect(disconnectAllCalled).toBe(true);
+      expect(screen.getByText('0 Active')).toBeInTheDocument();
+    });
+  });
 });
