@@ -255,6 +255,115 @@ describe('AgentStatusCard (fetch seam)', () => {
     expect(screen.queryByText(/connected role/i)).not.toBeInTheDocument();
   });
 
+  it.each([
+    { name: 'real Go agent', supportsDevUserHint: false },
+    { name: 'mock agent', supportsDevUserHint: true },
+  ])('gates dev user hint for $name across pair, connect, and disconnect', async ({ supportsDevUserHint }) => {
+    const health = {
+      status: 'ok',
+      service: 'mango-agent-windows',
+      version: '2.0.0',
+      tunnelActive: false,
+      ...(supportsDevUserHint ? { supportsDevUserHint: true } : {}),
+    };
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(health), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            state: 'disconnected',
+            version: '2.0.0',
+            publicKey: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+            assignedIp: null,
+            serverEndpoint: null,
+            allowedIps: [],
+            connectedSince: null,
+            bytesReceived: 0,
+            bytesSent: 0,
+            lastError: null,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ ticket: 'one-time-connect-ticket', expiresAt: '2026-11-20T03:00:00Z', expiresInSeconds: 60 }),
+          { status: 201, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            message: 'WireGuard tunnel connected',
+            state: 'connected',
+            publicKey: 'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=',
+            sessionId: 'sess-123',
+            assignedIp: '10.13.13.4',
+            serverEndpoint: 'vpn.mango.internal:51820',
+            allowedIps: ['10.20.0.0/16'],
+            connectedSince: '2026-11-20T02:59:00Z',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ success: true, message: 'WireGuard tunnel disconnected', state: 'disconnected' }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+
+    render(
+      <AgentStatusCard
+        accessToken="jwt-access-token"
+        username="staff01"
+        userRole={RoleName.STAFF}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByLabelText(/agent pairing token/i)).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText(/agent pairing token/i), {
+      target: { value: 'valid-pairing-token' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /pair agent/i }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /connect vpn/i })).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: /connect vpn/i }));
+    await waitFor(() => expect(screen.getByText('10.13.13.4')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /disconnect vpn/i }));
+    await waitFor(() => expect(screen.getByText(/^disconnected$/i)).toBeInTheDocument());
+
+    const statusCall = fetchMock.mock.calls.find(([url]) => url === 'http://127.0.0.1:47821/status');
+    const connectCall = fetchMock.mock.calls.find(([url]) => url === 'http://127.0.0.1:47821/connect');
+    const disconnectCall = fetchMock.mock.calls.find(([url]) => url === 'http://127.0.0.1:47821/disconnect');
+    expect(statusCall).toBeDefined();
+    expect(connectCall).toBeDefined();
+    expect(disconnectCall).toBeDefined();
+
+    if (supportsDevUserHint) {
+      expect(statusCall?.[1]?.headers).toEqual(expect.objectContaining({ 'X-Mango-Dev-User': 'staff01' }));
+      expect(connectCall?.[1]?.headers).toEqual(expect.objectContaining({ 'X-Mango-Dev-User': 'staff01' }));
+      expect(JSON.parse(String(connectCall?.[1]?.body))).toEqual(expect.objectContaining({ userHint: 'staff01' }));
+      expect(disconnectCall?.[1]?.headers).toEqual(
+        expect.objectContaining({
+          'X-Mango-Dev-User': 'staff01',
+          'Content-Type': 'application/json',
+        }),
+      );
+      expect(JSON.parse(String(disconnectCall?.[1]?.body))).toEqual({ userHint: 'staff01' });
+    } else {
+      expect(statusCall?.[1]?.headers).not.toEqual(expect.objectContaining({ 'X-Mango-Dev-User': expect.anything() }));
+      expect(connectCall?.[1]?.headers).not.toEqual(expect.objectContaining({ 'X-Mango-Dev-User': expect.anything() }));
+      expect(JSON.parse(String(connectCall?.[1]?.body))).not.toHaveProperty('userHint');
+      expect(disconnectCall?.[1]?.headers).not.toEqual(expect.objectContaining({ 'X-Mango-Dev-User': expect.anything() }));
+      expect(disconnectCall?.[1]?.headers).not.toEqual(expect.objectContaining({ 'Content-Type': expect.anything() }));
+      expect(disconnectCall?.[1]?.body).toBeUndefined();
+    }
+  });
+
   it('surfaces connect errors honestly without faking connected state', async () => {
     fetchMock
       .mockResolvedValueOnce(

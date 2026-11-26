@@ -66,6 +66,15 @@ function providerLabel(provider?: VpnProviderType): string {
   }
 }
 
+function resolveDevUserHint(
+  health: AgentHealthResponse,
+  username?: string,
+  userRole?: RoleName,
+): string | undefined {
+  if (!health.supportsDevUserHint) return undefined;
+  return (username || userRole || '').toLowerCase() || undefined;
+}
+
 const LOCAL_STORAGE_TOKEN_KEY = 'mango_agent_pairing_token';
 
 function getSavedPairingToken(): string {
@@ -140,7 +149,7 @@ export function AgentStatusCard({
     }
 
     try {
-      const userHint = (username || userRole || '').toLowerCase();
+      const userHint = resolveDevUserHint(health, username, userRole);
       const status = await fetchAgentStatus(activeToken, userHint);
       savePairingToken(activeToken);
       setView({ kind: 'paired', health, status });
@@ -209,7 +218,7 @@ export function AgentStatusCard({
     if (!token) return;
 
     const timer = setInterval(() => {
-      const userHint = (username || userRole || '').toLowerCase();
+      const userHint = resolveDevUserHint(view.health, username, userRole);
       void fetchAgentStatus(token, userHint)
         .then((newStatus) => {
           setView((prev) => {
@@ -233,7 +242,14 @@ export function AgentStatusCard({
     }, 2500);
 
     return () => clearInterval(timer);
-  }, [view.kind, view.kind === 'paired' ? view.status.state : null, pairingToken, username, userRole]);
+  }, [
+    view.kind,
+    view.kind === 'paired' ? view.status.state : null,
+    view.kind === 'paired' ? view.health.supportsDevUserHint : null,
+    pairingToken,
+    username,
+    userRole,
+  ]);
 
   async function handlePairSubmit(e: FormEvent) {
     e.preventDefault();
@@ -248,7 +264,7 @@ export function AgentStatusCard({
     try {
       if (view.kind === 'unpaired') {
         try {
-          const userHint = (username || userRole || '').toLowerCase();
+          const userHint = resolveDevUserHint(view.health, username, userRole);
           const status = await fetchAgentStatus(trimmed, userHint);
           savePairingToken(trimmed);
           setView({ kind: 'paired', health: view.health, status });
@@ -278,7 +294,7 @@ export function AgentStatusCard({
     setDisconnectMessage(null);
     setIsTunnelBusy(true);
     try {
-      const userHint = (username || userRole || '').toLowerCase() || undefined;
+      const userHint = resolveDevUserHint(view.health, username, userRole);
       let ticketRes;
       let res;
       if (selectedGatewayKey.startsWith('gw:')) {
@@ -335,7 +351,7 @@ export function AgentStatusCard({
     setDisconnectMessage(null);
     setIsTunnelBusy(true);
     try {
-      const userHint = (username || userRole || '').toLowerCase();
+      const userHint = resolveDevUserHint(view.health, username, userRole);
       const res = await disconnectAgent(pairingToken.trim(), userHint);
       setDisconnectMessage('ตัดการเชื่อมต่อ VPN เรียบร้อยแล้ว (Disconnected safely)');
       setView({
