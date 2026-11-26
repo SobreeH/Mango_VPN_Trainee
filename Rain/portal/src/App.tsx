@@ -800,7 +800,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                 </div>
 
                 {/* User Info & Logout Button */}
-                <div className="flex items-center gap-2 pl-2 border-l border-white/10">
+                <div className={`flex items-center gap-2 pl-2 border-l ${isDark ? 'border-white/10' : 'border-stone-200'}`}>
                   <span className={`text-xs font-semibold hidden md:inline ${isDark ? 'text-stone-200' : 'text-slate-800'}`}>
                     {step.session.user.username}
                   </span>
@@ -808,9 +808,13 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                     type="button"
                     onClick={handleLogout}
                     aria-label="Log Out"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border border-white/10 bg-[#262420] text-stone-300 hover:bg-rose-950/60 hover:text-rose-200 hover:border-rose-900/50 transition-colors shadow-sm"
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors shadow-sm ${
+                      isDark
+                        ? 'border-white/10 bg-[#262420] text-stone-300 hover:bg-rose-950/60 hover:text-rose-200 hover:border-rose-900/50'
+                        : 'border-stone-200 bg-white text-slate-700 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200'
+                    }`}
                   >
-                    <LogOut className="h-3.5 w-3.5 text-rose-400" />
+                    <LogOut className="h-3.5 w-3.5 text-rose-500" />
                     <span>{lang === 'th' ? 'ออกจากระบบ' : 'Log Out'}</span>
                   </button>
                 </div>
@@ -1021,19 +1025,23 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                   <div className={`rounded-3xl border p-6 sm:p-8 space-y-6 shadow-2xl backdrop-blur-xl ${
                     isDark ? 'border-white/5 bg-[#1e1d1a]/85 shadow-black/80' : 'border-stone-200/90 bg-white/95 shadow-stone-200/60'
                   }`}>
-                    <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                    <div className={`flex items-center justify-between border-b pb-4 ${isDark ? 'border-white/5' : 'border-stone-200'}`}>
                       <div>
                         <h3 className={`text-lg font-bold ${isDark ? 'text-stone-100' : 'text-stone-900'}`}>
                           {lang === 'th' ? 'ข้อมูลโปรไฟล์และความปลอดภัย' : 'Profile & Security Overview'}
                         </h3>
-                        <p className="text-xs text-stone-400 mt-1">
+                        <p className={`text-xs mt-1 ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
                           {lang === 'th' ? 'ข้อมูลบัญชีผู้ใช้และสถานะการยืนยันตัวตน' : 'Account credentials and identity posture'}
                         </p>
                       </div>
                       <span className={`font-mono text-xs font-bold px-3 py-1 rounded-full border ${
                         step.session.user.role === 'STAFF'
-                          ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
-                          : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                          ? isDark
+                            ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+                            : 'bg-amber-500/10 border-amber-500/30 text-amber-700'
+                          : isDark
+                            ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                            : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700'
                       }`}>
                         {step.session.user.role}
                       </span>
@@ -1041,23 +1049,23 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                       <div className={`p-4 rounded-2xl border ${isDark ? 'border-white/5 bg-[#141311]/70' : 'border-stone-200 bg-stone-50'}`}>
-                        <span className="text-stone-400 block text-[11px]">{lang === 'th' ? 'ชื่อผู้ใช้' : 'Username'}</span>
-                        <span className="font-semibold text-stone-100 text-sm mt-0.5 block">{step.session.user.username}</span>
+                        <span className={`block text-[11px] ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>{lang === 'th' ? 'ชื่อผู้ใช้' : 'Username'}</span>
+                        <span className={`font-semibold text-sm mt-0.5 block ${isDark ? 'text-stone-100' : 'text-slate-900'}`}>{step.session.user.username}</span>
                       </div>
                       <div className={`p-4 rounded-2xl border ${isDark ? 'border-white/5 bg-[#141311]/70' : 'border-stone-200 bg-stone-50'}`}>
-                        <span className="text-stone-400 block text-[11px]">{lang === 'th' ? 'อีเมลองค์กร' : 'Email'}</span>
-                        <span className="font-semibold text-stone-100 text-sm mt-0.5 block">{step.session.user.email}</span>
+                        <span className={`block text-[11px] ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>{lang === 'th' ? 'อีเมลองค์กร' : 'Email'}</span>
+                        <span className={`font-semibold text-sm mt-0.5 block ${isDark ? 'text-stone-100' : 'text-slate-900'}`}>{step.session.user.email}</span>
                       </div>
                       <div className={`p-4 rounded-2xl border ${isDark ? 'border-white/5 bg-[#141311]/70' : 'border-stone-200 bg-stone-50'}`}>
-                        <span className="text-stone-400 block text-[11px]">{lang === 'th' ? 'การยืนยันตัวตน 2 ขั้น (MFA)' : 'Two-Factor Authentication'}</span>
-                        <span className="font-semibold text-emerald-400 text-sm mt-0.5 block flex items-center gap-1.5">
+                        <span className={`block text-[11px] ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>{lang === 'th' ? 'การยืนยันตัวตน 2 ขั้น (MFA)' : 'Two-Factor Authentication'}</span>
+                        <span className={`font-semibold text-sm mt-0.5 flex items-center gap-1.5 ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
                           <ShieldCheck className="h-4 w-4" />
                           {lang === 'th' ? 'เปิดใช้งานแล้ว (TOTP Authenticator)' : 'Enabled (TOTP Authenticator)'}
                         </span>
                       </div>
                       <div className={`p-4 rounded-2xl border ${isDark ? 'border-white/5 bg-[#141311]/70' : 'border-stone-200 bg-stone-50'}`}>
-                        <span className="text-stone-400 block text-[11px]">{lang === 'th' ? 'สถานะเซสชัน' : 'Session Status'}</span>
-                        <span className="font-semibold text-stone-200 text-sm mt-0.5 block">
+                        <span className={`block text-[11px] ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>{lang === 'th' ? 'สถานะเซสชัน' : 'Session Status'}</span>
+                        <span className={`font-semibold text-sm mt-0.5 block ${isDark ? 'text-stone-200' : 'text-slate-900'}`}>
                           {lang === 'th' ? 'ทำงานอยู่ (หมุนเวียนโทเค็นอัตโนมัติ)' : 'Active (Auto-refreshing JWT)'}
                         </span>
                       </div>
@@ -1072,21 +1080,21 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                   <div className={`rounded-3xl border p-6 sm:p-8 space-y-6 shadow-2xl backdrop-blur-xl ${
                     isDark ? 'border-white/5 bg-[#1e1d1a]/85 shadow-black/80' : 'border-stone-200/90 bg-white/95 shadow-stone-200/60'
                   }`}>
-                    <div className="border-b border-white/5 pb-4">
+                    <div className={`border-b pb-4 ${isDark ? 'border-white/5' : 'border-stone-200'}`}>
                       <h3 className={`text-lg font-bold ${isDark ? 'text-stone-100' : 'text-stone-900'}`}>
                         {lang === 'th' ? 'ช่วยเหลือและแก้ปัญหาการใช้งาน' : 'Help & Troubleshooting'}
                       </h3>
-                      <p className="text-xs text-stone-400 mt-1">
+                      <p className={`text-xs mt-1 ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
                         {lang === 'th' ? 'วิธีเชื่อมต่อและข้อแนะนำสำหรับโปรแกรม MANGO Windows Agent' : 'Guidance for connecting via MANGO Windows Agent'}
                       </p>
                     </div>
 
-                    <div className="space-y-4 text-xs leading-relaxed text-stone-300">
+                    <div className={`space-y-4 text-xs leading-relaxed ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
                       <div className={`p-4 rounded-2xl border space-y-2 ${isDark ? 'border-white/5 bg-[#141311]/70' : 'border-stone-200 bg-stone-50'}`}>
-                        <h4 className="font-bold text-amber-400 text-sm">
+                        <h4 className={`font-bold text-sm ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
                           {lang === 'th' ? '1. ตรวจสอบการทำงานของ Windows Agent' : '1. Verify Windows Agent is Running'}
                         </h4>
-                        <p className="text-stone-400">
+                        <p className={isDark ? 'text-stone-400' : 'text-stone-600'}>
                           {lang === 'th'
                             ? 'โปรแกรม MANGO Windows Agent จะต้องเปิดทำงานอยู่ในเบื้องหลัง และเปิดพอร์ต 127.0.0.1:47821 บนเครื่องคอมพิวเตอร์ของคุณ'
                             : 'MANGO Windows Agent must run in the background listening on loopback port 127.0.0.1:47821.'}
@@ -1094,10 +1102,10 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                       </div>
 
                       <div className={`p-4 rounded-2xl border space-y-2 ${isDark ? 'border-white/5 bg-[#141311]/70' : 'border-stone-200 bg-stone-50'}`}>
-                        <h4 className="font-bold text-amber-400 text-sm">
+                        <h4 className={`font-bold text-sm ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
                           {lang === 'th' ? '2. การจับคู่ Agent (Pairing Token)' : '2. Agent Pairing Token'}
                         </h4>
-                        <p className="text-stone-400">
+                        <p className={isDark ? 'text-stone-400' : 'text-stone-600'}>
                           {lang === 'th'
                             ? 'หากหน้าจอขึ้นสถานะ "Agent Reachable (Unpaired)" ให้คัดลอก Pairing Token ที่สร้างจากคอนฟิกของ Agent มาวางในช่อง Agent Pairing Token แล้วกดยืนยัน'
                             : 'If the status says "Agent Reachable (Unpaired)", paste your token into the Agent Pairing Token field and click Pair Agent.'}
@@ -1105,10 +1113,10 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                       </div>
 
                       <div className={`p-4 rounded-2xl border space-y-2 ${isDark ? 'border-white/5 bg-[#141311]/70' : 'border-stone-200 bg-stone-50'}`}>
-                        <h4 className="font-bold text-emerald-400 text-sm">
+                        <h4 className={`font-bold text-sm ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
                           {lang === 'th' ? '3. ติดต่อฝ่ายไอที (IT Support)' : '3. IT Support Contact'}
                         </h4>
-                        <p className="text-stone-400">
+                        <p className={isDark ? 'text-stone-400' : 'text-stone-600'}>
                           {lang === 'th'
                             ? 'หากพบปัญหาการเข้าถึงเครือข่าย หรือต้องการเพิ่มสิทธิ์การใช้งาน กรุณาติดต่อ: บริษัท แมงโก้ คอนซัลแตนท์ จำกัด (แผนกไอที) โทร 02-xxx-xxxx หรืออีเมล support@mangoconsultant.com'
                             : 'Need additional network permissions or experiencing issues? Contact IT Support at support@mangoconsultant.com'}
