@@ -115,7 +115,7 @@ function isValidHttpUrl(value: string): boolean {
   }
 }
 
-function toDto(row: {
+export function toAgentVersionDto(row: {
   id: string;
   version: string;
   platform: string;
@@ -136,6 +136,8 @@ function toDto(row: {
     releasedAt: row.releasedAt.toISOString(),
   };
 }
+
+const toDto = toAgentVersionDto;
 
 export function registerAgentVersionRoutes(app: FastifyInstance, prisma: PrismaClient) {
   app.get('/agent-versions', async (_request, reply) => {

@@ -14,6 +14,7 @@ import {
   PolicyProtocol,
   RoleName,
   VpnProviderType,
+  type AgentVersionListResponse,
   type ConnectTicketRequest,
   type ConnectTicketResponse,
   type DaemonPolicyRule,
@@ -24,7 +25,12 @@ import {
   type VpnDisconnectResponse,
   type VpnGatewayListResponse,
 } from '@mango/shared';
-import { AgentVersionError, assertAgentVersionAllowed, toGatewayDto } from '@mango/rain-admin';
+import {
+  AgentVersionError,
+  assertAgentVersionAllowed,
+  toAgentVersionDto,
+  toGatewayDto,
+} from '@mango/rain-admin';
 import type { ApiConfig } from '../../config.js';
 import type { VpnDaemonClient } from '../../lib/vpn-daemon.js';
 import { createAuthenticateHook } from '../../middleware/auth.js';
@@ -161,6 +167,30 @@ export async function registerVpnRoutes(
 
       const response: VpnGatewayListResponse = {
         items: rows.map(toGatewayDto),
+      };
+      return reply.status(200).send(response);
+    },
+  );
+
+  app.get(
+    '/api/vpn/agent-versions',
+    { preHandler: authenticate },
+    async (request, reply) => {
+      if (!request.authUser) {
+        return reply.status(401).send({
+          statusCode: 401,
+          error: 'Unauthorized',
+          message: 'Authentication required',
+        });
+      }
+
+      const rows = await prisma.agentVersion.findMany({
+        where: { isActive: true },
+        orderBy: [{ releasedAt: 'desc' }, { version: 'desc' }],
+      });
+
+      const response: AgentVersionListResponse = {
+        items: rows.map(toAgentVersionDto),
       };
       return reply.status(200).send(response);
     },
