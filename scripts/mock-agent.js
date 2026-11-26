@@ -252,6 +252,7 @@ const server = http.createServer(async (req, res) => {
         version: agentState.version,
         uptimeSeconds,
         tunnelActive: agentState.state === 'connected',
+        supportsDevUserHint: true,
       });
     }
 
