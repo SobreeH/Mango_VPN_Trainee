@@ -448,6 +448,7 @@ export interface AgentHealthResponse {
   version: string;
   uptimeSeconds?: number;
   tunnelActive: boolean;
+  supportsDevUserHint?: boolean;
 }
 
 export interface AgentStatusResponse {

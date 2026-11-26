@@ -133,8 +133,12 @@ func TestStrictOriginAllowlistAndPnaPreflight(t *testing.T) {
 	if got := recAllowed.Header().Get("Access-Control-Allow-Private-Network"); got != "true" {
 		t.Fatalf("expected Access-Control-Allow-Private-Network true, got %q", got)
 	}
-	if allowHeaders := recAllowed.Header().Get("Access-Control-Allow-Headers"); !strings.Contains(allowHeaders, "X-Mango-Agent-Token") {
+	allowHeaders := recAllowed.Header().Get("Access-Control-Allow-Headers")
+	if !strings.Contains(allowHeaders, "X-Mango-Agent-Token") {
 		t.Fatalf("expected X-Mango-Agent-Token in Access-Control-Allow-Headers, got %q", allowHeaders)
+	}
+	if strings.Contains(strings.ToLower(allowHeaders), "x-mango-dev-user") {
+		t.Fatalf("production CORS must not allow X-Mango-Dev-User, got %q", allowHeaders)
 	}
 
 	// 2. Untrusted Origin on preflight and on /status, /connect, /disconnect must be rejected with 403

@@ -161,14 +161,16 @@ export async function disconnectAgent(pairingToken: string, userHint?: string): 
   const headers: Record<string, string> = {
     'X-Mango-Agent-Token': pairingToken,
   };
-  if (userHint) {
-    headers['X-Mango-Dev-User'] = userHint;
-  }
-  const res = await fetch(`${getAgentBaseUrl()}/disconnect`, {
+  const init: RequestInit = {
     method: 'POST',
     headers,
-    body: JSON.stringify({ userHint }),
-  });
+  };
+  if (userHint) {
+    headers['X-Mango-Dev-User'] = userHint;
+    headers['Content-Type'] = 'application/json';
+    init.body = JSON.stringify({ userHint });
+  }
+  const res = await fetch(`${getAgentBaseUrl()}/disconnect`, init);
   if (!res.ok) {
     throw await parseAgentError(res, `Agent disconnect failed (${res.status})`);
   }
