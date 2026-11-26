@@ -1,0 +1,119 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env.cloud}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.cloud}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env.cloud}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mango-net
+
+  vpn-gateway:
+    build:
+      context: ../..
+      dockerfile: Sobree/vpn-daemon/Dockerfile
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      net.ipv4.ip_forward: "1"
+      net.ipv4.conf.all.src_valid_mark: "1"
+    environment:
+      DAEMON_LISTEN_ADDR: 0.0.0.0:50051
+      DAEMON_SHARED_SECRET: ${DAEMON_SHARED_SECRET:?Set DAEMON_SHARED_SECRET in .env.cloud}
+      WG_INTERFACE: ${WG_INTERFACE:-wg0}
+      WG_LISTEN_PORT: ${WG_LISTEN_PORT:-51820}
+      WG_GATEWAY_CIDR: ${WG_GATEWAY_CIDR:-10.13.13.1/24}
+      WG_PRIVATE_KEY: ${WG_PRIVATE_KEY:?Set WG_PRIVATE_KEY in .env.cloud}
+    ports:
+      - "${WG_LISTEN_PORT:-51820}:51820/udp"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:50051/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+    networks:
+      - mango-net
+
+  api:
+    build:
+      context: ../..
+      dockerfile: Sobree/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:?Set POSTGRES_USER in .env.cloud}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.cloud}@postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env.cloud}?schema=public
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env.cloud}
+      REFRESH_SECRET: ${REFRESH_SECRET:?Set REFRESH_SECRET in .env.cloud}
+      TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:?Set TOTP_ENCRYPTION_KEY in .env.cloud}
+      DAEMON_SHARED_SECRET: ${DAEMON_SHARED_SECRET:?Set DAEMON_SHARED_SECRET in .env.cloud}
+      VPN_DAEMON_URL: http://vpn-gateway:50051
+      WG_SERVER_PUBLIC_KEY: ${WG_SERVER_PUBLIC_KEY:?Set WG_SERVER_PUBLIC_KEY in .env.cloud}
+      WG_SERVER_ENDPOINT: ${WG_SERVER_ENDPOINT:?Set WG_SERVER_ENDPOINT to <PUBLIC_IP_OR_DNS>:51820}
+      WG_DNS: ${WG_DNS:-1.1.1.1}
+      CORS_ORIGIN: ${CORS_ORIGIN:?Set CORS_ORIGIN to https://<MANGO_DOMAIN>}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      vpn-gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4000/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      start_period: 15s
+      retries: 5
+    networks:
+      - mango-net
+
+  portal:
+    build:
+      context: ../..
+      dockerfile: Rain/portal/Dockerfile
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: ${VITE_API_URL:?Set VITE_API_URL in .env.cloud}
+      VITE_AGENT_URL: ${VITE_AGENT_URL:-http://127.0.0.1:47821}
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - mango-net
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    environment:
+      MANGO_DOMAIN: ${MANGO_DOMAIN:?Set MANGO_DOMAIN in .env.cloud}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - portal
+    networks:
+      - mango-net
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  mango-net:
+    driver: bridge

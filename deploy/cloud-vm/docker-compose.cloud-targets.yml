@@ -1,0 +1,96 @@
+services:
+  vpn-gateway:
+    networks:
+      mango-net: {}
+      mango-targets-net:
+        ipv4_address: 172.28.0.2
+
+  target-routes:
+    image: alpine:3.20
+    restart: "no"
+    network_mode: service:vpn-gateway
+    cap_add:
+      - NET_ADMIN
+    depends_on:
+      vpn-gateway:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command: >-
+      set -eu;
+      i=0;
+      while [ $$i -lt 20 ] && ! ip -f inet addr show | grep -q "172.28.0.2"; do
+        i=$$((i + 1)); sleep 1;
+      done;
+      ip -f inet addr show | grep -q "172.28.0.2";
+      ip route replace 10.99.0.0/24 via 172.28.0.99;
+      ip route replace 10.20.0.0/16 via 172.28.0.20;
+      ip route replace 10.30.0.0/24 via 172.28.0.30;
+      ip route show
+
+  target-admin:
+    build:
+      context: ../../test-targets
+      dockerfile: Dockerfile.target
+    restart: unless-stopped
+    environment:
+      ZONE_ID: admin
+      ZONE_TITLE: Admin Restricted Console
+      TARGET_IP: 10.99.0.10
+      TARGET_CIDR: 10.99.0.0/24
+      ALLOWED_ROLES: ADMIN
+      DENIED_ROLES: STAFF, CLIENT
+      GATEWAY_TRANSIT_IP: 172.28.0.2
+      VPN_SUBNET: 10.13.13.0/24
+    networks:
+      mango-targets-net:
+        ipv4_address: 172.28.0.99
+    volumes:
+      - ../../test-targets/sites/admin:/usr/share/nginx/html:ro
+
+  target-staff:
+    build:
+      context: ../../test-targets
+      dockerfile: Dockerfile.target
+    restart: unless-stopped
+    environment:
+      ZONE_ID: staff
+      ZONE_TITLE: Staff Internal Web
+      TARGET_IP: 10.20.0.10
+      TARGET_CIDR: 10.20.0.0/16
+      ALLOWED_ROLES: ADMIN, STAFF
+      DENIED_ROLES: CLIENT
+      GATEWAY_TRANSIT_IP: 172.28.0.2
+      VPN_SUBNET: 10.13.13.0/24
+    networks:
+      mango-targets-net:
+        ipv4_address: 172.28.0.20
+    volumes:
+      - ../../test-targets/sites/staff:/usr/share/nginx/html:ro
+
+  target-client:
+    build:
+      context: ../../test-targets
+      dockerfile: Dockerfile.target
+    restart: unless-stopped
+    environment:
+      ZONE_ID: client
+      ZONE_TITLE: Client Shared Portal
+      TARGET_IP: 10.30.0.10
+      TARGET_CIDR: 10.30.0.0/24
+      ALLOWED_ROLES: ADMIN, STAFF, CLIENT
+      DENIED_ROLES: None (VPN required)
+      GATEWAY_TRANSIT_IP: 172.28.0.2
+      VPN_SUBNET: 10.13.13.0/24
+    networks:
+      mango-targets-net:
+        ipv4_address: 172.28.0.30
+    volumes:
+      - ../../test-targets/sites/client:/usr/share/nginx/html:ro
+
+networks:
+  mango-targets-net:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24

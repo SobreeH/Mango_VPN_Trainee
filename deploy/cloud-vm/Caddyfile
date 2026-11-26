@@ -1,0 +1,28 @@
+# An EC2 public address such as 198-51-100-24.sslip.io resolves to the VM.
+# Caddy obtains and renews Let's Encrypt TLS automatically when ports 80/443
+# are reachable and MANGO_DOMAIN is set to that hostname.
+{$MANGO_DOMAIN} {
+  @api path /api/* /health
+  handle @api {
+    reverse_proxy api:4000
+  }
+  handle {
+    reverse_proxy portal:3000
+  }
+}
+
+# Custom DNS alternative:
+# vpn.example.com {
+#   reverse_proxy portal:3000
+# }
+# api.vpn.example.com {
+#   reverse_proxy api:4000
+# }
+
+# Local HTTP-only fallback when inbound 80/443 are blocked. Use an SSH tunnel
+# to the VM and browse to http://localhost:8080.
+# :80 {
+#   @api path /api/* /health
+#   handle @api { reverse_proxy api:4000 }
+#   handle { reverse_proxy portal:3000 }
+# }
