@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Download } from 'lucide-react';
 import { RoleName, type UserDto } from '@mango/shared';
 import type { AuthRefreshContext } from '../api/auth';
 import { createUser, fetchUsers, updateUserStatus } from '../lib/adminApi';
+import { downloadCsv } from '../lib/csv';
 import { getThemeClasses, type UiLang } from '../lib/theme';
 import { useToast } from './Toast';
 import { ConfirmModal } from './ConfirmModal';
@@ -13,6 +15,20 @@ interface UsersTabProps {
   auth?: AuthRefreshContext;
   lang?: UiLang;
   isDark?: boolean;
+}
+
+function exportUsersToCsv(usersToExport: UserDto[]) {
+  const headers = ['User ID', 'Username', 'Email', 'Role', 'Status', 'MFA Enabled', 'Created At'];
+  const rows = usersToExport.map((u) => [
+    u.id,
+    u.username,
+    u.email,
+    u.role,
+    u.isActive ? 'ACTIVE' : 'DISABLED',
+    u.totpEnabled ? 'YES' : 'NO',
+    u.createdAt ? new Date(u.createdAt).toISOString() : '',
+  ]);
+  downloadCsv(`mango-vpn-users-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
 }
 
 export function UsersTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark = true }: UsersTabProps) {
@@ -250,7 +266,7 @@ export function UsersTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark = 
               className={`w-full sm:max-w-xs h-10 rounded-xl border px-4 text-xs focus:outline-none transition-colors ${t.input}`}
             />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <label htmlFor="filter-user-role" className={`text-xs ${t.muted}`}>
               Role:
             </label>
@@ -265,6 +281,23 @@ export function UsersTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark = 
               <option value={RoleName.STAFF}>STAFF</option>
               <option value={RoleName.CLIENT}>CLIENT</option>
             </select>
+            <button
+              type="button"
+              aria-label="Export Users CSV"
+              onClick={() => {
+                exportUsersToCsv(filteredUsers);
+                showToast({
+                  type: 'success',
+                  title: 'Users Exported',
+                  message: `Exported ${filteredUsers.length} user records to CSV.`,
+                });
+              }}
+              disabled={filteredUsers.length === 0}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 px-4 text-xs font-semibold shadow-sm transition-all disabled:opacity-40"
+            >
+              <Download className="h-3.5 w-3.5" />
+              <span>{lang === 'th' ? 'ส่งออก CSV' : 'Export CSV'}</span>
+            </button>
           </div>
         </div>
       )}

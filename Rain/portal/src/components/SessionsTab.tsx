@@ -3,7 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Activity, Download, Filter, PowerOff, RefreshCw, Search, ShieldAlert, Wifi, X } from 'lucide-react';
 import { SessionStatus, VpnProviderType, type VpnSessionDto } from '@mango/shared';
 import type { AuthRefreshContext } from '../api/auth';
-import { disconnectAllSessions, disconnectSession, fetchSessions } from '../lib/adminApi';
+import { fetchSessions, disconnectAllSessions, disconnectSession } from '../lib/adminApi';
+import { downloadCsv } from '../lib/csv';
 import { getThemeClasses, type UiLang } from '../lib/theme';
 import { useToast } from './Toast';
 import { ConfirmModal } from './ConfirmModal';
@@ -14,15 +15,6 @@ interface SessionsTabProps {
   auth?: AuthRefreshContext;
   lang?: UiLang;
   isDark?: boolean;
-}
-
-function escapeCsv(val: unknown): string {
-  if (val === null || val === undefined) return '';
-  const str = typeof val === 'object' ? JSON.stringify(val) : String(val);
-  if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
-    return `"${str.replace(/"/g, '""')}"`;
-  }
-  return str;
 }
 
 function exportSessionsToCsv(sessionsToExport: VpnSessionDto[]) {
@@ -37,21 +29,7 @@ function exportSessionsToCsv(sessionsToExport: VpnSessionDto[]) {
     s.status,
     s.connectedAt ? new Date(s.connectedAt).toISOString() : '',
   ]);
-
-  const csvContent = [
-    headers.map(escapeCsv).join(','),
-    ...rows.map((row) => row.map(escapeCsv).join(',')),
-  ].join('\r\n');
-
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `mango-vpn-sessions-${new Date().toISOString().slice(0, 10)}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  downloadCsv(`mango-vpn-sessions-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
 }
 
 export function SessionsTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark = true }: SessionsTabProps) {
@@ -60,6 +38,7 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark
   const { showToast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | SessionStatus>('ALL');
+  const [autoRefresh, setAutoRefresh] = useState(false);
   const [confirmTerminateAll, setConfirmTerminateAll] = useState(false);
   const [sessionToDisconnect, setSessionToDisconnect] = useState<{
     id: string;
@@ -70,6 +49,7 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark
   const listQuery = useQuery({
     queryKey: ['admin-sessions', apiBaseUrl],
     queryFn: () => fetchSessions(apiBaseUrl, accessToken, auth),
+    refetchInterval: autoRefresh ? 5000 : false,
   });
 
   const disconnectMutation = useMutation({
@@ -161,6 +141,25 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            aria-label="Toggle Auto-Refresh"
+            aria-pressed={autoRefresh}
+            onClick={() => setAutoRefresh((prev) => !prev)}
+            className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-medium transition-colors ${
+              autoRefresh
+                ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
+                : `${t.secondaryBtn} hover:border-amber-500/40 hover:text-amber-400`
+            }`}
+          >
+            <span
+              className={`h-2 w-2 rounded-full ${
+                autoRefresh ? 'bg-emerald-400 animate-pulse' : 'bg-stone-500'
+              }`}
+            />
+            <span>{lang === 'th' ? 'อัตโนมัติ 5 วิ' : 'Auto 5s'}</span>
+          </button>
+
           <button
             type="button"
             onClick={() => void listQuery.refetch()}

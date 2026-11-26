@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Download, FileText, ShieldAlert, X } from 'lucide-react';
+import { Download, FileText, RefreshCw, ShieldAlert, X } from 'lucide-react';
 import type { AuditLogDto } from '@mango/shared';
 import type { AuthRefreshContext } from '../api/auth';
 import { fetchAuditLogs } from '../lib/adminApi';
+import { downloadCsv } from '../lib/csv';
 import { getThemeClasses, type UiLang } from '../lib/theme';
 import { useToast } from './Toast';
 
@@ -13,15 +14,6 @@ interface AuditLogsTabProps {
   auth?: AuthRefreshContext;
   lang?: UiLang;
   isDark?: boolean;
-}
-
-function escapeCsv(val: unknown): string {
-  if (val === null || val === undefined) return '';
-  const str = typeof val === 'object' ? JSON.stringify(val) : String(val);
-  if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
-    return `"${str.replace(/"/g, '""')}"`;
-  }
-  return str;
 }
 
 function exportAuditLogsToCsv(logsToExport: AuditLogDto[]) {
@@ -36,21 +28,7 @@ function exportAuditLogsToCsv(logsToExport: AuditLogDto[]) {
     log.ipAddress ?? '',
     log.metadata ? JSON.stringify(log.metadata) : '',
   ]);
-
-  const csvContent = [
-    headers.map(escapeCsv).join(','),
-    ...rows.map((row) => row.map(escapeCsv).join(',')),
-  ].join('\r\n');
-
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `mango-vpn-audit-logs-${new Date().toISOString().slice(0, 10)}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  downloadCsv(`mango-vpn-audit-logs-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
 }
 
 export function AuditLogsTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark = true }: AuditLogsTabProps) {
@@ -60,6 +38,7 @@ export function AuditLogsTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDar
   const [actionFilter, setActionFilter] = useState('');
   const [targetTypeFilter, setTargetTypeFilter] = useState('');
   const [searchFilter, setSearchFilter] = useState('');
+  const [autoRefresh, setAutoRefresh] = useState(false);
   const [selectedLog, setSelectedLog] = useState<AuditLogDto | null>(null);
 
   const query = useQuery({
@@ -77,6 +56,7 @@ export function AuditLogsTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDar
         },
         auth,
       ),
+    refetchInterval: autoRefresh ? 5000 : false,
   });
 
   const logs = query.data?.items ?? [];
@@ -102,22 +82,53 @@ export function AuditLogsTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDar
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              exportAuditLogsToCsv(logs);
-              showToast({
-                type: 'success',
-                title: 'Audit Trail Exported',
-                message: `Exported ${logs.length} audit records to CSV successfully.`,
-              });
-            }}
-            disabled={logs.length === 0}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 px-4 py-2 text-xs font-semibold shadow-sm transition-all disabled:opacity-40"
-          >
-            <Download className="h-3.5 w-3.5" />
-            <span>{lang === 'th' ? 'ส่งออก CSV' : 'Export CSV'}</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              aria-label="Toggle Auto-Refresh"
+              aria-pressed={autoRefresh}
+              onClick={() => setAutoRefresh((prev) => !prev)}
+              className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-medium transition-colors ${
+                autoRefresh
+                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
+                  : `${t.secondaryBtn} hover:border-amber-500/40 hover:text-amber-400`
+              }`}
+            >
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  autoRefresh ? 'bg-emerald-400 animate-pulse' : 'bg-stone-500'
+                }`}
+              />
+              <span>{lang === 'th' ? 'อัตโนมัติ 5 วิ' : 'Auto 5s'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void query.refetch()}
+              disabled={query.isFetching}
+              className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-medium hover:border-amber-500/40 hover:text-amber-400 transition-colors disabled:opacity-50 ${t.secondaryBtn}`}
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${query.isFetching ? 'animate-spin text-amber-400' : ''}`} />
+              <span>{lang === 'th' ? 'รีเฟรช' : 'Refresh'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                exportAuditLogsToCsv(logs);
+                showToast({
+                  type: 'success',
+                  title: 'Audit Trail Exported',
+                  message: `Exported ${logs.length} audit records to CSV successfully.`,
+                });
+              }}
+              disabled={logs.length === 0}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 px-4 py-2 text-xs font-semibold shadow-sm transition-all disabled:opacity-40"
+            >
+              <Download className="h-3.5 w-3.5" />
+              <span>{lang === 'th' ? 'ส่งออก CSV' : 'Export CSV'}</span>
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

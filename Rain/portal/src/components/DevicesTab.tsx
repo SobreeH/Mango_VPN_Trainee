@@ -5,6 +5,7 @@ import {
   ChevronDown,
   Clock,
   Copy,
+  Download,
   Eye,
   Laptop,
   Monitor,
@@ -17,6 +18,7 @@ import {
 } from 'lucide-react';
 import type { AuthRefreshContext } from '../api/auth';
 import { fetchDevices, revokeDevice } from '../lib/adminApi';
+import { downloadCsv } from '../lib/csv';
 import { getThemeClasses, type UiLang } from '../lib/theme';
 import { useToast } from './Toast';
 import { ConfirmModal } from './ConfirmModal';
@@ -27,6 +29,20 @@ interface DevicesTabProps {
   auth?: AuthRefreshContext;
   lang?: UiLang;
   isDark?: boolean;
+}
+
+function exportDevicesToCsv(devicesToExport: DeviceDto[]) {
+  const headers = ['Device ID', 'Hostname', 'Username', 'User ID', 'Status', 'Fingerprint', 'Last Seen'];
+  const rows = devicesToExport.map((d) => [
+    d.id,
+    d.hostname,
+    d.username ?? '',
+    d.userId,
+    d.status,
+    d.fingerprint,
+    d.lastSeenAt ? new Date(d.lastSeenAt).toISOString() : '',
+  ]);
+  downloadCsv(`mango-vpn-devices-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
 }
 
 function getDeviceMeta(hostname: string) {
@@ -150,15 +166,34 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark 
           </span>
         </div>
 
-        <button
-          type="button"
-          onClick={() => void listQuery.refetch()}
-          disabled={listQuery.isFetching}
-          className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-medium hover:border-amber-500/40 hover:text-amber-400 transition-colors disabled:opacity-50 ${t.secondaryBtn}`}
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${listQuery.isFetching ? 'animate-spin text-amber-400' : ''}`} />
-          <span>{lang === 'th' ? 'รีเฟรช' : 'Refresh'}</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => void listQuery.refetch()}
+            disabled={listQuery.isFetching}
+            className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-medium hover:border-amber-500/40 hover:text-amber-400 transition-colors disabled:opacity-50 ${t.secondaryBtn}`}
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${listQuery.isFetching ? 'animate-spin text-amber-400' : ''}`} />
+            <span>{lang === 'th' ? 'รีเฟรช' : 'Refresh'}</span>
+          </button>
+          <button
+            type="button"
+            aria-label="Export Devices CSV"
+            onClick={() => {
+              exportDevicesToCsv(filteredDevices);
+              showToast({
+                type: 'success',
+                title: 'Devices Exported',
+                message: `Exported ${filteredDevices.length} device records to CSV.`,
+              });
+            }}
+            disabled={filteredDevices.length === 0}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 px-4 py-2 text-xs font-semibold shadow-sm transition-all disabled:opacity-40"
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span>{lang === 'th' ? 'ส่งออก CSV' : 'Export CSV'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter and Search Bar matching Reference UI */}
