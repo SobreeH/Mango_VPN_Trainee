@@ -1501,17 +1501,10 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                 type="submit"
                 disabled={isSubmitting}
                 aria-label="Sign In"
-                className="w-full h-11 rounded-xl bg-[#059669] hover:bg-[#047857] text-white font-bold px-4 text-sm shadow-md shadow-emerald-500/20 transition-all hover:shadow-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full h-11 rounded-xl bg-[#059669] hover:bg-[#047857] text-white font-bold px-4 text-sm shadow-md shadow-emerald-500/20 transition-all hover:shadow-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (lang === 'th' ? 'กำลังเข้าสู่ระบบ...' : 'Signing in...') : (lang === 'th' ? 'เข้าสู่ระบบ' : 'Sign in')}
               </button>
-
-              {/* Helper text directly under sign in button matching reference */}
-              <p className={`text-[11px] text-center pt-1 ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
-                {lang === 'th'
-                  ? 'บัญชีสร้างโดยผู้ดูแลระบบ หากเข้าไม่ได้ติดต่อฝ่ายไอที'
-                  : "Accounts are created by your admin. Contact IT if you can't sign in."}
-              </p>
             </form>
           )}
 
