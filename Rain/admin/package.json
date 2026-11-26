@@ -16,6 +16,7 @@
   "scripts": {
     "build": "tsc",
     "seed": "tsx src/seed.ts",
+    "seed:test-targets": "tsx src/seed-test-targets.ts",
     "test": "vitest run"
   },
   "dependencies": {
