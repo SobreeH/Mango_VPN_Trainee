@@ -483,7 +483,7 @@ export function AgentStatusCard({
               <button
                 type="submit"
                 disabled={isPairing}
-                className="h-11 rounded-xl bg-[#f59e0b] hover:bg-[#d97706] px-5 text-xs font-bold text-stone-950 shadow-md shadow-amber-500/20 disabled:opacity-50"
+                className="h-11 rounded-xl bg-[#059669] hover:bg-[#047857] px-5 text-xs font-bold text-white shadow-md shadow-emerald-500/20 disabled:opacity-50"
               >
                 {isPairing ? 'Pairing...' : 'Pair Agent'}
               </button>

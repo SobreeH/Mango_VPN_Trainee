@@ -91,7 +91,7 @@ export function AgentVersionsTab({ apiBaseUrl, accessToken, auth, lang = 'th', i
       <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b ${t.border}`}>
         <div>
           <div className="flex items-center gap-2">
-            <Package className="h-5 w-5 text-amber-400" />
+            <Package className="h-5 w-5 text-emerald-400" />
             <h2 className={`text-lg font-bold tracking-tight ${t.heading}`}>
               {lang === 'th' ? 'จัดการเวอร์ชัน Agent (Agent Versions Registry)' : 'Agent Versions Registry'}
             </h2>
@@ -115,7 +115,7 @@ export function AgentVersionsTab({ apiBaseUrl, accessToken, auth, lang = 'th', i
         className={`rounded-3xl border p-6 space-y-5 ${t.card}`}
       >
         <div className={`flex items-center gap-2 text-sm font-bold ${t.heading}`}>
-          <UploadCloud className="h-4 w-4 text-amber-400" />
+          <UploadCloud className="h-4 w-4 text-emerald-400" />
           <span>{lang === 'th' ? 'เผยแพร่เวอร์ชันใหม่ (Publish Version)' : 'Publish Agent Version'}</span>
         </div>
 
@@ -204,7 +204,7 @@ export function AgentVersionsTab({ apiBaseUrl, accessToken, auth, lang = 'th', i
             type="submit"
             aria-label="Publish Version"
             disabled={createMutation.isPending}
-            className="h-10 rounded-xl bg-[#f59e0b] hover:bg-[#d97706] px-5 text-xs font-bold text-stone-950 shadow-md shadow-amber-500/20 disabled:opacity-50 transition-colors"
+            className="h-10 rounded-xl bg-[#059669] hover:bg-[#047857] px-5 text-xs font-bold text-white shadow-md shadow-emerald-500/20 disabled:opacity-50 transition-colors"
           >
             {createMutation.isPending
               ? (lang === 'th' ? 'กำลังเผยแพร่...' : 'Publishing...')
@@ -288,7 +288,7 @@ export function AgentVersionsTab({ apiBaseUrl, accessToken, auth, lang = 'th', i
               setSearchTerm('');
               setPlatformFilter('ALL');
             }}
-            className="text-amber-400 hover:underline font-semibold"
+            className="text-emerald-400 hover:underline font-semibold"
           >
             {lang === 'th' ? 'ล้างการค้นหา' : 'Clear filters'}
           </button>
@@ -318,7 +318,7 @@ export function AgentVersionsTab({ apiBaseUrl, accessToken, auth, lang = 'th', i
                             target="_blank"
                             rel="noopener noreferrer"
                             title="Download Link"
-                            className={`${t.muted} hover:text-amber-400`}
+                            className={`${t.muted} hover:text-emerald-400`}
                           >
                             <Download className="h-3.5 w-3.5" />
                           </a>
@@ -348,7 +348,7 @@ export function AgentVersionsTab({ apiBaseUrl, accessToken, auth, lang = 'th', i
                           <span>{item.isActive ? 'Active' : 'Inactive'}</span>
                         </span>
                         {item.isRequired && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2.5 py-0.5 text-[11px] font-bold">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 text-[11px] font-bold">
                             <Shield className="h-3 w-3" />
                             <span>Required</span>
                           </span>
@@ -388,7 +388,7 @@ export function AgentVersionsTab({ apiBaseUrl, accessToken, auth, lang = 'th', i
                           className={`rounded-xl px-3 py-1.5 text-xs font-semibold border transition-colors ${
                             item.isRequired
                               ? t.secondaryBtn
-                              : 'border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20'
+                              : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-amber-500/20'
                           }`}
                         >
                           {item.isRequired

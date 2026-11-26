@@ -67,16 +67,16 @@ export function NetworkTopology({
     const isSelected = selectedNode === id;
     if (isSelected) {
       return isDark
-        ? 'border-amber-400/60 bg-amber-500/10 shadow-lg shadow-amber-500/10'
+        ? 'border-amber-400/60 bg-emerald-500/10 shadow-lg shadow-amber-500/10'
         : 'border-amber-500 bg-amber-50 shadow-md shadow-amber-500/10';
     }
     if (isConnected) {
       return isDark
-        ? 'border-emerald-500/25 bg-[#141311]/85 hover:border-emerald-400/50'
+        ? 'border-emerald-500/25 bg-slate-950/85 hover:border-emerald-400/50'
         : 'border-emerald-300 bg-emerald-50/60 hover:border-emerald-500';
     }
     return isDark
-      ? 'border-white/5 bg-[#141311]/70 hover:border-white/20'
+      ? 'border-white/5 bg-slate-950/60 hover:border-white/20'
       : 'border-stone-200 bg-stone-50 hover:border-stone-300';
   };
 
@@ -84,7 +84,7 @@ export function NetworkTopology({
     <div className={`pt-6 border-t space-y-4 ${t.border}`}>
       <div className={`flex items-center justify-between text-[11px] ${t.muted}`}>
         <span className="font-medium flex items-center gap-1.5">
-          <Lock className="h-3 w-3 text-amber-400" />
+          <Lock className="h-3 w-3 text-emerald-400" />
           {lang === 'th'
             ? 'แผนผังเส้นทางเครือข่าย (คลิกที่แต่ละจุดเพื่อดูรายละเอียด)'
             : 'Interactive Network Topology (click any node to inspect)'}
