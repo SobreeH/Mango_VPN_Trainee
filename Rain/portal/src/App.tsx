@@ -1114,7 +1114,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                                   {ver.platform}
                                 </span>
                                 {ver.isRequired && (
-                                  <span className="rounded-full bg-amber-500/15 border border-emerald-500/30 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-400">
+                                  <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 text-[10px] font-semibold text-amber-400">
                                     {lang === 'th' ? 'บังคับอัปเดต' : 'Required'}
                                   </span>
                                 )}
@@ -1246,12 +1246,12 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
         {/* Left Column: Mango Hero Banner */}
         <div className={`md:col-span-5 p-8 sm:p-10 flex flex-col justify-between border-b md:border-b-0 md:border-r relative overflow-hidden transition-colors duration-300 ${
           isDark
-            ? 'bg-gradient-to-br from-amber-500/10 via-[#1a1815] to-[#141311] border-white/5'
-            : 'bg-gradient-to-br from-yellow-400/15 via-[#faf8f2] to-white border-stone-200/80'
+            ? 'bg-gradient-to-br from-emerald-500/10 via-slate-900 to-slate-950 border-slate-800/80'
+            : 'bg-gradient-to-br from-emerald-500/10 via-slate-50 to-white border-slate-200/80'
         }`}>
           {/* Subtle inner accent glow */}
           <div className={`absolute -top-12 -left-12 w-44 h-44 rounded-full blur-2xl pointer-events-none ${
-            isDark ? 'bg-amber-500/15' : 'bg-emerald-400/15'
+            isDark ? 'bg-emerald-500/15' : 'bg-emerald-400/15'
           }`} />
 
           {/* Top Brand Header */}
@@ -1501,17 +1501,10 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                 type="submit"
                 disabled={isSubmitting}
                 aria-label="Sign In"
-                className="w-full h-11 rounded-xl bg-[#059669] hover:bg-[#047857] text-white font-bold px-4 text-sm shadow-md shadow-emerald-500/20 transition-all hover:shadow-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full h-11 rounded-xl bg-[#059669] hover:bg-[#047857] text-white font-bold px-4 text-sm shadow-md shadow-emerald-500/20 transition-all hover:shadow-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (lang === 'th' ? 'กำลังเข้าสู่ระบบ...' : 'Signing in...') : (lang === 'th' ? 'เข้าสู่ระบบ' : 'Sign in')}
               </button>
-
-              {/* Helper text directly under sign in button matching reference */}
-              <p className={`text-[11px] text-center pt-1 ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
-                {lang === 'th'
-                  ? 'บัญชีสร้างโดยผู้ดูแลระบบ หากเข้าไม่ได้ติดต่อฝ่ายไอที'
-                  : "Accounts are created by your admin. Contact IT if you can't sign in."}
-              </p>
             </form>
           )}
 
