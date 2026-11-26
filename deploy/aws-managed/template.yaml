@@ -1,0 +1,485 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Mango VPN managed AWS deployment with private ECS services, PostgreSQL, ALB, and a WireGuard gateway.
+Metadata:
+  AWSToolsMetrics:
+    AWSAgentToolkit: aws-cloudformation@3
+
+Parameters:
+  AllowedWebCidr:
+    Type: String
+    Default: 203.0.113.0/24
+    AllowedPattern: ^([0-9]{1,3}\.){3}[0-9]{1,3}/([0-9]|[1-2][0-9]|3[0-2])$
+    Description: IPv4 CIDR allowed to reach the public ALB. Use your office or VPN CIDR.
+  AllowedWireGuardCidr:
+    Type: String
+    Default: 203.0.113.0/24
+    AllowedPattern: ^([0-9]{1,3}\.){3}[0-9]{1,3}/([0-9]|[1-2][0-9]|3[0-2])$
+    Description: IPv4 CIDR allowed to reach the WireGuard UDP listener.
+  CertificateArn:
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^arn:[^:]+:acm:[^:]+:[0-9]{12}:certificate/.+$
+    Description: ACM certificate ARN for HTTPS. Leave empty for HTTP-only development.
+  CustomDomainName:
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$
+    Description: Optional custom domain matching CertificateArn (e.g. vpn.example.com). Leave empty to use ALB DNS.
+  EnableNatGateway:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Create one NAT gateway for private ECS egress. Disable to reduce cost only if egress is otherwise provided.
+  ApiDesiredCount:
+    Type: Number
+    Default: 0
+    MinValue: 0
+    Description: Initial API task count. Keep zero until an image is pushed to ECR.
+  PortalDesiredCount:
+    Type: Number
+    Default: 0
+    MinValue: 0
+    Description: Initial portal task count. Keep zero until an image is pushed to ECR.
+  ApiImageTag:
+    Type: String
+    Default: latest
+    AllowedPattern: ^[A-Za-z0-9._-]+$
+    Description: API image tag in the stack ECR repository.
+  PortalImageTag:
+    Type: String
+    Default: latest
+    AllowedPattern: ^[A-Za-z0-9._-]+$
+    Description: Portal image tag in the stack ECR repository.
+  DaemonImageTag:
+    Type: String
+    Default: latest
+    AllowedPattern: ^[A-Za-z0-9._-]+$
+    Description: VPN daemon image tag in the stack daemon ECR repository.
+  DBInstanceClass:
+    Type: String
+    Default: db.t4g.micro
+    AllowedValues: [db.t4g.micro, db.t4g.small, db.t3.micro, db.t3.small]
+    Description: RDS PostgreSQL instance class.
+  GatewayInstanceType:
+    Type: String
+    Default: t4g.micro
+    AllowedValues: [t4g.micro, t4g.small, t3.micro, t3.small]
+    Description: WireGuard gateway EC2 instance type.
+  UbuntuAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id
+    Description: SSM parameter containing an Ubuntu 24.04 arm64 AMI ID.
+  WgListenPort:
+    Type: Number
+    Default: 51820
+    MinValue: 1
+    MaxValue: 65535
+    Description: UDP port used by WireGuard.
+
+Conditions:
+  HasCertificateArn: !Not [!Equals [!Ref CertificateArn, ""]]
+  NoCertificateArn: !Equals [!Ref CertificateArn, ""]
+  HasCustomDomain: !Not [!Equals [!Ref CustomDomainName, ""]]
+  CreateNatGateway: !Equals [!Ref EnableNatGateway, "true"]
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Metadata: {com.aws.cloudformation.Context: {why: Isolates the managed workload, must: Use DNS and the 10.50.0.0/16 address space.}}
+    Properties: {CidrBlock: 10.50.0.0/16, EnableDnsSupport: true, EnableDnsHostnames: true, Tags: [{Key: Name, Value: !Sub "${AWS::StackName}-vpc"}]}
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Metadata: {com.aws.cloudformation.Context: {why: Provides public subnet egress, must: Attach only to this VPC.}}
+    Properties: {Tags: [{Key: Name, Value: !Sub "${AWS::StackName}-igw"}]}
+  VpcGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Metadata: {com.aws.cloudformation.Context: {why: Connects the VPC to the internet gateway, must: Use the stack VPC.}}
+    Properties: {InternetGatewayId: !Ref InternetGateway, VpcId: !Ref Vpc}
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Metadata: {com.aws.cloudformation.Context: {why: Hosts the ALB and gateway, must: Use AZ zero and 10.50.1.0/24.}}
+    Properties: {VpcId: !Ref Vpc, CidrBlock: 10.50.1.0/24, AvailabilityZone: !Select [0, !GetAZs ""], MapPublicIpOnLaunch: true, Tags: [{Key: Name, Value: !Sub "${AWS::StackName}-public-a"}]}
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Metadata: {com.aws.cloudformation.Context: {why: Provides a second ALB AZ, must: Use AZ one and 10.50.2.0/24.}}
+    Properties: {VpcId: !Ref Vpc, CidrBlock: 10.50.2.0/24, AvailabilityZone: !Select [1, !GetAZs ""], MapPublicIpOnLaunch: true, Tags: [{Key: Name, Value: !Sub "${AWS::StackName}-public-b"}]}
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Metadata: {com.aws.cloudformation.Context: {why: Keeps ECS and RDS private, must: Use AZ zero and 10.50.10.0/24.}}
+    Properties: {VpcId: !Ref Vpc, CidrBlock: 10.50.10.0/24, AvailabilityZone: !Select [0, !GetAZs ""], Tags: [{Key: Name, Value: !Sub "${AWS::StackName}-private-a"}]}
+  PrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Metadata: {com.aws.cloudformation.Context: {why: Keeps ECS and RDS private, must: Use AZ one and 10.50.20.0/24.}}
+    Properties: {VpcId: !Ref Vpc, CidrBlock: 10.50.20.0/24, AvailabilityZone: !Select [1, !GetAZs ""], Tags: [{Key: Name, Value: !Sub "${AWS::StackName}-private-b"}]}
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Metadata: {com.aws.cloudformation.Context: {why: Routes public resources, must: Belong to the stack VPC.}}
+    Properties: {VpcId: !Ref Vpc, Tags: [{Key: Name, Value: !Sub "${AWS::StackName}-public-rt"}]}
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VpcGatewayAttachment
+    Metadata: {com.aws.cloudformation.Context: {why: Provides public internet routing, must: Target only the stack internet gateway.}}
+    Properties: {RouteTableId: !Ref PublicRouteTable, DestinationCidrBlock: 0.0.0.0/0, GatewayId: !Ref InternetGateway}
+  PublicSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Metadata: {com.aws.cloudformation.Context: {why: Routes public subnet A, must: Use the public route table.}}
+    Properties: {SubnetId: !Ref PublicSubnetA, RouteTableId: !Ref PublicRouteTable}
+  PublicSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Metadata: {com.aws.cloudformation.Context: {why: Routes public subnet B, must: Use the public route table.}}
+    Properties: {SubnetId: !Ref PublicSubnetB, RouteTableId: !Ref PublicRouteTable}
+  NatEip:
+    Type: AWS::EC2::EIP
+    Condition: CreateNatGateway
+    Metadata: {com.aws.cloudformation.Context: {why: Gives the optional NAT a stable public address, must: Exist only with the NAT gateway.}}
+    Properties: {Domain: vpc, Tags: [{Key: Name, Value: !Sub "${AWS::StackName}-nat-eip"}]}
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Condition: CreateNatGateway
+    Metadata: {com.aws.cloudformation.Context: {why: Provides private subnet egress, must: Be placed in public subnet A.}}
+    Properties: {AllocationId: !GetAtt NatEip.AllocationId, SubnetId: !Ref PublicSubnetA, Tags: [{Key: Name, Value: !Sub "${AWS::StackName}-nat"}]}
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Metadata: {com.aws.cloudformation.Context: {why: Routes private workloads, must: Belong to the stack VPC.}}
+    Properties: {VpcId: !Ref Vpc, Tags: [{Key: Name, Value: !Sub "${AWS::StackName}-private-rt"}]}
+  PrivateNatRoute:
+    Type: AWS::EC2::Route
+    Condition: CreateNatGateway
+    Metadata: {com.aws.cloudformation.Context: {why: Provides optional private egress, must: Target only the stack NAT gateway.}}
+    Properties: {RouteTableId: !Ref PrivateRouteTable, DestinationCidrBlock: 0.0.0.0/0, NatGatewayId: !Ref NatGateway}
+  PrivateSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Metadata: {com.aws.cloudformation.Context: {why: Routes private subnet A, must: Use the private route table.}}
+    Properties: {SubnetId: !Ref PrivateSubnetA, RouteTableId: !Ref PrivateRouteTable}
+  PrivateSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Metadata: {com.aws.cloudformation.Context: {why: Routes private subnet B, must: Use the private route table.}}
+    Properties: {SubnetId: !Ref PrivateSubnetB, RouteTableId: !Ref PrivateRouteTable}
+
+  DbMasterSecret:
+    Type: AWS::SecretsManager::Secret
+    Metadata: {com.aws.cloudformation.Context: {why: Generates the RDS master credential, must: Never expose the password in parameters or metadata.}}
+    Properties:
+      GenerateSecretString: {SecretStringTemplate: '{"username":"mango"}', GenerateStringKey: password, PasswordLength: 28, ExcludeCharacters: '"@/\\'}
+  JwtSecret:
+    Type: AWS::SecretsManager::Secret
+    Metadata: {com.aws.cloudformation.Context: {why: Stores the API signing secret, must: Be generated by Secrets Manager.}}
+    Properties: {GenerateSecretString: {PasswordLength: 48, ExcludeCharacters: '"\\'}}
+  RefreshSecret:
+    Type: AWS::SecretsManager::Secret
+    Metadata: {com.aws.cloudformation.Context: {why: Stores refresh token signing material, must: Be generated by Secrets Manager.}}
+    Properties: {GenerateSecretString: {PasswordLength: 48, ExcludeCharacters: '"\\'}}
+  DaemonSharedSecret:
+    Type: AWS::SecretsManager::Secret
+    Metadata: {com.aws.cloudformation.Context: {why: Authenticates API to the daemon, must: Be generated and shared only at runtime.}}
+    Properties: {GenerateSecretString: {PasswordLength: 48, ExcludeCharacters: '"\\'}}
+  TotpEncryptionSecret:
+    Type: AWS::SecretsManager::Secret
+    Metadata: {com.aws.cloudformation.Context: {why: Stores the required 64-character TOTP key, must: Be replaced with openssl rand -hex 32 before API startup.}}
+    Properties: {SecretString: replace-with-64-hex-characters}
+  WireGuardKeySecret:
+    Type: AWS::SecretsManager::Secret
+    Metadata: {com.aws.cloudformation.Context: {why: Shares gateway WireGuard keys at runtime, must: Be replaced with generated JSON before gateway startup.}}
+    Properties: {SecretString: '{"privateKey":"replace-after-deploy","publicKey":"replace-after-deploy"}'}
+
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Metadata: {com.aws.cloudformation.Context: {why: Constrains RDS to private subnets, must: Include both AZs.}}
+    Properties: {DBSubnetGroupDescription: Mango VPN private database subnets, SubnetIds: [!Ref PrivateSubnetA, !Ref PrivateSubnetB]}
+  DbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Metadata: {com.aws.cloudformation.Context: {why: Protects PostgreSQL, must: Allow 5432 only from the API security group.}}
+    Properties:
+      GroupDescription: PostgreSQL access from Mango API tasks
+      VpcId: !Ref Vpc
+      SecurityGroupIngress: [{IpProtocol: tcp, FromPort: 5432, ToPort: 5432, SourceSecurityGroupId: !Ref EcsApiSecurityGroup}]
+  RdsInstance:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Retain
+    Metadata: {com.aws.cloudformation.Context: {why: Stores Mango VPN state, must: "Remain private, encrypted, and backed up."}}
+    Properties:
+      Engine: postgres
+      EngineVersion: "16.15"
+      DBName: mangovpn
+      MasterUsername: mango
+      MasterUserPassword: !Sub '{{resolve:secretsmanager:${DbMasterSecret}:SecretString:password}}'
+      DBInstanceClass: !Ref DBInstanceClass
+      AllocatedStorage: 20
+      StorageType: gp3
+      StorageEncrypted: true
+      BackupRetentionPeriod: 7
+      PubliclyAccessible: false
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      VPCSecurityGroups: [!GetAtt DbSecurityGroup.GroupId]
+
+  ApiEcrRepo:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Metadata: {com.aws.cloudformation.Context: {why: Stores immutable API images, must: Scan pushes and retain images on stack deletion.}}
+    Properties: {ImageScanningConfiguration: {ScanOnPush: true}, LifecyclePolicy: {LifecyclePolicyText: '{"rules":[{"rulePriority":1,"description":"Keep last five images","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":5},"action":{"type":"expire"}}]}'}}
+  PortalEcrRepo:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Metadata: {com.aws.cloudformation.Context: {why: Stores immutable portal images, must: Scan pushes and retain images on stack deletion.}}
+    Properties: {ImageScanningConfiguration: {ScanOnPush: true}, LifecyclePolicy: {LifecyclePolicyText: '{"rules":[{"rulePriority":1,"description":"Keep last five images","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":5},"action":{"type":"expire"}}]}'}}
+  DaemonEcrRepo:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Metadata: {com.aws.cloudformation.Context: {why: Stores immutable vpn-daemon images, must: Scan pushes and retain images on stack deletion.}}
+    Properties: {ImageScanningConfiguration: {ScanOnPush: true}, LifecyclePolicy: {LifecyclePolicyText: '{"rules":[{"rulePriority":1,"description":"Keep last five images","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":5},"action":{"type":"expire"}}]}'}}
+
+  EcsCluster:
+    Type: AWS::ECS::Cluster
+    Metadata: {com.aws.cloudformation.Context: {why: Runs the Fargate services, must: Use the stack cluster.}}
+    Properties: {ClusterSettings: [{Name: containerInsights, Value: enabled}], Tags: [{Key: Name, Value: !Sub "${AWS::StackName}-ecs"}]}
+  ApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Metadata: {com.aws.cloudformation.Context: {why: Centralizes API logs, must: Retain logs for at least 14 days.}}
+    Properties: {RetentionInDays: 14, LogGroupName: !Sub "/mango/${AWS::StackName}/api"}
+  PortalLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Metadata: {com.aws.cloudformation.Context: {why: Centralizes portal logs, must: Retain logs for at least 14 days.}}
+    Properties: {RetentionInDays: 14, LogGroupName: !Sub "/mango/${AWS::StackName}/portal"}
+  EcsTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Metadata: {com.aws.cloudformation.Context: {why: Lets ECS pull images and inject secrets, must: Limit secret reads to this stack.}}
+    Properties:
+      AssumeRolePolicyDocument: {Version: "2012-10-17", Statement: [{Effect: Allow, Principal: {Service: ecs-tasks.amazonaws.com}, Action: sts:AssumeRole}]}
+      ManagedPolicyArns: [arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy]
+      Policies:
+        - PolicyName: ReadMangoSecrets
+          PolicyDocument: {Version: "2012-10-17", Statement: [{Effect: Allow, Action: [secretsmanager:GetSecretValue], Resource: [!Ref DbMasterSecret, !Ref JwtSecret, !Ref RefreshSecret, !Ref DaemonSharedSecret, !Ref TotpEncryptionSecret, !Ref WireGuardKeySecret]}]}
+  EcsTaskRole:
+    Type: AWS::IAM::Role
+    Metadata: {com.aws.cloudformation.Context: {why: Provides ECS task runtime and ECS Exec SSM channel access, must: Grant only ssmmessages permissions for ECS Exec.}}
+    Properties:
+      AssumeRolePolicyDocument: {Version: "2012-10-17", Statement: [{Effect: Allow, Principal: {Service: ecs-tasks.amazonaws.com}, Action: sts:AssumeRole}]}
+      Policies:
+        - PolicyName: EcsExecSsmMessages
+          PolicyDocument: {Version: "2012-10-17", Statement: [{Effect: Allow, Action: [ssmmessages:CreateControlChannel, ssmmessages:CreateDataChannel, ssmmessages:OpenControlChannel, ssmmessages:OpenDataChannel], Resource: "*"}]}
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Metadata: {com.aws.cloudformation.Context: {why: Protects the public ALB, must: Allow web ports only from AllowedWebCidr.}}
+    Properties: {GroupDescription: Mango ALB ingress, VpcId: !Ref Vpc, SecurityGroupIngress: [{IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: !Ref AllowedWebCidr}, {IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: !Ref AllowedWebCidr}]}
+  EcsApiSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Metadata: {com.aws.cloudformation.Context: {why: Protects API tasks, must: Allow port 4000 only from the ALB.}}
+    Properties: {GroupDescription: Mango API task ingress, VpcId: !Ref Vpc, SecurityGroupIngress: [{IpProtocol: tcp, FromPort: 4000, ToPort: 4000, SourceSecurityGroupId: !Ref AlbSecurityGroup}]}
+  EcsPortalSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Metadata: {com.aws.cloudformation.Context: {why: Protects portal tasks, must: Allow port 3000 only from the ALB.}}
+    Properties: {GroupDescription: Mango portal task ingress, VpcId: !Ref Vpc, SecurityGroupIngress: [{IpProtocol: tcp, FromPort: 3000, ToPort: 3000, SourceSecurityGroupId: !Ref AlbSecurityGroup}]}
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Metadata: {com.aws.cloudformation.Context: {why: Publishes the portal and API, must: Be internet-facing across two public subnets.}}
+    Properties: {Scheme: internet-facing, Type: application, Subnets: [!Ref PublicSubnetA, !Ref PublicSubnetB], SecurityGroups: [!Ref AlbSecurityGroup], Tags: [{Key: Name, Value: !Sub "${AWS::StackName}-alb"}]}
+  ApiTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Metadata: {com.aws.cloudformation.Context: {why: Routes API traffic, must: Use IP targets and the API health endpoint.}}
+    Properties: {VpcId: !Ref Vpc, TargetType: ip, Port: 4000, Protocol: HTTP, HealthCheckPath: /health, HealthCheckPort: traffic-port, Matcher: {HttpCode: "200"}}
+  PortalTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Metadata: {com.aws.cloudformation.Context: {why: Routes portal traffic, must: Use IP targets and the root health check.}}
+    Properties: {VpcId: !Ref Vpc, TargetType: ip, Port: 3000, Protocol: HTTP, HealthCheckPath: /, HealthCheckPort: traffic-port, Matcher: {HttpCode: "200"}}
+  AlbHttpsListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Condition: HasCertificateArn
+    Metadata: {com.aws.cloudformation.Context: {why: Terminates TLS, must: Require the supplied ACM certificate and TLS 1.3 capable policy.}}
+    Properties: {LoadBalancerArn: !Ref ApplicationLoadBalancer, Port: 443, Protocol: HTTPS, SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06, Certificates: [{CertificateArn: !Ref CertificateArn}], DefaultActions: [{Type: forward, TargetGroupArn: !Ref PortalTargetGroup}]}
+  AlbHttpsApiRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Condition: HasCertificateArn
+    Metadata: {com.aws.cloudformation.Context: {why: Routes API paths to the API service, must: Keep priority unique.}}
+    Properties: {ListenerArn: !Ref AlbHttpsListener, Priority: 10, Conditions: [{Field: path-pattern, PathPatternConfig: {Values: [/api/*, /health]}}], Actions: [{Type: forward, TargetGroupArn: !Ref ApiTargetGroup}]}
+  AlbHttpRedirectListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Condition: HasCertificateArn
+    Metadata: {com.aws.cloudformation.Context: {why: Redirects cleartext traffic, must: Redirect permanently to HTTPS.}}
+    Properties: {LoadBalancerArn: !Ref ApplicationLoadBalancer, Port: 80, Protocol: HTTP, DefaultActions: [{Type: redirect, RedirectConfig: {Protocol: HTTPS, Port: "443", StatusCode: HTTP_301}}]}
+  AlbHttpDevListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Condition: NoCertificateArn
+    Metadata: {com.aws.cloudformation.Context: {why: Supports certificate-free development, must: Be replaced by HTTPS in production.}}
+    Properties: {LoadBalancerArn: !Ref ApplicationLoadBalancer, Port: 80, Protocol: HTTP, DefaultActions: [{Type: forward, TargetGroupArn: !Ref PortalTargetGroup}]}
+  AlbHttpDevApiRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Condition: NoCertificateArn
+    Metadata: {com.aws.cloudformation.Context: {why: Routes development API paths, must: Keep priority unique.}}
+    Properties: {ListenerArn: !Ref AlbHttpDevListener, Priority: 10, Conditions: [{Field: path-pattern, PathPatternConfig: {Values: [/api/*, /health]}}], Actions: [{Type: forward, TargetGroupArn: !Ref ApiTargetGroup}]}
+
+  ApiTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Metadata: {com.aws.cloudformation.Context: {why: Defines the API runtime, must: Inject all secrets at task start and build DATABASE_URL in the container.}}
+    Properties:
+      Family: !Sub "${AWS::StackName}-api"
+      Cpu: 512
+      Memory: 1024
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      ExecutionRoleArn: !GetAtt EcsTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt EcsTaskRole.Arn
+      ContainerDefinitions:
+        - Name: api
+          Image: !Sub "${ApiEcrRepo.RepositoryUri}:${ApiImageTag}"
+          Essential: true
+          PortMappings: [{ContainerPort: 4000, Protocol: tcp}]
+          Environment: [{Name: NODE_ENV, Value: production}, {Name: PORT, Value: "4000"}, {Name: DB_HOST, Value: !GetAtt RdsInstance.Endpoint.Address}, {Name: VPN_DAEMON_URL, Value: !Sub "http://${WireGuardGatewayInstance.PrivateIp}:50051"}, {Name: WG_SERVER_ENDPOINT, Value: !Sub "${WireGuardGatewayEip}:51820"}, {Name: WG_DNS, Value: 1.1.1.1}, {Name: CORS_ORIGIN, Value: !If [HasCustomDomain, !Sub "https://${CustomDomainName}", !If [HasCertificateArn, !Sub "https://${ApplicationLoadBalancer.DNSName}", !Sub "http://${ApplicationLoadBalancer.DNSName}"]]}]
+          Secrets: [{Name: DB_PASSWORD, ValueFrom: !Sub "${DbMasterSecret}:password::"}, {Name: JWT_SECRET, ValueFrom: !Ref JwtSecret}, {Name: REFRESH_SECRET, ValueFrom: !Ref RefreshSecret}, {Name: DAEMON_SHARED_SECRET, ValueFrom: !Ref DaemonSharedSecret}, {Name: TOTP_ENCRYPTION_KEY, ValueFrom: !Ref TotpEncryptionSecret}, {Name: WG_SERVER_PUBLIC_KEY, ValueFrom: !Sub "${WireGuardKeySecret}:publicKey::"}]
+          Command: [sh, -c, "export DATABASE_URL=postgresql://mango:${DB_PASSWORD}@${DB_HOST}:5432/mangovpn?schema=public; npx prisma migrate deploy --schema=Sobree/api/prisma/schema.prisma && exec node Sobree/api/dist/server.js"]
+          LogConfiguration: {LogDriver: awslogs, Options: {awslogs-group: !Ref ApiLogGroup, awslogs-region: !Ref AWS::Region, awslogs-stream-prefix: api}}
+  PortalTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Metadata: {com.aws.cloudformation.Context: {why: Defines the nginx portal runtime, must: Point runtime API calls at the public portal URL.}}
+    Properties:
+      Family: !Sub "${AWS::StackName}-portal"
+      Cpu: 256
+      Memory: 512
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      ExecutionRoleArn: !GetAtt EcsTaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt EcsTaskRole.Arn
+      ContainerDefinitions:
+        - Name: portal
+          Image: !Sub "${PortalEcrRepo.RepositoryUri}:${PortalImageTag}"
+          Essential: true
+          PortMappings: [{ContainerPort: 3000, Protocol: tcp}]
+          Environment: [{Name: VITE_API_URL, Value: !If [HasCustomDomain, !Sub "https://${CustomDomainName}", !If [HasCertificateArn, !Sub "https://${ApplicationLoadBalancer.DNSName}", !Sub "http://${ApplicationLoadBalancer.DNSName}"]]}, {Name: VITE_AGENT_URL, Value: "http://127.0.0.1:47821"}]
+          LogConfiguration: {LogDriver: awslogs, Options: {awslogs-group: !Ref PortalLogGroup, awslogs-region: !Ref AWS::Region, awslogs-stream-prefix: portal}}
+  ApiService:
+    Type: AWS::ECS::Service
+    Metadata: {com.aws.cloudformation.Context: {why: Maintains API tasks behind the ALB, must: Start at the requested count after images exist and support ECS Exec for seeding.}}
+    Properties: {Cluster: !Ref EcsCluster, DesiredCount: !Ref ApiDesiredCount, EnableExecuteCommand: true, LaunchType: FARGATE, TaskDefinition: !Ref ApiTaskDefinition, HealthCheckGracePeriodSeconds: 90, LoadBalancers: [{ContainerName: api, ContainerPort: 4000, TargetGroupArn: !Ref ApiTargetGroup}], NetworkConfiguration: {AwsvpcConfiguration: {AssignPublicIp: DISABLED, SecurityGroups: [!Ref EcsApiSecurityGroup], Subnets: [!Ref PrivateSubnetA, !Ref PrivateSubnetB]}}}
+  PortalService:
+    Type: AWS::ECS::Service
+    Metadata: {com.aws.cloudformation.Context: {why: Maintains portal tasks behind the ALB, must: Start at the requested count after images exist.}}
+    Properties: {Cluster: !Ref EcsCluster, DesiredCount: !Ref PortalDesiredCount, LaunchType: FARGATE, TaskDefinition: !Ref PortalTaskDefinition, HealthCheckGracePeriodSeconds: 30, LoadBalancers: [{ContainerName: portal, ContainerPort: 3000, TargetGroupArn: !Ref PortalTargetGroup}], NetworkConfiguration: {AwsvpcConfiguration: {AssignPublicIp: DISABLED, SecurityGroups: [!Ref EcsPortalSecurityGroup], Subnets: [!Ref PrivateSubnetA, !Ref PrivateSubnetB]}}}
+
+  WireGuardGatewaySecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Metadata: {com.aws.cloudformation.Context: {why: Protects the gateway, must: Allow WireGuard only from the approved CIDR and daemon API only from ECS API tasks.}}
+    Properties: {GroupDescription: Mango WireGuard gateway ingress, VpcId: !Ref Vpc, SecurityGroupIngress: [{IpProtocol: udp, FromPort: !Ref WgListenPort, ToPort: !Ref WgListenPort, CidrIp: !Ref AllowedWireGuardCidr}, {IpProtocol: tcp, FromPort: 50051, ToPort: 50051, SourceSecurityGroupId: !Ref EcsApiSecurityGroup}]}
+  WireGuardGatewayRole:
+    Type: AWS::IAM::Role
+    Metadata: {com.aws.cloudformation.Context: {why: Gives the gateway SSM and secret access, must: Avoid SSH and limit secret scope.}}
+    Properties:
+      AssumeRolePolicyDocument: {Version: "2012-10-17", Statement: [{Effect: Allow, Principal: {Service: ec2.amazonaws.com}, Action: sts:AssumeRole}]}
+      ManagedPolicyArns: [arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore]
+      Policies:
+        - PolicyName: GatewaySecretsAndImagePull
+          PolicyDocument: {Version: "2012-10-17", Statement: [{Effect: Allow, Action: [secretsmanager:GetSecretValue, secretsmanager:PutSecretValue], Resource: [!Ref DaemonSharedSecret, !Ref WireGuardKeySecret]}, {Effect: Allow, Action: [ecr:GetAuthorizationToken], Resource: "*"}, {Effect: Allow, Action: [ecr:BatchCheckLayerAvailability, ecr:GetDownloadUrlForLayer, ecr:BatchGetImage], Resource: !GetAtt DaemonEcrRepo.Arn}]}
+  WireGuardGatewayProfile:
+    Type: AWS::IAM::InstanceProfile
+    Metadata: {com.aws.cloudformation.Context: {why: Attaches the gateway role to EC2, must: Contain only the stack gateway role.}}
+    Properties: {Roles: [!Ref WireGuardGatewayRole]}
+  WireGuardGatewayLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Metadata: {com.aws.cloudformation.Context: {why: Installs and starts the daemon host, must: "Require IMDSv2, encrypted gp3, forwarding, and no SSH dependency."}}
+    Properties:
+      LaunchTemplateData:
+        ImageId: !Ref UbuntuAmiId
+        InstanceType: !Ref GatewayInstanceType
+        IamInstanceProfile: {Name: !Ref WireGuardGatewayProfile}
+        SecurityGroupIds: [!Ref WireGuardGatewaySecurityGroup]
+        MetadataOptions: {HttpTokens: required, HttpPutResponseHopLimit: 2}
+        BlockDeviceMappings: [{DeviceName: /dev/sda1, Ebs: {VolumeType: gp3, VolumeSize: 20, Encrypted: true, DeleteOnTermination: true}}]
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            set -euxo pipefail
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            apt-get install -y docker.io wireguard-tools nftables iproute2 awscli jq
+            systemctl enable --now docker
+            modprobe tun || true
+            sysctl -w net.ipv4.ip_forward=1
+            echo net.ipv4.ip_forward=1 >/etc/sysctl.d/99-mango-forwarding.conf
+            cat >/usr/local/bin/mango-gateway-start.sh <<'SCRIPT'
+            #!/bin/bash
+            set -euo pipefail
+            WG_JSON=$(aws secretsmanager get-secret-value --secret-id ${WireGuardKeySecret} --query SecretString --output text --region ${AWS::Region})
+            DAEMON_SECRET=$(aws secretsmanager get-secret-value --secret-id ${DaemonSharedSecret} --query SecretString --output text --region ${AWS::Region})
+            WG_PRIVATE_KEY=$(echo "$WG_JSON" | jq -r .privateKey)
+            if [ -z "$WG_PRIVATE_KEY" ] || [ "$WG_PRIVATE_KEY" = "replace-after-deploy" ]; then
+              echo "WireGuardKeySecret is not initialized yet. Skipping daemon start." >&2
+              exit 0
+            fi
+            mkdir -p /etc/mango
+            chmod 700 /etc/mango
+            cat >/etc/mango/daemon.env <<EOF
+            DAEMON_LISTEN_ADDR=0.0.0.0:50051
+            DAEMON_SHARED_SECRET=$DAEMON_SECRET
+            WG_INTERFACE=wg0
+            WG_LISTEN_PORT=${WgListenPort}
+            WG_GATEWAY_CIDR=10.13.13.1/24
+            WG_PRIVATE_KEY=$WG_PRIVATE_KEY
+            EOF
+            chmod 600 /etc/mango/daemon.env
+            aws ecr get-login-password --region ${AWS::Region} | docker login --username AWS --password-stdin ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com
+            docker pull ${DaemonEcrRepo.RepositoryUri}:${DaemonImageTag}
+            docker rm -f mango-vpn-daemon || true
+            docker run -d --name mango-vpn-daemon --restart unless-stopped --network host --cap-add NET_ADMIN --device /dev/net/tun --env-file /etc/mango/daemon.env ${DaemonEcrRepo.RepositoryUri}:${DaemonImageTag}
+            SCRIPT
+            chmod 755 /usr/local/bin/mango-gateway-start.sh
+            /usr/local/bin/mango-gateway-start.sh || echo "Run /usr/local/bin/mango-gateway-start.sh via SSM after pushing DaemonEcrRepo image and setting WireGuardKeySecret."
+  WireGuardGatewayInstance:
+    Type: AWS::EC2::Instance
+    Metadata: {com.aws.cloudformation.Context: {why: Provides the Linux WireGuard and policy gateway, must: Disable source destination checks for routed VPN traffic.}}
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      SecurityGroupIds: [!Ref WireGuardGatewaySecurityGroup]
+      IamInstanceProfile: !Ref WireGuardGatewayProfile
+      SourceDestCheck: false
+      LaunchTemplate: {LaunchTemplateId: !Ref WireGuardGatewayLaunchTemplate, Version: !GetAtt WireGuardGatewayLaunchTemplate.LatestVersionNumber}
+      Tags: [{Key: Name, Value: !Sub "${AWS::StackName}-wireguard-gateway"}]
+  WireGuardGatewayEip:
+    Type: AWS::EC2::EIP
+    Metadata: {com.aws.cloudformation.Context: {why: Gives clients a stable WireGuard endpoint, must: Use the VPC domain.}}
+    Properties: {Domain: vpc, Tags: [{Key: Name, Value: !Sub "${AWS::StackName}-wireguard-eip"}]}
+  WireGuardGatewayEipAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Metadata: {com.aws.cloudformation.Context: {why: Associates the stable endpoint, must: Attach to the stack gateway instance.}}
+    Properties: {AllocationId: !GetAtt WireGuardGatewayEip.AllocationId, InstanceId: !Ref WireGuardGatewayInstance}
+  VpnReturnRoute:
+    Type: AWS::EC2::Route
+    Metadata: {com.aws.cloudformation.Context: {why: Routes VPN client replies to the gateway, must: Preserve the 10.13.13.0/24 return path.}}
+    Properties: {RouteTableId: !Ref PrivateRouteTable, DestinationCidrBlock: 10.13.13.0/24, InstanceId: !Ref WireGuardGatewayInstance}
+
+Outputs:
+  PortalUrl:
+    Description: Public URL for the portal and API entry point.
+    Value: !If [HasCustomDomain, !Sub "https://${CustomDomainName}", !If [HasCertificateArn, !Sub "https://${ApplicationLoadBalancer.DNSName}", !Sub "http://${ApplicationLoadBalancer.DNSName}"]]
+  AlbDnsName:
+    Description: DNS name of the application load balancer.
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+  ApiEcrRepository:
+    Description: ECR repository URI for the API image.
+    Value: !GetAtt ApiEcrRepo.RepositoryUri
+  PortalEcrRepository:
+    Description: ECR repository URI for the portal image.
+    Value: !GetAtt PortalEcrRepo.RepositoryUri
+  DaemonEcrRepository:
+    Description: ECR repository URI for the vpn-daemon image.
+    Value: !GetAtt DaemonEcrRepo.RepositoryUri
+  EcsClusterName:
+    Description: ECS cluster name used by the services.
+    Value: !Ref EcsCluster
+  WireGuardGatewayInstanceId:
+    Description: EC2 instance ID for SSM Session Manager access.
+    Value: !Ref WireGuardGatewayInstance
+  WireGuardGatewayPublicIp:
+    Description: Stable public IP for WireGuard clients.
+    Value: !Ref WireGuardGatewayEip
+  WireGuardKeySecretArn:
+    Description: Secrets Manager ARN containing the gateway key JSON.
+    Value: !Ref WireGuardKeySecret
+  TotpEncryptionSecretArn:
+    Description: Secrets Manager ARN requiring a 64-character hex TOTP key.
+    Value: !Ref TotpEncryptionSecret
