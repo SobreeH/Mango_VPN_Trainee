@@ -1447,7 +1447,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                     aria-label="Username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder={lang === 'th' ? 'เช่น somchai หรือ admin' : 'e.g. somchai or admin'}
+                    placeholder={lang === 'th' ? 'กรอกชื่อผู้ใช้' : 'Enter your username'}
                     className={`w-full h-11 rounded-xl border pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-colors ${
                       isDark
                         ? 'border-white/10 bg-slate-800/70 text-stone-100 placeholder-stone-500 focus:border-emerald-400'
@@ -1474,7 +1474,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                     aria-label="Password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••••••"
+                    placeholder={lang === 'th' ? 'กรอกรหัสผ่าน' : 'Enter your password'}
                     className={`w-full h-11 rounded-xl border pl-9 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-colors ${
                       isDark
                         ? 'border-white/10 bg-slate-800/70 text-stone-100 placeholder-stone-500 focus:border-emerald-400'
