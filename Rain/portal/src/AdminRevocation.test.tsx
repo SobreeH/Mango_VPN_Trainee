@@ -712,4 +712,78 @@ describe('Portal Admin Users, Devices & Sessions Tabs (fetch seam)', () => {
     expect(mgmtToggle).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('tab', { name: /Users/i })).toBeInTheDocument();
   });
+
+  it('supports Auto-Refresh toggle in Sessions and Export CSV buttons in Users and Devices', async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/audit-logs')) {
+        return new Response(
+          JSON.stringify({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 1 }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (url.endsWith('/api/sessions')) {
+        return new Response(JSON.stringify({ items: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.endsWith('/api/users')) {
+        return new Response(
+          JSON.stringify({
+            items: [
+              {
+                id: 'u-1',
+                username: 'alice.staff',
+                email: 'alice@mango.local',
+                role: RoleName.STAFF,
+                isActive: true,
+                totpEnabled: true,
+                createdAt: '2026-11-20T00:00:00.000Z',
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (url.endsWith('/api/devices')) {
+        return new Response(
+          JSON.stringify({
+            items: [
+              {
+                id: 'dev-1',
+                userId: 'u-1',
+                username: 'alice.staff',
+                hostname: 'alice-laptop',
+                fingerprint: 'fp-123456',
+                status: DeviceStatus.ACTIVE,
+                lastSeenAt: '2026-11-26T00:00:00.000Z',
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response(JSON.stringify({ message: 'Not found' }), { status: 404 });
+    });
+
+    renderWithQuery(<App initialSession={adminSession} />);
+
+    // Sessions Auto-Refresh toggle
+    fireEvent.click(screen.getByRole('tab', { name: /Sessions/i }));
+    const autoBtn = await screen.findByRole('button', { name: /Toggle Auto-Refresh/i });
+    expect(autoBtn).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(autoBtn);
+    expect(autoBtn).toHaveAttribute('aria-pressed', 'true');
+
+    // Users Export CSV button
+    fireEvent.click(screen.getByRole('tab', { name: /Users/i }));
+    expect(await screen.findByText('alice.staff')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Export Users CSV/i })).toBeEnabled();
+
+    // Devices Export CSV button
+    fireEvent.click(screen.getByRole('tab', { name: /Devices/i }));
+    expect(await screen.findByText('alice-laptop')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Export Devices CSV/i })).toBeEnabled();
+  });
 });

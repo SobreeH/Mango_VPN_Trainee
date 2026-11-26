@@ -257,4 +257,73 @@ describe('Portal Admin Audit Logs & Agent Versions (fetch seam)', () => {
       );
     });
   });
+
+  it('filters Agent Versions by search term and toggles Auto-Refresh on Audit Logs', async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/audit-logs')) {
+        return new Response(
+          JSON.stringify({ items: [], total: 0, page: 1, pageSize: 20, totalPages: 1 }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (url.endsWith('/api/agent-versions')) {
+        return new Response(
+          JSON.stringify({
+            items: [
+              {
+                id: 'ver-win',
+                version: '1.2.0',
+                platform: 'windows-x64',
+                downloadUrl: 'https://downloads.mango.local/agent-1.2.0.msi',
+                sha256Checksum: 'a'.repeat(64),
+                isActive: true,
+                isRequired: false,
+                releasedAt: '2026-11-20T00:00:00.000Z',
+              },
+              {
+                id: 'ver-lin',
+                version: '2.0.0',
+                platform: 'linux-x64',
+                downloadUrl: 'https://downloads.mango.local/agent-2.0.0.tar.gz',
+                sha256Checksum: 'b'.repeat(64),
+                isActive: true,
+                isRequired: true,
+                releasedAt: '2026-11-21T00:00:00.000Z',
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response(JSON.stringify({ message: 'Not found' }), { status: 404 });
+    });
+
+    renderWithQuery(
+      <App
+        initialSession={{
+          accessToken: 'admin-token',
+          user: {
+            id: 'u-admin',
+            username: 'admin.test',
+            email: 'admin@mango.local',
+            role: RoleName.ADMIN,
+          },
+        }}
+      />,
+    );
+
+    const autoBtn = await screen.findByRole('button', { name: /Toggle Auto-Refresh/i });
+    expect(autoBtn).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(autoBtn);
+    expect(autoBtn).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(screen.getByRole('tab', { name: /Agent Versions/i }));
+    expect(await screen.findByText('1.2.0')).toBeInTheDocument();
+    expect(screen.getByText('2.0.0')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/Search agent versions/i), { target: { value: '2.0.0' } });
+    expect(screen.queryByText('1.2.0')).not.toBeInTheDocument();
+    expect(screen.getByText('2.0.0')).toBeInTheDocument();
+  });
 });

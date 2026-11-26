@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Search, X } from 'lucide-react';
 import {
   GatewayIpamMode,
   RoleName,
@@ -50,6 +51,8 @@ export function GatewaysTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark
     RoleName.CLIENT,
   ]);
   const [isDefault, setIsDefault] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [providerFilter, setProviderFilter] = useState<'ALL' | VpnProviderType>('ALL');
   const [pendingDelete, setPendingDelete] = useState<VpnGatewayDto | null>(null);
 
   const listQuery = useQuery({
@@ -118,6 +121,17 @@ export function GatewaysTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark
   };
 
   const gateways: VpnGatewayDto[] = listQuery.data?.items ?? [];
+  const filteredGateways = gateways.filter((gw) => {
+    const term = searchTerm.trim().toLowerCase();
+    const matchesSearch =
+      term === '' ||
+      gw.name.toLowerCase().includes(term) ||
+      gw.endpoint.toLowerCase().includes(term) ||
+      gw.subnetCidr.toLowerCase().includes(term) ||
+      gw.providerType.toLowerCase().includes(term);
+    const matchesProvider = providerFilter === 'ALL' || gw.providerType === providerFilter;
+    return matchesSearch && matchesProvider;
+  });
   const activeError =
     listQuery.error ?? createMutation.error ?? toggleMutation.error ?? deleteMutation.error ?? null;
 
@@ -268,6 +282,46 @@ export function GatewaysTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark
         </div>
       )}
 
+      {/* Search & Provider Filter Bar */}
+      {gateways.length > 0 && (
+        <div className={`flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between rounded-2xl border p-4 ${t.card}`}>
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-stone-500" />
+            <input
+              type="text"
+              aria-label="Search gateways"
+              placeholder={lang === 'th' ? 'ค้นหาชื่อเกตเวย์ Endpoint หรือ Subnet...' : 'Search gateway name, endpoint, or subnet...'}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={`w-full sm:max-w-sm h-10 rounded-xl border pl-9 pr-9 text-xs focus:outline-none transition-colors ${t.input}`}
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                aria-label="Clear search"
+                onClick={() => setSearchTerm('')}
+                className={`absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full ${t.muted}`}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              aria-label="Filter provider"
+              value={providerFilter}
+              onChange={(e) => setProviderFilter(e.target.value as 'ALL' | VpnProviderType)}
+              className={`h-10 rounded-xl border px-3 text-xs focus:outline-none cursor-pointer ${t.input}`}
+            >
+              <option value="ALL">{lang === 'th' ? 'ทุกผู้ให้บริการ' : 'All Providers'}</option>
+              <option value={VpnProviderType.WIREGUARD}>WIREGUARD</option>
+              <option value={VpnProviderType.FORTINET}>FORTINET</option>
+              <option value={VpnProviderType.CISCO}>CISCO</option>
+            </select>
+          </div>
+        </div>
+      )}
+
       {listQuery.isLoading ? (
         <p className={`text-sm ${t.muted}`}>{lang === 'th' ? 'กำลังโหลดข้อมูลเกตเวย์...' : 'Loading VPN gateways...'}</p>
       ) : gateways.length === 0 && !listQuery.error ? (
@@ -275,9 +329,23 @@ export function GatewaysTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark
           {lang === 'th' ? 'ยังไม่มี VPN Gateway ที่ลงทะเบียนไว้' : 'No VPN gateways registered.'}
           {lang === 'th' && <span className="sr-only">No VPN gateways registered.</span>}
         </div>
-      ) : gateways.length > 0 ? (
+      ) : filteredGateways.length === 0 ? (
+        <div className={`rounded-3xl border p-8 text-center text-xs space-y-2 ${t.card} ${t.muted}`}>
+          <p>{lang === 'th' ? 'ไม่พบเกตเวย์ที่ตรงกับการค้นหา' : 'No gateways match your search.'}</p>
+          <button
+            type="button"
+            onClick={() => {
+              setSearchTerm('');
+              setProviderFilter('ALL');
+            }}
+            className="text-amber-400 hover:underline font-semibold"
+          >
+            {lang === 'th' ? 'ล้างการค้นหา' : 'Clear filters'}
+          </button>
+        </div>
+      ) : (
         <div className="space-y-3">
-          {gateways.map((gw) => (
+          {filteredGateways.map((gw) => (
             <div
               key={gw.id}
               className={`flex flex-wrap items-center justify-between gap-3 rounded-3xl border p-5 text-sm ${t.card}`}
@@ -337,7 +405,7 @@ export function GatewaysTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark
             </div>
           ))}
         </div>
-      ) : null}
+      )}
 
       <ConfirmModal
         isOpen={pendingDelete !== null}

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, CheckCircle2, Download, Package, Shield, UploadCloud } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Download, Package, Search, Shield, UploadCloud, X } from 'lucide-react';
 import type { AgentVersionDto, UpdateAgentVersionRequest } from '@mango/shared';
 import type { AuthRefreshContext } from '../api/auth';
 import {
@@ -26,6 +26,8 @@ export function AgentVersionsTab({ apiBaseUrl, accessToken, auth, lang = 'th', i
   const [downloadUrl, setDownloadUrl] = useState('');
   const [sha256Checksum, setSha256Checksum] = useState('');
   const [isRequired, setIsRequired] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [platformFilter, setPlatformFilter] = useState<'ALL' | 'windows-x64' | 'linux-x64'>('ALL');
 
   const listQuery = useQuery({
     queryKey: ['agent-versions', apiBaseUrl],
@@ -70,6 +72,16 @@ export function AgentVersionsTab({ apiBaseUrl, accessToken, auth, lang = 'th', i
   };
 
   const versions: AgentVersionDto[] = listQuery.data?.items ?? [];
+  const filteredVersions = versions.filter((item) => {
+    const term = searchTerm.trim().toLowerCase();
+    const matchesSearch =
+      term === '' ||
+      item.version.toLowerCase().includes(term) ||
+      item.platform.toLowerCase().includes(term) ||
+      item.sha256Checksum.toLowerCase().includes(term);
+    const matchesPlatform = platformFilter === 'ALL' || item.platform === platformFilter;
+    return matchesSearch && matchesPlatform;
+  });
   const activeError =
     listQuery.error ?? createMutation.error ?? updateMutation.error ?? null;
 
@@ -212,6 +224,45 @@ export function AgentVersionsTab({ apiBaseUrl, accessToken, auth, lang = 'th', i
         </div>
       )}
 
+      {/* Search & Platform Filter Bar */}
+      {versions.length > 0 && (
+        <div className={`flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between rounded-2xl border p-4 ${t.card}`}>
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-stone-500" />
+            <input
+              type="text"
+              aria-label="Search agent versions"
+              placeholder={lang === 'th' ? 'ค้นหาเวอร์ชัน แพลตฟอร์ม หรือ SHA-256...' : 'Search version, platform, or SHA-256...'}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={`w-full sm:max-w-sm h-10 rounded-xl border pl-9 pr-9 text-xs focus:outline-none transition-colors ${t.input}`}
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                aria-label="Clear search"
+                onClick={() => setSearchTerm('')}
+                className={`absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full ${t.muted}`}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              aria-label="Filter platform"
+              value={platformFilter}
+              onChange={(e) => setPlatformFilter(e.target.value as 'ALL' | 'windows-x64' | 'linux-x64')}
+              className={`h-10 rounded-xl border px-3 text-xs focus:outline-none cursor-pointer ${t.input}`}
+            >
+              <option value="ALL">{lang === 'th' ? 'ทุกแพลตฟอร์ม' : 'All Platforms'}</option>
+              <option value="windows-x64">windows-x64</option>
+              <option value="linux-x64">linux-x64</option>
+            </select>
+          </div>
+        </div>
+      )}
+
       {/* Table / List View */}
       {listQuery.isLoading ? (
         <div className={`rounded-3xl border p-8 text-center text-xs ${t.card} ${t.muted}`}>
@@ -228,7 +279,21 @@ export function AgentVersionsTab({ apiBaseUrl, accessToken, auth, lang = 'th', i
             {lang === 'th' ? 'ยังไม่มีประวัติการเผยแพร่เวอร์ชัน Agent ในระบบ' : 'Published client builds will appear here.'}
           </p>
         </div>
-      ) : versions.length > 0 ? (
+      ) : filteredVersions.length === 0 ? (
+        <div className={`rounded-3xl border p-8 text-center text-xs space-y-2 ${t.card} ${t.muted}`}>
+          <p>{lang === 'th' ? 'ไม่พบเวอร์ชัน Agent ที่ตรงกับการค้นหา' : 'No agent versions match your search.'}</p>
+          <button
+            type="button"
+            onClick={() => {
+              setSearchTerm('');
+              setPlatformFilter('ALL');
+            }}
+            className="text-amber-400 hover:underline font-semibold"
+          >
+            {lang === 'th' ? 'ล้างการค้นหา' : 'Clear filters'}
+          </button>
+        </div>
+      ) : (
         <div className={`rounded-3xl border overflow-hidden ${t.card}`}>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -242,7 +307,7 @@ export function AgentVersionsTab({ apiBaseUrl, accessToken, auth, lang = 'th', i
                 </tr>
               </thead>
               <tbody className={`divide-y ${t.divide}`}>
-                {versions.map((item) => (
+                {filteredVersions.map((item) => (
                   <tr key={item.id} className={`transition-colors ${t.tableRow}`}>
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2">
@@ -338,7 +403,7 @@ export function AgentVersionsTab({ apiBaseUrl, accessToken, auth, lang = 'th', i
             </table>
           </div>
         </div>
-      ) : null}
+      )}
     </section>
   );
 }
