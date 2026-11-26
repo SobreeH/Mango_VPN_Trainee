@@ -326,3 +326,15 @@ All four services (`mango-postgres`, `mango-vpn-gateway`, `mango-api`, `mango-po
    - Windows Service: `cd Sobree/agent-windows && GOOS=windows GOARCH=amd64 go build -o mango-agent-windows.exe .`
    - Linux console: `cd Sobree/agent-windows && GOOS=linux GOARCH=amd64 go build -o mango-agent-linux .`
    - Record `Get-FileHash -Algorithm SHA256` (Windows) or `sha256sum` (Linux), then register both `windows-x64` and `linux-x64` releases in Admin **Agent Versions**, and verify live `mango0` tunnel activation/revocation with `wg show` and `nft list table inet mango_vpn`.
+
+---
+
+### 6.7 Track B Role-Enforcement Test Targets
+
+1. **Static target sites:** `docker-compose.test-targets.yml` and `test-targets/` add three nginx targets on the VPN subnets: `target-admin` (`10.99.0.10`, `10.99.0.0/24`), `target-staff` (`10.20.0.10`, `10.20.0.0/16`), and `target-client` (`10.30.0.10`, `10.30.0.0/24`). Each serves HTTP on `:80` and HTTPS on `:443` with a self-signed certificate. `/health.json` returns JSON with CORS and Private Network Access headers and the caller's `clientVpnIp`.
+2. **Routing:** `target-routes` adds VPN-side routes for the three subnets through `vpn-gateway`. It runs once (`restart: no`), so re-run `npm run docker:test-targets:up` after a gateway restart.
+3. **Localhost role harness:** `test-harness` serves `http://localhost:3090` (published on `127.0.0.1` only, with `TEST_HARNESS_PORT` as an override). Its role pages (`admin.html`, `staff.html`, `client.html`) inspect the local agent (`/health`, `/status`, `/disconnect`), probe `http://<target-ip>/health.json`, and report `PASS`, `MISMATCH`, `BLOCKED`, or `TIMEOUT` for each target.
+4. **Opt-in policy seeder:** `Rain/admin/src/seed-test-targets.ts` (`npm run db:seed:test-targets`) upserts 12 Track B policies by role and name and reuses the Mission 3 rows `Allow Internal Web` and `Block Admin Subnet`. It does not create users, and it writes only to the database, so peers must reconnect to pick up changes.
+5. **Scripts and docs:** `npm run docker:test-targets:up` and `npm run docker:test-targets:down` manage the stack with both Compose files. TUTORIAL Step B4, the README and QUICKSTART callouts, and the Phase 6 shutdown note describe the flow.
+
+**Verification status:** Verified `node scripts/check-guardrails.mjs` (0 violations), `npm run build`, merged Compose config, live Docker startup (`npm run docker:test-targets:up`), `target-routes` exit 0 + gateway routing table, HTTP `:80` and HTTPS `:443` `/health.json`, HTML `sub_filter`, `GET`/`OPTIONS` CORS + PNA headers, `127.0.0.1:3090` harness pages (`200 OK`), and host isolation without VPN. Interactive end-to-end client WireGuard tunnel verification across `ADMIN`, `STAFF`, and `CLIENT` (with `npm run db:seed:test-targets`, `Sobree/agent-windows`, and the Portal) remains to be exercised live.

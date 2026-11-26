@@ -274,6 +274,21 @@ sudo -E go run .
 
 เซอร์วิส `vpn-gateway` จำเป็นต้องใช้สิทธิ์ `NET_ADMIN` และคำสั่ง `wg`/`nft` บน Linux เท่านั้น สำหรับการรัน Daemon แบบ Native จะทำได้เฉพาะบนเครื่อง Linux จริง
 
+### ตัวเลือกเสริม: เป้าหมายทดสอบการบังคับใช้สิทธิ์ของ Track B
+
+เริ่มเป้าหมายเว็บแบบคงที่และหน้า Role Harness บน localhost ขั้นตอนการตั้งค่าและเมทริกซ์สิทธิ์ที่คาดหวังอยู่ใน [`TUTORIAL.th.md`](TUTORIAL.th.md) ขั้นตอน B4
+
+```bash
+npm run docker:test-targets:up     # postgres, vpn-gateway, เป้าหมาย 3 เครื่อง, target-routes, test-harness
+npm run db:seed                    # หากยังไม่เคย Seed ฐานข้อมูล
+npm run db:seed:test-targets       # Seed นโยบาย Track B จำนวน 12 รายการ (ไม่สร้างผู้ใช้)
+# เปิดหน้า Role Harness บนเบราว์เซอร์: http://localhost:3090
+npm run docker:test-targets:down   # หยุด Test Stack เมื่อทดสอบเสร็จ
+```
+
+> [!NOTE]
+> `AGENT_ALLOWED_ORIGINS` ของ Agent ต้องมี `http://localhost:3090,http://127.0.0.1:3090` สำหรับหน้า Harness และต้องสร้าง `staff01` กับ `client01` ในแท็บ **Users** ของ Admin ก่อนทดสอบ
+
 ### การรัน Docker Stack ครบชุด
 
 [`Rain/portal/nginx.conf`](Rain/portal/nginx.conf) ให้บริการ SPA บนพอร์ต `3000` พร้อม `Cache-Control: no-store` ที่ `/env-config.js` ให้ Build และเริ่ม Stack ครบชุด ตรวจ Healthcheck ของคอนเทนเนอร์ และ Seed บัญชี `ADMIN` คนแรก:

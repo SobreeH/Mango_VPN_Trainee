@@ -494,7 +494,7 @@ Set the agent's local address, browser-origin allowlist, pairing token, and API 
 
 ```powershell
 $env:AGENT_LISTEN_ADDR="127.0.0.1:47821"
-$env:AGENT_ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:3000"
+$env:AGENT_ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:3000,http://localhost:3090,http://127.0.0.1:3090"
 $env:AGENT_PAIRING_TOKEN="my-local-dev-pairing-token-01"
 $env:API_URL="http://localhost:4000"
 cd <path-to>\Mango_VPN_Trainee\Sobree\agent-windows
@@ -507,7 +507,7 @@ The agent runs `wireguard.exe /installtunnelservice` to bring up `mango0`, so th
 
 ```bash
 export AGENT_LISTEN_ADDR="127.0.0.1:47821"
-export AGENT_ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:3000"
+export AGENT_ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:3000,http://localhost:3090,http://127.0.0.1:3090"
 export AGENT_PAIRING_TOKEN="my-local-dev-pairing-token-01"
 export API_URL="http://localhost:4000"
 cd <path-to>/Mango_VPN_Trainee/Sobree/agent-windows
@@ -526,6 +526,72 @@ sudo -E go run .
 It listens on `127.0.0.1:50051` by default and needs root for `wg` and `nft`. Stop the daemon before restarting `vpn-gateway`.
 
 **What you should see:** A Go log saying the agent is listening on `127.0.0.1:47821`. Keep this elevated terminal open. If the tunnel command cannot be found, install the WireGuard tools for your OS (see the troubleshooting table in Phase 6). If a different process already owns port `47821`, stop that process first.
+
+#### Optional Step B4: Test Real Role Enforcement with Static Target Pages
+
+Step B3 only shows that the tunnel comes up. This optional step checks whether the role policies actually block or allow traffic. It uses three static websites inside the VPN network and a localhost harness that probes them from your browser.
+
+**What the stack provides:**
+
+| Target | IP | Zone CIDR | Role that should reach it |
+|---|---|---|---|
+| `target-admin` | `10.99.0.10` | `10.99.0.0/24` | ADMIN only |
+| `target-staff` | `10.20.0.10` | `10.20.0.0/16` | ADMIN and STAFF |
+| `target-client` | `10.30.0.10` | `10.30.0.0/24` | ADMIN, STAFF, and CLIENT |
+
+Each target serves plain HTTP on port `80` and HTTPS on port `443`. The HTTPS certificate is self-signed, with `CN` set to the target IP. Each target also serves `/health.json`, which returns JSON with the `clientVpnIp` that the target saw, and sends CORS and Private Network Access headers so the harness can read it. The harness probes only `http://<target-ip>/health.json`. The HTTPS listener is there for manual checks, described below.
+
+The Compose file in `docker-compose.test-targets.yml` also starts `target-routes`, which adds routes so that VPN-side traffic reaches each target through the `vpn-gateway`. The harness itself is published only on `127.0.0.1:3090` (or `TEST_HARNESS_PORT` if you set it), so it is reachable only from your own machine.
+
+**Run the test:**
+
+1. Make sure the database is seeded (`npm run db:seed`) and the users from Mission 3 exist (`staff01` and `client01`). Then seed the Track B policies:
+
+   ```bash
+   npm run db:seed:test-targets
+   ```
+
+   You should see `Seeded 12 Track B VPN policies.` The seeder is opt-in and creates no users. It upserts by role and name, so it updates the Mission 3 rows named `Allow Internal Web` (STAFF) and `Block Admin Subnet` (CLIENT) instead of creating duplicates. It also sets `Allow Internal Web` to priority `101` (it was `100` in Mission 3). The seeder writes to the database only. Connected peers are not updated, so seed before you connect. Connect reads the enabled policies for the user's role, ordered by priority ascending, at connect time.
+
+2. Start the test stack:
+
+   ```bash
+   npm run docker:test-targets:up
+   ```
+
+   Run this command again after you restart `vpn-gateway`, because `target-routes` runs only once (`restart: no`) and the routes must be re-added.
+
+3. Make sure the agent allows the harness origins. Step B3 already sets `AGENT_ALLOWED_ORIGINS` to include `http://localhost:3090,http://127.0.0.1:3090`. If you started the agent before that change, stop it and start it again.
+
+4. Open the harness in your browser at `http://localhost:3090`. Use the page for the role you are testing (`/admin.html`, `/staff.html`, or `/client.html`). Enter the agent URL (default `http://127.0.0.1:47821`), paste your `AGENT_PAIRING_TOKEN` into the empty token field, and click **Save**. Then click **Check /health** and **Get /status** to confirm the agent is reachable.
+
+5. Connect the tunnel as the user for that role (for example `staff01`) through the portal using the same flow as Mission 3, then click **Probe All 3 VPN Targets** in the harness. Each row shows one of these results:
+   - **REACHABLE** with **PASS**: the target responded and that matches the role's expected access.
+   - **BLOCKED** or **TIMEOUT** with **PASS**: the target was unreachable, which is the expected result for that role. A request that times out after 3.5 seconds is reported as `TIMEOUT`.
+   - **MISMATCH**: the result differs from the expected access. Check the policy priorities and whether you connected after seeding.
+
+   The index page is an overview only. It shows `N/A (overview)` and does not check any role.
+
+6. Disconnect, connect as the next user (`client01`), and probe again. Then repeat for ADMIN.
+
+**Expected access matrix:**
+
+| Connected role | `10.99.0.10` (admin) | `10.20.0.10` (staff) | `10.30.0.10` (client) |
+|---|---|---|---|
+| ADMIN | ALLOW | ALLOW | ALLOW |
+| STAFF | DENY | ALLOW | ALLOW |
+| CLIENT | DENY | DENY | ALLOW |
+
+**Manual HTTPS check:** The harness probes only HTTP. To test HTTPS, connect the tunnel and run this from your host terminal:
+
+```bash
+curl -k https://10.20.0.10/health.json
+```
+
+Use `-k` because the certificate is self-signed. A browser may also show a warning when you open `https://10.20.0.10` directly. Accept the warning there before trying a fetch from the harness.
+
+> [!NOTE]
+> The test stack does not stop with `docker compose down`, because that command does not include `docker-compose.test-targets.yml`. Use `npm run docker:test-targets:down` (see Phase 6).
 
 ### 🐳 Track C: One-Command Full Docker Stack (All 4 Containers)
 
@@ -888,5 +954,13 @@ Pop-Location
    ```
 
    **What you should see:** Compose reports the containers are stopped and removed. Your named PostgreSQL data volume is retained, so the next `docker compose up` can reuse the local database. Do not run `docker compose down -v` unless you deliberately want to delete that stored database data.
+
+3. If you ran the optional Track B test targets (Step B4), stop them with the matching script. Do not use plain `docker compose down` for this stack, because it does not include `docker-compose.test-targets.yml`.
+
+   ```bash
+   npm run docker:test-targets:down
+   ```
+
+   **What you should see:** Compose removes the containers of the Track B test stack (`postgres`, `vpn-gateway`, the three targets, `target-routes`, and `test-harness`). Named volumes are kept.
 
 You have now walked through MANGO VPN v2 from setup to governance, agent pairing, gateway inspection, and shutdown. Nice work!

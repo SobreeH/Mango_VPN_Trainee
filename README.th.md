@@ -63,7 +63,8 @@ Mango_VPN_Trainee/
 │       ├── src/gateways.ts            # จัดการ VPN Gateways (/api/gateways: WIREGUARD, FORTINET, CISCO)
 │       ├── src/agent-versions.ts      # จัดการเวอร์ชัน Agent (/api/agent-versions)
 │       ├── src/revocation.ts          # สั่งเตะ Peer และลบกฎ Firewall บน Daemon แบบ Real-time
-│       └── src/seed.ts                # สคริปต์สร้าง Role และ User เริ่มต้นลงฐานข้อมูล
+│       ├── src/seed.ts                # สคริปต์สร้าง Role และ User เริ่มต้นลงฐานข้อมูล
+│       └── src/seed-test-targets.ts   # Seeder นโยบาย Track B แบบเลือกใช้ (npm run db:seed:test-targets)
 │
 ├── Sobree/                            # ⚡ [Sobree] ดูแล Core API, Windows Agent และ Gateway Daemon
 │   ├── api/                           # @mango/api (Control Plane API พอร์ต 4000)
@@ -90,9 +91,13 @@ Mango_VPN_Trainee/
 │   └── check-environment.ps1          # Wrapper สำหรับ Windows PowerShell ที่เรียกใช้ check-environment.mjs
 │
 ├── docker-compose.yml                 # คอนฟิกรัน postgres, vpn-gateway, api, portal
+├── docker-compose.test-targets.yml     # ตัวเลือกเสริม Track B: เป้าหมาย VPN, target-routes และหน้า Role Harness บน localhost (TUTORIAL.th.md ขั้นตอน B4)
+├── test-targets/                         # เว็บเป้าหมายแบบคงที่ (sites/), Role Harness (harness/) และเทมเพลต nginx (nginx/)
 ├── .env.example                       # เทมเพลตตัวแปรสภาพแวดล้อม
 └── package.json                       # Root workspaces configuration
 ```
+
+> **การทดสอบ Track B แบบเลือกใช้ (Role Enforcement):** `docker-compose.test-targets.yml` และ `test-targets/` เพิ่มเป้าหมายเว็บแบบคงที่ 3 เครื่องที่แยกจาก VPN (`10.99.0.10`, `10.20.0.10`, `10.30.0.10`) และหน้า Role Harness บน localhost ที่ `http://localhost:3090` ใช้ตรวจการบังคับใช้กฎ `nftables` ตาม Role ของ `ADMIN`, `STAFF` และ `CLIENT` ดูรายละเอียดได้ที่ [`TUTORIAL.th.md`](TUTORIAL.th.md) ขั้นตอน B4
 
 ---
 
@@ -285,6 +290,9 @@ sudo -E go run .
 | `npm run db:generate` | อัปเดต Prisma Client จากไฟล์ `schema.prisma` |
 | `npm run db:migrate` | รัน Migration โครงสร้างฐานข้อมูล |
 | `npm run db:seed` | ใส่ข้อมูลตั้งต้น Role และ Admin ลงฐานข้อมูล |
+| `npm run db:seed:test-targets` | รัน `Rain/admin/src/seed-test-targets.ts` เพื่อ Upsert นโยบาย Track B จำนวน 12 รายการสำหรับ ADMIN, STAFF และ CLIENT (เลือกใช้) ต้องรัน `npm run db:seed` ก่อน และคำสั่งนี้ไม่สร้างผู้ใช้ |
+| `npm run docker:test-targets:up` | เริ่มชุดทดสอบ Track B แบบเลือกใช้ (`docker-compose.test-targets.yml` ซ้อนบน `docker-compose.yml`): `postgres`, `vpn-gateway`, เป้าหมายเว็บ 3 เครื่อง, `target-routes` และ Role Harness บน localhost ที่ `http://localhost:3090` |
+| `npm run docker:test-targets:down` | หยุดและลบชุดทดสอบ Track B โดยใช้ Compose ทั้งสองไฟล์ (Named Volume ยังคงอยู่) |
 | `npm run check:env` | ตรวจสอบความพร้อมของเครื่องมือในเครื่อง (`scripts/check-environment.mjs`, ใช้ได้ทั้ง Linux, macOS และ Windows; ค่าเริ่มต้น `--role All`) |
 | `npm run check:env -- --role Rain` | ตรวจความพร้อมแบบ Rain ที่ไม่ใช้ Docker โดยกำหนดให้ Docker, Docker Compose และ Go เป็น `OPTIONAL` |
 | `npm run check:env -- --role Sobree` | ตรวจความพร้อมแบบ Sobree เต็มรูปแบบ (จะ exit `1` หากขาด Docker, Docker Compose หรือ Go) |
