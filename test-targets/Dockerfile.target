@@ -1,0 +1,6 @@
+FROM nginx:1.27-alpine
+RUN apk add --no-cache iproute2 openssl
+COPY nginx/target.conf.template /etc/nginx/templates/target.conf.template
+COPY entrypoint.sh /usr/local/bin/target-entrypoint.sh
+RUN chmod +x /usr/local/bin/target-entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/target-entrypoint.sh"]

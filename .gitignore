@@ -22,6 +22,7 @@ presharedkey
 # WireGuard configurations
 *.conf
 !Rain/portal/nginx.conf
+!test-targets/nginx/harness.conf
 
 # Logs & Debug
 logs/

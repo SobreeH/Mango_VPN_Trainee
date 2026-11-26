@@ -418,7 +418,7 @@ npm run dev:portal
 
 ```powershell
 $env:AGENT_LISTEN_ADDR="127.0.0.1:47821"
-$env:AGENT_ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:3000"
+$env:AGENT_ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:3000,http://localhost:3090,http://127.0.0.1:3090"
 $env:AGENT_PAIRING_TOKEN="my-local-dev-pairing-token-01"
 $env:API_URL="http://localhost:4000"
 cd Sobree/agent-windows
@@ -429,7 +429,7 @@ go run .
 
 ```bash
 export AGENT_LISTEN_ADDR="127.0.0.1:47821"
-export AGENT_ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:3000"
+export AGENT_ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:3000,http://localhost:3090,http://127.0.0.1:3090"
 export AGENT_PAIRING_TOKEN="my-local-dev-pairing-token-01"
 export API_URL="http://localhost:4000"
 cd Sobree/agent-windows && sudo -E go run .
@@ -448,6 +448,78 @@ API ที่รันบน Host จะเรียก Daemon ที่ `http:/
 
 Go Agent ตั้งใจ **ไม่** แสดง Pairing Token ออกทาง stdout การตั้งค่า `$env:AGENT_PAIRING_TOKEN` ด้วยตัวเองทำให้คุณรู้ค่าที่จะวางในเบราว์เซอร์ หากคุณไม่ตั้งค่านี้ Agent อาจแจ้งว่าสร้าง Ephemeral Token ขึ้นมาให้ แต่ข้อความนั้นจะไม่เปิดเผยค่า Token
 
+
+#### ขั้นตอน B4 (ทางเลือก): ทดสอบการบังคับใช้สิทธิ์ตาม Role ด้วยหน้าเว็บทดสอบแบบคงที่
+
+ใช้ขั้นตอนนี้หลังจาก Track B ทำงานได้แล้ว เพื่อตรวจว่ากฎ `nftables` ตาม Role อนุญาตหรือบล็อกทราฟฟิกจริงตามที่กำหนดหรือไม่ มีเว็บเป้าหมายแบบคงที่ 3 เครื่องอยู่บนซับเน็ตของ VPN และหน้า Role Harness บน localhost ที่ `http://localhost:3090` จะทดสอบการเข้าถึงผ่านอุโมงค์ ให้ทำ Mission 3 ให้เสร็จก่อน เพื่อให้มีผู้ใช้ทดสอบ `staff01` และ `client01`
+
+| เป้าหมาย | คอนเทนเนอร์ | IP | ซับเน็ตที่อยู่ |
+| :--- | :--- | :--- | :--- |
+| โซน Admin | `target-admin` | `10.99.0.10` | `10.99.0.0/24` |
+| โซน Staff | `target-staff` | `10.20.0.10` | `10.20.0.0/16` |
+| โซน Client | `target-client` | `10.30.0.10` | `10.30.0.0/24` |
+
+เป้าหมายแต่ละเครื่องให้บริการ **HTTP ที่พอร์ต 80** และ **HTTPS ที่พอร์ต 443** ด้วยใบรับรองแบบ Self-signed Endpoint `/health.json` จะตอบกลับเป็น JSON พร้อม Header `Access-Control-Allow-Origin`, `Access-Control-Allow-Methods` และ `Access-Control-Allow-Private-Network: true` และแสดง `clientVpnIp` ที่เป้าหมายเห็น หน้า Harness ตรวจเฉพาะ HTTP `/health.json` ส่วนคอนเทนเนอร์ `target-routes` จะเพิ่มเส้นทางจากฝั่ง VPN เพื่อให้ทราฟฟิกไปยังซับเน็ตเหล่านี้ผ่าน `vpn-gateway`
+
+**รันชุดทดสอบ**
+
+1. จากโฟลเดอร์รากของโปรเจกต์ เริ่มชุดทดสอบแบบเลือกใช้ ซึ่งจะเริ่ม `postgres`, `vpn-gateway`, เป้าหมาย 3 เครื่อง, `target-routes` และ `test-harness`:
+
+   ```bash
+   npm run docker:test-targets:up
+   ```
+
+2. Seed นโยบาย Role ของ Track B หากยังไม่เคย Seed ฐานข้อมูล ให้รัน `npm run db:seed` ก่อน:
+
+   ```bash
+   npm run db:seed:test-targets
+   ```
+
+   **สิ่งที่ควรเห็น:** `Seeded 12 Track B VPN policies.` Seeder ใช้การ Upsert ตาม Role และชื่อนโยบาย จึงใช้แถวจาก Mission 3 ที่ชื่อ `Allow Internal Web` (STAFF) และ `Block Admin Subnet` (CLIENT) ซ้ำแทนการสร้างซ้ำ และจะปรับ `Allow Internal Web` เป็นลำดับความสำคัญ `101` (จากเดิม `100` ใน Mission 3)
+
+   Seeder เขียนลงฐานข้อมูลโดยตรงและไม่ได้ส่งการเปลี่ยนแปลงไปยัง Peer ที่เชื่อมต่ออยู่ การเชื่อมต่อจะอ่านนโยบายที่เปิดใช้งานของ Role ของผู้ใช้ ณ เวลาที่เชื่อมต่อ ดังนั้นหลัง Seed ให้ **ตัดการเชื่อมต่ออุโมงค์ที่ทำงานอยู่ แล้วเชื่อมต่อใหม่**
+
+3. ยืนยันว่า Agent อนุญาต Origin ของหน้า Harness ขั้นตอน B3 มี `http://localhost:3090,http://127.0.0.1:3090` อยู่ใน `AGENT_ALLOWED_ORIGINS` แล้ว หากคุณเริ่ม Agent ก่อนเพิ่มค่านี้ ให้รีสตาร์ท Agent
+
+4. เปิดหน้า Harness ที่ `http://localhost:3090` หน้าแรกเป็นภาพรวม และมีหน้า `admin.html`, `staff.html` และ `client.html` สำหรับแต่ละ Role ตั้งค่า URL ของ Agent (ค่าเริ่มต้น `http://127.0.0.1:47821`) วาง Pairing Token จากขั้นตอน B3 แล้วคลิก **Save** จากนั้นใช้ **Check /health** หรือ **Get /status** เพื่อยืนยันว่า Agent ตอบกลับ การตอบกลับของ `/status` ไม่มีฟิลด์ Role จึงต้องเลือกหน้าของ Role เอง
+
+**ขั้นตอนการทดสอบ Probe**
+
+1. เชื่อมต่ออุโมงค์ด้วยผู้ใช้ทดสอบหนึ่งคน เช่น `staff01` โดยใช้ขั้นตอนเดียวกับ Mission 3
+2. เปิดหน้า Harness ของ Role นั้นแล้วคลิก **Probe All 3 VPN Targets** Harness จะเรียก `http://<target-ip>/health.json` ของเป้าหมายแต่ละเครื่อง
+3. อ่านผลลัพธ์ของแต่ละแถว:
+   - **PASS:** ผลลัพธ์ (เข้าถึงได้หรือถูกบล็อก) ตรงกับที่ Role นั้นควรได้
+   - **MISMATCH:** ผลลัพธ์ต่างจากที่คาดไว้ ให้ตรวจนโยบายจากขั้นตอน Seed ข้อที่ 2
+   - **BLOCKED:** คำขอของเบราว์เซอร์ล้มเหลวในระดับเครือข่าย
+   - **TIMEOUT:** ไม่มีการตอบกลับภายใน 3.5 วินาที
+   - ในหน้าภาพรวม ทุกแถวจะแสดง `N/A (overview)` เพราะยังไม่ได้เลือก Role
+4. คลิก **Disconnect Tunnel** เชื่อมต่อด้วยผู้ใช้คนถัดไป แล้วทำซ้ำ
+
+**เมทริกซ์การเข้าถึงที่คาดหวัง**
+
+| เข้าสู่ระบบเป็น | `10.99.0.10` (โซน Admin) | `10.20.0.10` (โซน Staff) | `10.30.0.10` (โซน Client) |
+| :--- | :--- | :--- | :--- |
+| `ADMIN` | เข้าถึงได้ | เข้าถึงได้ | เข้าถึงได้ |
+| `STAFF` | ถูกบล็อก | เข้าถึงได้ | เข้าถึงได้ |
+| `CLIENT` | ถูกบล็อก | ถูกบล็อก | เข้าถึงได้ |
+
+**ตรวจ HTTPS จาก Command Line**
+
+หน้า Harness ทดสอบเฉพาะ HTTP หากต้องการตรวจ HTTPS ให้รันจากเครื่องที่ทราฟฟิกวิ่งผ่านอุโมงค์ ใช้ `-k` เพราะใบรับรองเป็นแบบ Self-signed:
+
+```bash
+curl -k https://10.20.0.10/health.json
+```
+
+**สิ่งที่ควรเห็น:** JSON ที่มี `"ok":true` และ `"zone"` ของเป้าหมายนั้น เมื่อ Role มีสิทธิ์เข้าถึง สำหรับเป้าหมายที่ถูกบล็อก คำขอจะเชื่อมต่อไม่สำเร็จ เบราว์เซอร์ยังต้องให้คุณยอมรับใบรับรอง Self-signed สำหรับ `https://10.x.x.x` ก่อน คำสั่ง `fetch` จึงจะสำเร็จ
+
+**หยุดชุดทดสอบเมื่อทดสอบเสร็จ**
+
+```bash
+npm run docker:test-targets:down
+```
+
+`docker compose down` จะไม่หยุดคอนเทนเนอร์ของ test-targets เพราะ `docker-compose.test-targets.yml` เป็นไฟล์แยกต่างหาก ให้ใช้คำสั่ง npm ด้านบนแทน
 
 ### 🐳 Track C: Docker Stack ครบชุดด้วยคำสั่งเดียว (คอนเทนเนอร์ 4 ตัว)
 
@@ -791,6 +863,8 @@ Linux/macOS (Bash):
     ```bash
     docker compose down
     ```
+
+   หากคุณเริ่มชุดทดสอบขั้นตอน B4 แบบเลือกใช้ ให้หยุดด้วย `npm run docker:test-targets:down` ด้วย เพราะ `docker compose down` ธรรมดาไม่รวม `docker-compose.test-targets.yml`
 
    **สิ่งที่ควรเห็น:** Compose แจ้งว่าคอนเทนเนอร์ถูกหยุดและลบแล้ว Named Volume ของข้อมูล PostgreSQL จะยังคงอยู่ ดังนั้นการรัน `docker compose up` ครั้งถัดไปจะใช้ฐานข้อมูลในเครื่องเดิมได้ อย่ารัน `docker compose down -v` เว้นแต่คุณตั้งใจจะลบข้อมูลฐานข้อมูลที่เก็บไว้
 

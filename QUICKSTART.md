@@ -278,6 +278,21 @@ sudo -E go run .
 
 The `vpn-gateway` service needs `NET_ADMIN` and `wg`/`nft` on Linux. Run the daemon natively only on Linux.
 
+### Optional: Track B role-enforcement test targets
+
+Start the optional static target sites and the localhost role harness. Setup steps and the expected access matrix are in [`TUTORIAL.md`](TUTORIAL.md) Step B4.
+
+```bash
+npm run docker:test-targets:up     # postgres, vpn-gateway, 3 target sites, target-routes, test-harness
+npm run db:seed                    # if you have not seeded the database yet
+npm run db:seed:test-targets       # seeds 12 Track B role policies (does not create users)
+# Open the localhost role harness in your browser: http://localhost:3090
+npm run docker:test-targets:down   # stop the test stack when you are finished
+```
+
+> [!NOTE]
+> The agent's `AGENT_ALLOWED_ORIGINS` must include `http://localhost:3090,http://127.0.0.1:3090` for the harness. Create `staff01` and `client01` in the Admin **Users** tab before testing.
+
 ### Full Docker stack
 
 [`Rain/portal/nginx.conf`](Rain/portal/nginx.conf) serves the SPA on port `3000` with `Cache-Control: no-store` on `/env-config.js`. Build and start the full stack, verify container healthchecks, and seed the initial `ADMIN` user:

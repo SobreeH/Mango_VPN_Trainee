@@ -59,7 +59,8 @@ Mango_VPN_Trainee/
 │       ├── src/agent-versions.ts      # /agent-versions
 │       ├── src/audit.ts               # Audit log writer helpers
 │       ├── src/revocation.ts          # Removes peers from the VPN daemon before revoke/disconnect is saved
-│       └── src/seed.ts                # Seeds ADMIN/STAFF/CLIENT roles and an initial ADMIN user
+│       ├── src/seed.ts                # Seeds ADMIN/STAFF/CLIENT roles and an initial ADMIN user
+│       └── src/seed-test-targets.ts   # Opt-in Track B role policy seeder (npm run db:seed:test-targets)
 │
 ├── Sobree/                            # ⚡ [Sobree] Control plane, Windows Agent, and gateway daemon
 │   ├── api/                           # @mango/api: control plane on :4000
@@ -100,10 +101,14 @@ Mango_VPN_Trainee/
 ├── docs/agents/                      # Agent skill configuration (issue tracker, triage labels, domain docs)
 ├── .github/                           # CI workflow (ci.yml) and CODEOWNERS
 ├── docker-compose.yml                 # postgres, vpn-gateway, api, portal
+├── docker-compose.test-targets.yml     # Optional Track B overlay: VPN target sites, target-routes, localhost role harness (TUTORIAL.md Step B4)
+├── test-targets/                         # Static target sites (sites/), role harness (harness/), nginx templates (nginx/)
 ├── .env.example                       # Environment template (copy to .env)
 ├── package.json                       # npm workspaces root
 └── tsconfig.base.json                 # Root TypeScript compiler options
 ```
+
+> **Optional Track B role-enforcement tests:** `docker-compose.test-targets.yml` and `test-targets/` add three VPN-isolated static target sites (`10.99.0.10`, `10.20.0.10`, `10.30.0.10`) and a localhost role harness at `http://localhost:3090`. Use them to check role-based `nftables` enforcement across `ADMIN`, `STAFF`, and `CLIENT`. See [`TUTORIAL.md`](TUTORIAL.md) Step B4.
 
 ---
 
@@ -268,6 +273,9 @@ Run `go vet ./...` and `go test ./...` in each Go module before you push.
 | `npm run db:generate` | Generates `@prisma/client` from `Sobree/api/prisma/schema.prisma` |
 | `npm run db:migrate` | Runs `prisma migrate dev` |
 | `npm run db:seed` | Runs `Rain/admin/src/seed.ts` |
+| `npm run db:seed:test-targets` | Runs `Rain/admin/src/seed-test-targets.ts`: upserts 12 opt-in Track B role policies (ADMIN, STAFF, CLIENT). Run `npm run db:seed` first; it does not create users |
+| `npm run docker:test-targets:up` | Builds and starts the optional Track B test stack (`docker-compose.test-targets.yml` layered on `docker-compose.yml`): `postgres`, `vpn-gateway`, three static targets, `target-routes`, and the localhost role harness at `http://localhost:3090` |
+| `npm run docker:test-targets:down` | Stops and removes the Track B test stack using both Compose files (named volumes are kept) |
 | `npm run check:env` | Runs `scripts/check-environment.mjs` (Linux, macOS, and Windows; `--role All` is the default) |
 | `npm run check:env -- --role Rain` | Rain's Docker-free readiness check. Marks Docker, Docker Compose, and Go as `OPTIONAL` |
 | `npm run check:env -- --role Sobree` | Full Sobree readiness. Exits `1` when Docker, Docker Compose, or Go is missing |
