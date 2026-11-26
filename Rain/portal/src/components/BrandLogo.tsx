@@ -7,11 +7,14 @@ interface BrandLogoProps {
 }
 
 /**
- * Renders the transparent Mango company logo without any background box.
- * In Dark Mode, `invert hue-rotate-180` turns dark lettering crisp white while preserving the green leaves.
+ * Renders the transparent Mango company logo paired with a compact VPN badge
+ * and subtle company subtitle—avoiding redundant stacked "MANGO" headings.
  */
 export function BrandLogo({ variant = 'sidebar', isDark = true, badgeText }: BrandLogoProps) {
   const logoFilterClass = isDark ? 'invert hue-rotate-180 brightness-110' : '';
+  const vpnPillClass = isDark
+    ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+    : 'bg-amber-500/15 border-amber-600/30 text-amber-700';
 
   if (variant === 'header') {
     return (
@@ -21,18 +24,18 @@ export function BrandLogo({ variant = 'sidebar', isDark = true, badgeText }: Bra
           alt="Mango Consultant Co., Ltd."
           className={`h-8 w-auto object-contain select-none shrink-0 transition-all ${logoFilterClass}`}
         />
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className={`text-base font-bold tracking-tight ${isDark ? 'text-stone-100' : 'text-slate-900'}`}>
-              MANGO VPN
-            </h1>
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-1.5">
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-extrabold tracking-wider border ${vpnPillClass}`}>
+              VPN
+            </span>
             {badgeText && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border bg-emerald-500/10 border-emerald-500/30 text-emerald-400">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border bg-emerald-500/10 border-emerald-500/30 text-emerald-500">
                 {badgeText}
               </span>
             )}
           </div>
-          <p className={`text-[10px] font-medium ${isDark ? 'text-stone-400' : 'text-amber-700'}`}>
+          <p className={`text-[10px] font-medium ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
             Mango Consultant Co., Ltd.
           </p>
         </div>
@@ -42,39 +45,39 @@ export function BrandLogo({ variant = 'sidebar', isDark = true, badgeText }: Bra
 
   if (variant === 'hero') {
     return (
-      <div className="space-y-3">
-        <img
-          src={mangoLogo}
-          alt="Mango Consultant Co., Ltd."
-          className={`h-10 w-auto object-contain select-none transition-all ${logoFilterClass}`}
-        />
-        <div>
-          <h1 className={`text-lg font-bold tracking-tight ${isDark ? 'text-stone-100' : 'text-stone-900'}`}>
-            MANGO VPN
-          </h1>
-          <p className={`text-[11px] font-medium ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
-            Mango Consultant Co., Ltd.
-          </p>
+      <div className="space-y-2">
+        <div className="flex items-end gap-2.5">
+          <img
+            src={mangoLogo}
+            alt="Mango Consultant Co., Ltd."
+            className={`h-10 w-auto object-contain select-none transition-all ${logoFilterClass}`}
+          />
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-extrabold tracking-wider border mb-1 ${vpnPillClass}`}>
+            VPN
+          </span>
         </div>
+        <p className={`text-[11px] font-medium ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
+          Mango Consultant Co., Ltd.
+        </p>
       </div>
     );
   }
 
   return (
     <div className="space-y-2">
-      <img
-        src={mangoLogo}
-        alt="Mango Consultant Co., Ltd."
-        className={`h-9 w-auto object-contain select-none transition-all ${logoFilterClass}`}
-      />
-      <div>
-        <h1 className={`text-base font-bold tracking-tight leading-tight ${isDark ? 'text-stone-100' : 'text-slate-900'}`}>
-          MANGO VPN
-        </h1>
-        <p className={`text-[10px] font-medium ${isDark ? 'text-stone-400' : 'text-amber-700'}`}>
-          Mango Consultant Co., Ltd.
-        </p>
+      <div className="flex items-end gap-2">
+        <img
+          src={mangoLogo}
+          alt="Mango Consultant Co., Ltd."
+          className={`h-8 w-auto object-contain select-none transition-all ${logoFilterClass}`}
+        />
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-extrabold tracking-wider border mb-0.5 ${vpnPillClass}`}>
+          VPN
+        </span>
       </div>
+      <p className={`text-[10px] font-medium tracking-wide ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
+        Mango Consultant Co., Ltd.
+      </p>
     </div>
   );
 }
