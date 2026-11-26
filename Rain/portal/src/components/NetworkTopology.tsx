@@ -72,11 +72,11 @@ export function NetworkTopology({
     }
     if (isConnected) {
       return isDark
-        ? 'border-emerald-500/25 bg-[#141311]/85 hover:border-emerald-400/50'
+        ? 'border-emerald-500/25 bg-slate-950/85 hover:border-emerald-400/50'
         : 'border-emerald-300 bg-emerald-50/60 hover:border-emerald-500';
     }
     return isDark
-      ? 'border-white/5 bg-[#141311]/70 hover:border-white/20'
+      ? 'border-white/5 bg-slate-950/60 hover:border-white/20'
       : 'border-stone-200 bg-stone-50 hover:border-stone-300';
   };
 

@@ -342,11 +342,11 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
             
             {/* Left Sidebar */}
             <aside className={`w-full md:w-64 lg:w-72 shrink-0 rounded-3xl border shadow-2xl p-6 flex flex-col justify-between backdrop-blur-xl transition-colors min-h-[calc(100vh-6rem)] ${
-              isDark ? 'border-white/5 bg-[#1e1d1a]/85' : 'border-stone-200/90 bg-white/95'
+              isDark ? 'border-slate-800/80 bg-slate-900/90' : 'border-slate-200/90 bg-white/95'
             }`}>
               <div className="space-y-7">
                 {/* Brand Header */}
-                <BrandLogo variant="sidebar" isDark={isDark} />
+                <div className={`pb-5 border-b ${isDark ? 'border-slate-800/80' : 'border-slate-200/80'}`}><BrandLogo variant="sidebar" isDark={isDark} /></div>
 
                 {/* Collapsible & Ordered Navigation Groups */}
                 <nav role="tablist" aria-label="Admin Governance" className="space-y-4">
@@ -479,7 +479,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                 <div className="flex items-center gap-3">
                   {/* Language Switcher Pills */}
                   <div className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
-                    isDark ? 'bg-[#1e1d1a]/85 border-white/5' : 'bg-white border-stone-200'
+                    isDark ? 'bg-slate-900/90 border-white/5' : 'bg-white border-stone-200'
                   }`}>
                     <button
                       type="button"
@@ -510,7 +510,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                     role="group"
                     aria-label="Toggle theme"
                     className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
-                      isDark ? 'bg-[#1e1d1a]/85 border-white/5' : 'bg-white border-stone-200'
+                      isDark ? 'bg-slate-900/90 border-white/5' : 'bg-white border-stone-200'
                     }`}
                   >
                     <button
@@ -547,7 +547,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                 {/* Total Users */}
                 <div className={`p-4 rounded-3xl border transition-all ${
                   isDark
-                    ? 'bg-[#1e1d1a]/85 border-white/5 shadow-xl hover:border-amber-500/20'
+                    ? 'bg-slate-900/90 border-white/5 shadow-xl hover:border-amber-500/20'
                     : 'bg-white border-stone-200 shadow-md'
                 }`}>
                   <div className="flex items-center justify-between mb-2">
@@ -569,7 +569,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                 {/* Registered Devices */}
                 <div className={`p-4 rounded-3xl border transition-all ${
                   isDark
-                    ? 'bg-[#1e1d1a]/85 border-white/5 shadow-xl hover:border-amber-500/20'
+                    ? 'bg-slate-900/90 border-white/5 shadow-xl hover:border-amber-500/20'
                     : 'bg-white border-stone-200 shadow-md'
                 }`}>
                   <div className="flex items-center justify-between mb-2">
@@ -591,7 +591,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                 {/* Active Sessions */}
                 <div className={`p-4 rounded-3xl border transition-all ${
                   isDark
-                    ? 'bg-[#1e1d1a]/85 border-white/5 shadow-xl hover:border-amber-500/20'
+                    ? 'bg-slate-900/90 border-white/5 shadow-xl hover:border-amber-500/20'
                     : 'bg-white border-stone-200 shadow-md'
                 }`}>
                   <div className="flex items-center justify-between mb-2">
@@ -616,7 +616,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                 {/* Security Posture */}
                 <div className={`p-4 rounded-3xl border transition-all ${
                   isDark
-                    ? 'bg-[#1e1d1a]/85 border-white/5 shadow-xl hover:border-amber-500/20'
+                    ? 'bg-slate-900/90 border-white/5 shadow-xl hover:border-amber-500/20'
                     : 'bg-white border-stone-200 shadow-md'
                 }`}>
                   <div className="flex items-center justify-between mb-2">
@@ -721,7 +721,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
           <div className="max-w-5xl mx-auto w-full space-y-6 relative z-10 py-2 sm:py-4">
             {/* Top Navbar */}
             <header className={`rounded-3xl border shadow-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 backdrop-blur-xl transition-colors ${
-              isDark ? 'border-white/5 bg-[#1e1d1a]/85 shadow-black/80' : 'border-stone-200/90 bg-white/95 shadow-stone-200/60'
+              isDark ? 'border-slate-800/80 bg-slate-900/90 shadow-black/80' : 'border-slate-200/90 bg-white/95 shadow-stone-200/60'
             }`}>
               {/* Brand & User Role */}
               <BrandLogo variant="header" isDark={isDark} badgeText="CLIENT PORTAL" />
@@ -730,7 +730,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
               <div className="flex items-center gap-3 flex-wrap">
                 {/* Language Switcher */}
                 <div className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
-                  isDark ? 'bg-[#141311] border-white/5' : 'bg-white border-stone-200'
+                  isDark ? 'bg-slate-950 border-white/5' : 'bg-white border-stone-200'
                 }`}>
                   <button
                     type="button"
@@ -761,7 +761,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                   role="group"
                   aria-label="Toggle theme"
                   className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
-                    isDark ? 'bg-[#141311] border-white/5' : 'bg-white border-stone-200'
+                    isDark ? 'bg-slate-950 border-white/5' : 'bg-white border-stone-200'
                   }`}
                 >
                   <button
@@ -801,7 +801,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                     aria-label="Log Out"
                     className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors shadow-sm ${
                       isDark
-                        ? 'border-white/10 bg-[#262420] text-stone-300 hover:bg-rose-950/60 hover:text-rose-200 hover:border-rose-900/50'
+                        ? 'border-white/10 bg-slate-800 text-stone-300 hover:bg-rose-950/60 hover:text-rose-200 hover:border-rose-900/50'
                         : 'border-stone-200 bg-white text-slate-700 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200'
                     }`}
                   >
@@ -841,11 +841,11 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
           <div className="w-full flex-1 flex flex-col md:flex-row gap-6 relative z-10 items-stretch">
             {/* Left Sidebar */}
             <aside className={`w-full md:w-64 lg:w-72 shrink-0 rounded-3xl border shadow-2xl p-6 flex flex-col justify-between backdrop-blur-xl transition-colors min-h-[calc(100vh-6rem)] ${
-              isDark ? 'border-white/5 bg-[#1e1d1a]/85 shadow-black/80' : 'border-stone-200/90 bg-white/95 shadow-stone-200/60'
+              isDark ? 'border-slate-800/80 bg-slate-900/90 shadow-black/80' : 'border-slate-200/90 bg-white/95 shadow-stone-200/60'
             }`}>
               <div className="space-y-7">
                 {/* Brand Header */}
-                <BrandLogo variant="sidebar" isDark={isDark} />
+                <div className={`pb-5 border-b ${isDark ? 'border-slate-800/80' : 'border-slate-200/80'}`}><BrandLogo variant="sidebar" isDark={isDark} /></div>
 
                 {/* Non-Admin Navigation Menu */}
                 <nav role="tablist" aria-label="Client Navigation" className="space-y-2">
@@ -924,7 +924,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                 <div className="flex items-center gap-3">
                   {/* Language Switcher */}
                   <div className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
-                    isDark ? 'bg-[#1e1d1a]/85 border-white/5' : 'bg-white border-stone-200'
+                    isDark ? 'bg-slate-900/90 border-white/5' : 'bg-white border-stone-200'
                   }`}>
                     <button
                       type="button"
@@ -955,7 +955,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                     role="group"
                     aria-label="Toggle theme"
                     className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
-                      isDark ? 'bg-[#1e1d1a]/85 border-white/5' : 'bg-white border-stone-200'
+                      isDark ? 'bg-slate-900/90 border-white/5' : 'bg-white border-stone-200'
                     }`}
                   >
                     <button
@@ -1004,7 +1004,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                 <div className="w-full space-y-6">
                   {/* Profile Card */}
                   <div className={`rounded-3xl border p-6 sm:p-8 space-y-6 shadow-2xl backdrop-blur-xl ${
-                    isDark ? 'border-white/5 bg-[#1e1d1a]/85 shadow-black/80' : 'border-stone-200/90 bg-white/95 shadow-stone-200/60'
+                    isDark ? 'border-slate-800/80 bg-slate-900/90 shadow-black/80' : 'border-slate-200/90 bg-white/95 shadow-stone-200/60'
                   }`}>
                     <div className={`flex items-center justify-between border-b pb-4 ${isDark ? 'border-white/5' : 'border-stone-200'}`}>
                       <div>
@@ -1029,22 +1029,22 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                      <div className={`p-4 rounded-2xl border ${isDark ? 'border-white/5 bg-[#141311]/70' : 'border-stone-200 bg-stone-50'}`}>
+                      <div className={`p-4 rounded-2xl border ${isDark ? 'border-white/5 bg-slate-950/60' : 'border-stone-200 bg-stone-50'}`}>
                         <span className={`block text-[11px] ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>{lang === 'th' ? 'ชื่อผู้ใช้' : 'Username'}</span>
                         <span className={`font-semibold text-sm mt-0.5 block ${isDark ? 'text-stone-100' : 'text-slate-900'}`}>{step.session.user.username}</span>
                       </div>
-                      <div className={`p-4 rounded-2xl border ${isDark ? 'border-white/5 bg-[#141311]/70' : 'border-stone-200 bg-stone-50'}`}>
+                      <div className={`p-4 rounded-2xl border ${isDark ? 'border-white/5 bg-slate-950/60' : 'border-stone-200 bg-stone-50'}`}>
                         <span className={`block text-[11px] ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>{lang === 'th' ? 'อีเมลองค์กร' : 'Email'}</span>
                         <span className={`font-semibold text-sm mt-0.5 block ${isDark ? 'text-stone-100' : 'text-slate-900'}`}>{step.session.user.email}</span>
                       </div>
-                      <div className={`p-4 rounded-2xl border ${isDark ? 'border-white/5 bg-[#141311]/70' : 'border-stone-200 bg-stone-50'}`}>
+                      <div className={`p-4 rounded-2xl border ${isDark ? 'border-white/5 bg-slate-950/60' : 'border-stone-200 bg-stone-50'}`}>
                         <span className={`block text-[11px] ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>{lang === 'th' ? 'การยืนยันตัวตน 2 ขั้น (MFA)' : 'Two-Factor Authentication'}</span>
                         <span className={`font-semibold text-sm mt-0.5 flex items-center gap-1.5 ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
                           <ShieldCheck className="h-4 w-4" />
                           {lang === 'th' ? 'เปิดใช้งานแล้ว (TOTP Authenticator)' : 'Enabled (TOTP Authenticator)'}
                         </span>
                       </div>
-                      <div className={`p-4 rounded-2xl border ${isDark ? 'border-white/5 bg-[#141311]/70' : 'border-stone-200 bg-stone-50'}`}>
+                      <div className={`p-4 rounded-2xl border ${isDark ? 'border-white/5 bg-slate-950/60' : 'border-stone-200 bg-stone-50'}`}>
                         <span className={`block text-[11px] ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>{lang === 'th' ? 'สถานะเซสชัน' : 'Session Status'}</span>
                         <span className={`font-semibold text-sm mt-0.5 block ${isDark ? 'text-stone-200' : 'text-slate-900'}`}>
                           {lang === 'th' ? 'ทำงานอยู่ (หมุนเวียนโทเค็นอัตโนมัติ)' : 'Active (Auto-refreshing JWT)'}
@@ -1059,7 +1059,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                 <div className="w-full space-y-6">
                   {/* Agent Installer Download Card */}
                   <div className={`rounded-3xl border p-6 sm:p-8 space-y-5 shadow-2xl backdrop-blur-xl ${
-                    isDark ? 'border-white/5 bg-[#1e1d1a]/85 shadow-black/80' : 'border-stone-200/90 bg-white/95 shadow-stone-200/60'
+                    isDark ? 'border-slate-800/80 bg-slate-900/90 shadow-black/80' : 'border-slate-200/90 bg-white/95 shadow-stone-200/60'
                   }`}>
                     <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-4 ${isDark ? 'border-white/5' : 'border-stone-200'}`}>
                       <div>
@@ -1089,7 +1089,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                           : 'Failed to load agent installers'}
                       </div>
                     ) : (staffAgentVersionsQuery.data?.items.length ?? 0) === 0 ? (
-                      <div className={`rounded-2xl border p-4 text-xs ${isDark ? 'border-white/5 bg-[#141311]/70 text-stone-400' : 'border-stone-200 bg-stone-50 text-stone-600'}`}>
+                      <div className={`rounded-2xl border p-4 text-xs ${isDark ? 'border-white/5 bg-slate-950/60 text-stone-400' : 'border-stone-200 bg-stone-50 text-stone-600'}`}>
                         {lang === 'th'
                           ? 'ยังไม่มีตัวติดตั้ง Agent ที่เผยแพร่ในระบบ กรุณาติดต่อฝ่ายไอที'
                           : 'No active agent installers published yet. Please contact IT Support.'}
@@ -1100,7 +1100,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                           <div
                             key={ver.id}
                             className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl border ${
-                              isDark ? 'border-white/5 bg-[#141311]/70' : 'border-stone-200 bg-stone-50'
+                              isDark ? 'border-white/5 bg-slate-950/60' : 'border-stone-200 bg-stone-50'
                             }`}
                           >
                             <div className="space-y-1.5 min-w-0">
@@ -1169,7 +1169,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
 
                   {/* Help & Troubleshooting Card */}
                   <div className={`rounded-3xl border p-6 sm:p-8 space-y-6 shadow-2xl backdrop-blur-xl ${
-                    isDark ? 'border-white/5 bg-[#1e1d1a]/85 shadow-black/80' : 'border-stone-200/90 bg-white/95 shadow-stone-200/60'
+                    isDark ? 'border-slate-800/80 bg-slate-900/90 shadow-black/80' : 'border-slate-200/90 bg-white/95 shadow-stone-200/60'
                   }`}>
                     <div className={`border-b pb-4 ${isDark ? 'border-white/5' : 'border-stone-200'}`}>
                       <h3 className={`text-lg font-bold ${isDark ? 'text-stone-100' : 'text-stone-900'}`}>
@@ -1181,7 +1181,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                     </div>
 
                     <div className={`space-y-4 text-xs leading-relaxed ${isDark ? 'text-stone-300' : 'text-slate-700'}`}>
-                      <div className={`p-4 rounded-2xl border space-y-2 ${isDark ? 'border-white/5 bg-[#141311]/70' : 'border-stone-200 bg-stone-50'}`}>
+                      <div className={`p-4 rounded-2xl border space-y-2 ${isDark ? 'border-white/5 bg-slate-950/60' : 'border-stone-200 bg-stone-50'}`}>
                         <h4 className={`font-bold text-sm ${isDark ? 'text-emerald-400' : 'text-amber-600'}`}>
                           {lang === 'th' ? '1. ตรวจสอบการทำงานของ Windows Agent' : '1. Verify Windows Agent is Running'}
                         </h4>
@@ -1192,7 +1192,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                         </p>
                       </div>
 
-                      <div className={`p-4 rounded-2xl border space-y-2 ${isDark ? 'border-white/5 bg-[#141311]/70' : 'border-stone-200 bg-stone-50'}`}>
+                      <div className={`p-4 rounded-2xl border space-y-2 ${isDark ? 'border-white/5 bg-slate-950/60' : 'border-stone-200 bg-stone-50'}`}>
                         <h4 className={`font-bold text-sm ${isDark ? 'text-emerald-400' : 'text-amber-600'}`}>
                           {lang === 'th' ? '2. การจับคู่ Agent (Pairing Token)' : '2. Agent Pairing Token'}
                         </h4>
@@ -1203,7 +1203,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                         </p>
                       </div>
 
-                      <div className={`p-4 rounded-2xl border space-y-2 ${isDark ? 'border-white/5 bg-[#141311]/70' : 'border-stone-200 bg-stone-50'}`}>
+                      <div className={`p-4 rounded-2xl border space-y-2 ${isDark ? 'border-white/5 bg-slate-950/60' : 'border-stone-200 bg-stone-50'}`}>
                         <h4 className={`font-bold text-sm ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
                           {lang === 'th' ? '3. ติดต่อฝ่ายไอที (IT Support)' : '3. IT Support Contact'}
                         </h4>
@@ -1226,7 +1226,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
 
   return (
     <main className={`min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden transition-colors duration-300 ${
-      isDark ? 'bg-[#141311] text-stone-100' : 'bg-[#fcfbf7] text-stone-900'
+      isDark ? 'bg-slate-950 text-stone-100' : 'bg-slate-100 text-stone-900'
     }`}>
       {/* Ambient gradient glows (Mango Theme: Warm Golden Amber & Moss/Mint Green) */}
       <div className={`absolute -top-32 -left-32 w-80 h-80 rounded-full blur-3xl pointer-events-none transition-colors duration-500 ${
@@ -1239,8 +1239,8 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
       {/* Centered Floating 2-Column Card */}
       <section className={`w-full max-w-3xl lg:max-w-4xl min-h-[580px] grid grid-cols-1 md:grid-cols-12 rounded-3xl border shadow-2xl overflow-hidden backdrop-blur-md relative z-10 transition-colors duration-300 ${
         isDark
-          ? 'border-white/5 bg-[#1e1d1a]/85 shadow-black/80'
-          : 'border-stone-200/90 bg-white/95 shadow-stone-200/60'
+          ? 'border-slate-800/80 bg-slate-900/90 shadow-black/80'
+          : 'border-slate-200/90 bg-white/95 shadow-stone-200/60'
       }`}>
         
         {/* Left Column: Mango Hero Banner */}
@@ -1291,7 +1291,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
 
         {/* Right Column: Sign In & MFA Form */}
         <div className={`md:col-span-7 p-8 sm:p-10 flex flex-col justify-between space-y-6 transition-colors duration-300 ${
-          isDark ? 'bg-[#1e1d1a]/80' : 'bg-white/95'
+          isDark ? 'bg-slate-900/80' : 'bg-white/95'
         }`}>
           {/* Top Bar: Language & Theme Switches */}
           <div className="flex items-center justify-between">
@@ -1306,7 +1306,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
             <div className="flex items-center gap-2">
               {/* Language Switcher Pills */}
               <div className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
-                isDark ? 'bg-[#141311] border-white/5' : 'bg-stone-100 border-stone-200'
+                isDark ? 'bg-slate-950 border-white/5' : 'bg-stone-100 border-stone-200'
               }`}>
                 <button
                   type="button"
@@ -1337,7 +1337,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                 role="group"
                 aria-label="Toggle theme"
                 className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
-                  isDark ? 'bg-[#141311] border-white/5' : 'bg-stone-100 border-stone-200'
+                  isDark ? 'bg-slate-950 border-white/5' : 'bg-stone-100 border-stone-200'
                 }`}
               >
                 <button
@@ -1450,7 +1450,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                     placeholder={lang === 'th' ? 'เช่น somchai หรือ admin' : 'e.g. somchai or admin'}
                     className={`w-full h-11 rounded-xl border pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-colors ${
                       isDark
-                        ? 'border-white/10 bg-[#262420]/70 text-stone-100 placeholder-stone-500 focus:border-emerald-400'
+                        ? 'border-white/10 bg-slate-800/70 text-stone-100 placeholder-stone-500 focus:border-emerald-400'
                         : 'border-stone-300 bg-white text-stone-900 placeholder-stone-400 focus:border-emerald-600'
                     }`}
                   />
@@ -1477,7 +1477,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                     placeholder="••••••••••••"
                     className={`w-full h-11 rounded-xl border pl-9 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-colors ${
                       isDark
-                        ? 'border-white/10 bg-[#262420]/70 text-stone-100 placeholder-stone-500 focus:border-emerald-400'
+                        ? 'border-white/10 bg-slate-800/70 text-stone-100 placeholder-stone-500 focus:border-emerald-400'
                         : 'border-stone-300 bg-white text-stone-900 placeholder-stone-400 focus:border-emerald-600'
                     }`}
                   />
@@ -1488,7 +1488,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                     title={lang === 'th' ? (showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน') : (showPassword ? 'Hide password' : 'Show password')}
                     className={`absolute right-3 top-3 p-1 rounded-lg transition-colors ${
                       isDark
-                        ? 'text-stone-400 hover:text-stone-200 hover:bg-[#262420]'
+                        ? 'text-stone-400 hover:text-stone-200 hover:bg-slate-800'
                         : 'text-stone-500 hover:text-stone-700 hover:bg-stone-200'
                     }`}
                   >
@@ -1530,7 +1530,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
               {/* QR Code and Secret Key block for First-time setup */}
               {step.challenge.status === 'MFA_SETUP_REQUIRED' && (
                 <div className={`space-y-3 rounded-2xl border p-4 text-center ${
-                  isDark ? 'border-white/5 bg-[#141311]/80' : 'border-stone-200 bg-stone-50'
+                  isDark ? 'border-white/5 bg-slate-950/80' : 'border-stone-200 bg-stone-50'
                 }`}>
                   <p className={`text-xs ${isDark ? 'text-stone-400' : 'text-stone-600'}`}>
                     Scan this QR code with your Authenticator app, or enter the key manually.
@@ -1543,7 +1543,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                     />
                   )}
                   <code className={`block break-all rounded-lg px-2 py-1 text-xs font-mono font-bold border ${
-                    isDark ? 'bg-[#262420] text-amber-300 border-white/5' : 'bg-stone-200 text-amber-800 border-stone-300'
+                    isDark ? 'bg-slate-800 text-amber-300 border-white/5' : 'bg-stone-200 text-amber-800 border-stone-300'
                   }`}>
                     {step.challenge.secretBase32}
                   </code>
@@ -1587,14 +1587,14 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                           className={`h-14 sm:h-16 rounded-2xl flex items-center justify-center font-mono text-2xl font-bold transition-all shadow-sm ${
                             char
                               ? isDark
-                                ? 'bg-[#262420] border-2 border-amber-500/40 text-stone-100 shadow-inner'
+                                ? 'bg-slate-800 border-2 border-amber-500/40 text-stone-100 shadow-inner'
                                 : 'bg-white border-2 border-stone-300 text-stone-900 shadow-inner'
                               : isCurrent
                                 ? isDark
-                                  ? 'bg-[#262420] border-2 border-amber-500 ring-2 ring-amber-500/25 text-stone-100'
+                                  ? 'bg-slate-800 border-2 border-amber-500 ring-2 ring-amber-500/25 text-stone-100'
                                   : 'bg-white border-2 border-amber-500 ring-2 ring-amber-500/25 text-stone-900'
                                 : isDark
-                                  ? 'bg-[#141311]/60 border border-white/5 text-stone-500'
+                                  ? 'bg-slate-950/60 border border-white/5 text-stone-500'
                                   : 'bg-stone-50 border border-stone-200 text-stone-400'
                           }`}
                         >
@@ -1638,7 +1638,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
 
                 {showSetupKey && (
                   <p className={`text-[11px] p-2.5 rounded-xl border text-left leading-relaxed ${
-                    isDark ? 'border-white/5 bg-[#141311] text-stone-300' : 'border-stone-200 bg-stone-100 text-stone-700'
+                    isDark ? 'border-white/5 bg-slate-950 text-stone-300' : 'border-stone-200 bg-stone-100 text-stone-700'
                   }`}>
                     {lang === 'th'
                       ? '💡 หากเปลี่ยนเครื่องหรือต้องการผูก Authenticator ใหม่ กรุณาติดต่อผู้ดูแลระบบ (Admin) เพื่อขอรีเซ็ตคีย์ MFA ตามนโยบายความปลอดภัย Zero-Trust'
