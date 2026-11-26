@@ -68,7 +68,7 @@ export function AuditLogsTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDar
       <div className={`rounded-3xl border p-6 space-y-4 ${t.card}`}>
         <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b ${t.border}`}>
           <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
+            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
               <FileText className="h-4 w-4" />
             </div>
             <div>
@@ -91,7 +91,7 @@ export function AuditLogsTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDar
               className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-medium transition-colors ${
                 autoRefresh
                   ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
-                  : `${t.secondaryBtn} hover:border-amber-500/40 hover:text-amber-400`
+                  : `${t.secondaryBtn} hover:border-emerald-500/40 hover:text-emerald-400`
               }`}
             >
               <span
@@ -106,9 +106,9 @@ export function AuditLogsTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDar
               type="button"
               onClick={() => void query.refetch()}
               disabled={query.isFetching}
-              className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-medium hover:border-amber-500/40 hover:text-amber-400 transition-colors disabled:opacity-50 ${t.secondaryBtn}`}
+              className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-medium hover:border-emerald-500/40 hover:text-emerald-400 transition-colors disabled:opacity-50 ${t.secondaryBtn}`}
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${query.isFetching ? 'animate-spin text-amber-400' : ''}`} />
+              <RefreshCw className={`h-3.5 w-3.5 ${query.isFetching ? 'animate-spin text-emerald-400' : ''}`} />
               <span>{lang === 'th' ? 'รีเฟรช' : 'Refresh'}</span>
             </button>
 
@@ -123,7 +123,7 @@ export function AuditLogsTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDar
                 });
               }}
               disabled={logs.length === 0}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 px-4 py-2 text-xs font-semibold shadow-sm transition-all disabled:opacity-40"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-4 py-2 text-xs font-semibold shadow-sm transition-all disabled:opacity-40"
             >
               <Download className="h-3.5 w-3.5" />
               <span>{lang === 'th' ? 'ส่งออก CSV' : 'Export CSV'}</span>
@@ -238,8 +238,8 @@ export function AuditLogsTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDar
                     <td className={`px-4 py-3 font-medium ${t.text}`}>
                       {log.actorUsername ?? log.actorUserId ?? 'system'}
                     </td>
-                    <td className="px-4 py-3 font-mono text-[11px] text-amber-400">
-                      <span className="px-2 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                    <td className="px-4 py-3 font-mono text-[11px] text-emerald-400">
+                      <span className="px-2 py-0.5 rounded-lg bg-emerald-500/10 border border-amber-500/20">
                         {log.action}
                       </span>
                     </td>

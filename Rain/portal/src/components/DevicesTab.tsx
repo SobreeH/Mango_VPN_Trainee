@@ -56,7 +56,7 @@ function getDeviceMeta(hostname: string) {
   if (lower.includes('iphone') || lower.includes('android') || lower.includes('mobile')) {
     return { icon: Smartphone, label: 'Mobile', colorClass: 'text-sky-400 bg-sky-500/10 border-sky-500/20' };
   }
-  return { icon: Monitor, label: 'Windows / PC', colorClass: 'text-amber-400 bg-amber-500/10 border-amber-500/20' };
+  return { icon: Monitor, label: 'Windows / PC', colorClass: 'text-emerald-400 bg-emerald-500/10 border-amber-500/20' };
 }
 
 function formatDeviceDate(iso: string | null, lang: UiLang = 'th'): string {
@@ -153,7 +153,7 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark 
       <div className={`flex flex-wrap items-center justify-between gap-3 rounded-3xl border px-5 py-4 ${t.card}`}>
         <div className="flex flex-wrap items-center gap-3 text-xs">
           <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-medium ${t.pillMuted}`}>
-            <Monitor className="h-3.5 w-3.5 text-amber-400" />
+            <Monitor className="h-3.5 w-3.5 text-emerald-400" />
             {lang === 'th' ? `ทั้งหมด ${devices.length} เครื่อง` : `Total ${devices.length} Devices`}
           </span>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 font-medium text-emerald-500">
@@ -171,9 +171,9 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark 
             type="button"
             onClick={() => void listQuery.refetch()}
             disabled={listQuery.isFetching}
-            className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-medium hover:border-amber-500/40 hover:text-amber-400 transition-colors disabled:opacity-50 ${t.secondaryBtn}`}
+            className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-medium hover:border-emerald-500/40 hover:text-emerald-400 transition-colors disabled:opacity-50 ${t.secondaryBtn}`}
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${listQuery.isFetching ? 'animate-spin text-amber-400' : ''}`} />
+            <RefreshCw className={`h-3.5 w-3.5 ${listQuery.isFetching ? 'animate-spin text-emerald-400' : ''}`} />
             <span>{lang === 'th' ? 'รีเฟรช' : 'Refresh'}</span>
           </button>
           <button
@@ -188,7 +188,7 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark 
               });
             }}
             disabled={filteredDevices.length === 0}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 px-4 py-2 text-xs font-semibold shadow-sm transition-all disabled:opacity-40"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-4 py-2 text-xs font-semibold shadow-sm transition-all disabled:opacity-40"
           >
             <Download className="h-3.5 w-3.5" />
             <span>{lang === 'th' ? 'ส่งออก CSV' : 'Export CSV'}</span>
@@ -205,7 +205,7 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark 
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder={lang === 'th' ? 'ค้นหาชื่อเครื่อง ผู้ใช้ หรือ Fingerprint' : 'Search hostname, user, or fingerprint...'}
             aria-label="Search devices"
-            className={`w-full h-12 rounded-2xl border px-5 pr-10 text-xs sm:text-sm focus:ring-1 focus:ring-amber-400 focus:outline-none transition-colors ${t.input}`}
+            className={`w-full h-12 rounded-2xl border px-5 pr-10 text-xs sm:text-sm focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-colors ${t.input}`}
           />
           {searchTerm && (
             <button
@@ -223,7 +223,7 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark 
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as 'ALL' | DeviceStatus)}
             aria-label="Filter status"
-            className={`w-full h-12 rounded-2xl border px-5 pr-10 text-xs sm:text-sm focus:ring-1 focus:ring-amber-400 focus:outline-none transition-colors appearance-none cursor-pointer ${t.input}`}
+            className={`w-full h-12 rounded-2xl border px-5 pr-10 text-xs sm:text-sm focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-colors appearance-none cursor-pointer ${t.input}`}
           >
             <option value="ALL">{lang === 'th' ? 'ทุกสถานะ' : 'All Statuses'}</option>
             <option value={DeviceStatus.ACTIVE}>{lang === 'th' ? 'ใช้งานอยู่' : 'Active'}</option>
@@ -336,7 +336,7 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark 
                           type="button"
                           aria-label="Inspect device"
                           onClick={() => setDeviceToInspect(d)}
-                          className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-1.5 text-xs font-medium hover:border-amber-500/40 hover:text-amber-400 transition-colors shadow-sm ${t.secondaryBtn}`}
+                          className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-1.5 text-xs font-medium hover:border-emerald-500/40 hover:text-emerald-400 transition-colors shadow-sm ${t.secondaryBtn}`}
                         >
                           <Eye className="h-3.5 w-3.5" />
                           <span>{lang === 'th' ? 'ดูรายละเอียด' : 'Inspect'}</span>
@@ -411,7 +411,7 @@ export function DevicesTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark 
                     type="button"
                     aria-label="Copy fingerprint"
                     onClick={() => void handleCopyFingerprint(deviceToInspect.fingerprint)}
-                    className="inline-flex items-center gap-1 rounded-lg bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 text-[11px] font-semibold text-amber-400 hover:bg-amber-500/20 transition-colors"
+                    className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 text-[11px] font-semibold text-emerald-400 hover:bg-amber-500/20 transition-colors"
                   >
                     <Copy className="h-3 w-3" />
                     <span>{lang === 'th' ? 'คัดลอก' : 'Copy'}</span>

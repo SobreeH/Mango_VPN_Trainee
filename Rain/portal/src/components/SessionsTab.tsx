@@ -117,7 +117,7 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark
       {/* Header Card with Export CSV & Emergency Terminate All */}
       <div className={`rounded-3xl border p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4 ${t.card}`}>
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-2xl bg-amber-500/10 text-amber-400">
+          <div className="p-2.5 rounded-2xl bg-emerald-500/10 text-emerald-400">
             <Wifi className="h-5 w-5" />
           </div>
           <div>
@@ -149,7 +149,7 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark
             className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-medium transition-colors ${
               autoRefresh
                 ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
-                : `${t.secondaryBtn} hover:border-amber-500/40 hover:text-amber-400`
+                : `${t.secondaryBtn} hover:border-emerald-500/40 hover:text-emerald-400`
             }`}
           >
             <span
@@ -164,9 +164,9 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark
             type="button"
             onClick={() => void listQuery.refetch()}
             disabled={listQuery.isFetching}
-            className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-medium hover:border-amber-500/40 hover:text-amber-400 transition-colors disabled:opacity-50 ${t.secondaryBtn}`}
+            className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3.5 py-2 text-xs font-medium hover:border-emerald-500/40 hover:text-emerald-400 transition-colors disabled:opacity-50 ${t.secondaryBtn}`}
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${listQuery.isFetching ? 'animate-spin text-amber-400' : ''}`} />
+            <RefreshCw className={`h-3.5 w-3.5 ${listQuery.isFetching ? 'animate-spin text-emerald-400' : ''}`} />
             <span>{lang === 'th' ? 'รีเฟรช' : 'Refresh'}</span>
           </button>
 
@@ -181,7 +181,7 @@ export function SessionsTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark
               });
             }}
             disabled={filteredSessions.length === 0}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 px-4 py-2 text-xs font-semibold shadow-sm transition-all disabled:opacity-40"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-4 py-2 text-xs font-semibold shadow-sm transition-all disabled:opacity-40"
           >
             <Download className="h-3.5 w-3.5" />
             <span>{lang === 'th' ? 'ส่งออก CSV' : 'Export CSV'}</span>

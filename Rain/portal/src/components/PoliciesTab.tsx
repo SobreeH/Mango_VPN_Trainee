@@ -133,7 +133,7 @@ export function PoliciesTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark
         className={`rounded-3xl border p-6 space-y-5 ${t.card}`}
       >
         <div className={`flex items-center gap-2.5 pb-2 border-b ${t.border}`}>
-          <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
+          <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
             <Plus className="h-4 w-4" />
           </div>
           <div>
@@ -269,7 +269,7 @@ export function PoliciesTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark
           type="submit"
           aria-label="Create Policy"
           disabled={createMutation.isPending}
-          className="rounded-xl bg-[#f59e0b] hover:bg-[#d97706] px-6 py-2.5 text-xs sm:text-sm font-bold text-stone-950 shadow-md shadow-amber-500/20 disabled:opacity-50 transition-colors"
+          className="rounded-xl bg-[#059669] hover:bg-[#047857] px-6 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md shadow-emerald-500/20 disabled:opacity-50 transition-colors"
         >
           {createMutation.isPending
             ? (lang === 'th' ? 'กำลังสร้าง...' : 'Creating...')
@@ -402,7 +402,7 @@ export function PoliciesTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <span className={`font-bold text-sm tracking-tight ${t.heading}`}>{pol.name}</span>
-                  <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 text-[11px] font-bold text-amber-400">
+                  <span className="rounded-full bg-emerald-500/10 border border-amber-500/20 px-2.5 py-0.5 text-[11px] font-bold text-emerald-400">
                     {pol.role}
                   </span>
                   <span

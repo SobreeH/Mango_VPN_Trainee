@@ -25,8 +25,8 @@ export function getThemeClasses(isDark: boolean): ThemeClasses {
       ? 'border-white/5 bg-[#141311]/80 text-stone-200'
       : 'border-stone-200 bg-stone-50/90 text-stone-800',
     input: isDark
-      ? 'border-white/10 bg-[#262420]/70 text-stone-100 placeholder-stone-500 focus:border-amber-400'
-      : 'border-stone-300 bg-white text-stone-900 placeholder-stone-400 focus:border-amber-500',
+      ? 'border-white/10 bg-[#262420]/70 text-stone-100 placeholder-stone-500 focus:border-emerald-400'
+      : 'border-stone-300 bg-white text-stone-900 placeholder-stone-400 focus:border-emerald-600',
     tableHead: isDark
       ? 'bg-[#141311]/80 text-stone-400 border-b border-white/5'
       : 'bg-stone-100/90 text-stone-600 border-b border-stone-200',

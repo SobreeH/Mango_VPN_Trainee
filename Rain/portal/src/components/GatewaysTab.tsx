@@ -265,7 +265,7 @@ export function GatewaysTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark
           type="submit"
           aria-label="Register Gateway"
           disabled={createMutation.isPending}
-          className="rounded-xl bg-[#f59e0b] hover:bg-[#d97706] px-6 py-2.5 text-xs sm:text-sm font-bold text-stone-950 shadow-md shadow-amber-500/20 disabled:opacity-50 transition-colors"
+          className="rounded-xl bg-[#059669] hover:bg-[#047857] px-6 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md shadow-emerald-500/20 disabled:opacity-50 transition-colors"
         >
           {createMutation.isPending
             ? (lang === 'th' ? 'กำลังลงทะเบียน...' : 'Registering...')
@@ -338,7 +338,7 @@ export function GatewaysTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark
               setSearchTerm('');
               setProviderFilter('ALL');
             }}
-            className="text-amber-400 hover:underline font-semibold"
+            className="text-emerald-400 hover:underline font-semibold"
           >
             {lang === 'th' ? 'ล้างการค้นหา' : 'Clear filters'}
           </button>
@@ -359,7 +359,7 @@ export function GatewaysTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark
                     {gw.providerType}
                   </span>
                   {gw.isDefault && (
-                    <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 text-[11px] font-semibold text-amber-400">
+                    <span className="rounded-full bg-amber-500/15 border border-emerald-500/30 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-400">
                       DEFAULT
                     </span>
                   )}

@@ -158,7 +158,7 @@ export function UsersTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark = 
               required
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className={`w-full h-11 rounded-xl border px-4 text-xs sm:text-sm focus:ring-1 focus:ring-amber-400 focus:outline-none transition-colors ${t.input}`}
+              className={`w-full h-11 rounded-xl border px-4 text-xs sm:text-sm focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-colors ${t.input}`}
             />
           </div>
           <div>
@@ -172,7 +172,7 @@ export function UsersTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark = 
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className={`w-full h-11 rounded-xl border px-4 text-xs sm:text-sm focus:ring-1 focus:ring-amber-400 focus:outline-none transition-colors ${t.input}`}
+              className={`w-full h-11 rounded-xl border px-4 text-xs sm:text-sm focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-colors ${t.input}`}
             />
           </div>
           <div>
@@ -183,7 +183,7 @@ export function UsersTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark = 
               <button
                 type="button"
                 onClick={handleGeneratePassword}
-                className="text-[11px] text-amber-500 hover:text-amber-400 underline font-medium"
+                className="text-[11px] text-amber-500 hover:text-emerald-400 underline font-medium"
               >
                 {lang === 'th' ? 'สุ่มรหัสผ่านปลอดภัย' : 'Generate Secure'}
               </button>
@@ -195,7 +195,7 @@ export function UsersTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark = 
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className={`w-full h-11 rounded-xl border px-4 text-xs sm:text-sm focus:ring-1 focus:ring-amber-400 focus:outline-none transition-colors ${t.input}`}
+              className={`w-full h-11 rounded-xl border px-4 text-xs sm:text-sm focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-colors ${t.input}`}
             />
             <div className="mt-1 text-[11px]">
               <span
@@ -224,7 +224,7 @@ export function UsersTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark = 
               aria-label="Role"
               value={role}
               onChange={(e) => setRole(e.target.value as RoleName)}
-              className={`w-full h-11 rounded-xl border px-4 text-xs sm:text-sm focus:ring-1 focus:ring-amber-400 focus:outline-none transition-colors cursor-pointer ${t.input}`}
+              className={`w-full h-11 rounded-xl border px-4 text-xs sm:text-sm focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-colors cursor-pointer ${t.input}`}
             >
               <option value={RoleName.ADMIN}>ADMIN</option>
               <option value={RoleName.STAFF}>STAFF</option>
@@ -236,7 +236,7 @@ export function UsersTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark = 
           type="submit"
           aria-label="Create User"
           disabled={!isFormValid || createMutation.isPending}
-          className="h-11 rounded-xl bg-[#f59e0b] hover:bg-[#d97706] px-6 text-xs sm:text-sm font-bold text-stone-950 shadow-md shadow-amber-500/20 disabled:opacity-50 transition-colors"
+          className="h-11 rounded-xl bg-[#059669] hover:bg-[#047857] px-6 text-xs sm:text-sm font-bold text-white shadow-md shadow-emerald-500/20 disabled:opacity-50 transition-colors"
         >
           {createMutation.isPending
             ? (lang === 'th' ? 'กำลังสร้าง...' : 'Creating...')
@@ -293,7 +293,7 @@ export function UsersTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark = 
                 });
               }}
               disabled={filteredUsers.length === 0}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 px-4 text-xs font-semibold shadow-sm transition-all disabled:opacity-40"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-4 text-xs font-semibold shadow-sm transition-all disabled:opacity-40"
             >
               <Download className="h-3.5 w-3.5" />
               <span>{lang === 'th' ? 'ส่งออก CSV' : 'Export CSV'}</span>
@@ -332,7 +332,7 @@ export function UsersTab({ apiBaseUrl, accessToken, auth, lang = 'th', isDark = 
                     <div className={`text-xs mt-0.5 ${t.muted}`}>{u.email}</div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="font-mono text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-full font-bold">
+                    <span className="font-mono text-xs text-emerald-400 bg-emerald-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-full font-bold">
                       {u.role}
                     </span>
                   </td>
