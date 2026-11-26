@@ -25,6 +25,7 @@ import QRCode from 'qrcode';
 import { RoleName, type AuthTokensResponse, type AuthUserDto, type LoginResponse } from '@mango/shared';
 import { loginUser, logoutUser, verifyOtpCode, type AuthRefreshContext } from './api/auth';
 import { AgentStatusCard } from './components/AgentStatusCard';
+import { BrandLogo } from './components/BrandLogo';
 import { DEFAULT_API_URL, fetchAvailableAgentVersions, fetchUsers, fetchDevices, fetchSessions } from './lib/adminApi';
 import { ToastProvider } from './components/Toast';
 import { AuditLogsTab } from './components/AuditLogsTab';
@@ -345,17 +346,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
             }`}>
               <div className="space-y-7">
                 {/* Brand Header */}
-                <div className="flex items-center gap-2.5">
-                  <span className="text-3xl" role="img" aria-label="Mango">🥭</span>
-                  <div>
-                    <h1 className={`text-base font-bold tracking-tight ${isDark ? 'text-stone-100' : 'text-slate-900'}`}>
-                      MANGO VPN
-                    </h1>
-                    <p className={`text-[10px] font-medium ${isDark ? 'text-stone-400' : 'text-amber-700'}`}>
-                      Mango Consultant Co., Ltd.
-                    </p>
-                  </div>
-                </div>
+                <BrandLogo variant="sidebar" isDark={isDark} />
 
                 {/* Collapsible & Ordered Navigation Groups */}
                 <nav role="tablist" aria-label="Admin Governance" className="space-y-4">
@@ -733,22 +724,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
               isDark ? 'border-white/5 bg-[#1e1d1a]/85 shadow-black/80' : 'border-stone-200/90 bg-white/95 shadow-stone-200/60'
             }`}>
               {/* Brand & User Role */}
-              <div className="flex items-center gap-3">
-                <span className="text-3xl" role="img" aria-label="Mango">🥭</span>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h1 className={`text-base font-bold tracking-tight ${isDark ? 'text-stone-100' : 'text-slate-900'}`}>
-                      MANGO VPN
-                    </h1>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border bg-emerald-500/10 border-emerald-500/30 text-emerald-400">
-                      CLIENT PORTAL
-                    </span>
-                  </div>
-                  <p className={`text-[10px] font-medium ${isDark ? 'text-stone-400' : 'text-amber-700'}`}>
-                    Mango Consultant Co., Ltd.
-                  </p>
-                </div>
-              </div>
+              <BrandLogo variant="header" isDark={isDark} badgeText="CLIENT PORTAL" />
 
               {/* Utility Controls & Logout */}
               <div className="flex items-center gap-3 flex-wrap">
@@ -869,17 +845,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
             }`}>
               <div className="space-y-7">
                 {/* Brand Header */}
-                <div className="flex items-center gap-2.5">
-                  <span className="text-3xl" role="img" aria-label="Mango">🥭</span>
-                  <div>
-                    <h1 className={`text-base font-bold tracking-tight ${isDark ? 'text-stone-100' : 'text-slate-900'}`}>
-                      MANGO VPN
-                    </h1>
-                    <p className={`text-[10px] font-medium ${isDark ? 'text-stone-400' : 'text-amber-700'}`}>
-                      Mango Consultant Co., Ltd.
-                    </p>
-                  </div>
-                </div>
+                <BrandLogo variant="sidebar" isDark={isDark} />
 
                 {/* Non-Admin Navigation Menu */}
                 <nav role="tablist" aria-label="Client Navigation" className="space-y-2">
@@ -1289,20 +1255,8 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
           }`} />
 
           {/* Top Brand Header */}
-          <div className="space-y-1 relative z-10">
-            <div className="flex items-center gap-2.5">
-              <span className="text-3xl" role="img" aria-label="Mango">🥭</span>
-              <div>
-                <h1 className={`text-lg font-bold tracking-tight flex items-center gap-1.5 ${
-                  isDark ? 'text-stone-100' : 'text-stone-900'
-                }`}>
-                  MANGO VPN
-                </h1>
-                <p className={`text-[11px] font-medium ${
-                  isDark ? 'text-amber-400' : 'text-amber-600'
-                }`}>Mango Consultant Co., Ltd.</p>
-              </div>
-            </div>
+          <div className="relative z-10">
+            <BrandLogo variant="hero" isDark={isDark} />
           </div>
 
           {/* Center Greeting & Tagline */}
