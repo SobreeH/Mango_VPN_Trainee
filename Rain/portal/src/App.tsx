@@ -16,13 +16,16 @@ import {
   ShieldCheck,
   Activity,
   HelpCircle,
+  Download,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { z } from 'zod';
 import QRCode from 'qrcode';
 import { RoleName, type AuthTokensResponse, type AuthUserDto, type LoginResponse } from '@mango/shared';
 import { loginUser, logoutUser, verifyOtpCode, type AuthRefreshContext } from './api/auth';
 import { AgentStatusCard } from './components/AgentStatusCard';
-import { DEFAULT_API_URL, fetchUsers, fetchDevices, fetchSessions } from './lib/adminApi';
+import { DEFAULT_API_URL, fetchAvailableAgentVersions, fetchUsers, fetchDevices, fetchSessions } from './lib/adminApi';
 import { ToastProvider } from './components/Toast';
 import { AuditLogsTab } from './components/AuditLogsTab';
 import { AgentVersionsTab } from './components/AgentVersionsTab';
@@ -278,7 +281,19 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
       : undefined;
 
   const isAdmin = step.kind === 'authenticated' && step.session.user.role === RoleName.ADMIN;
+  const isStaffHelpOpen =
+    step.kind === 'authenticated' &&
+    step.session.user.role === RoleName.STAFF &&
+    clientTab === 'help';
   const currentToken = step.kind === 'authenticated' ? step.session.accessToken : '';
+  const [copiedChecksumId, setCopiedChecksumId] = useState<string | null>(null);
+
+  const staffAgentVersionsQuery = useQuery({
+    queryKey: ['vpn-agent-versions', apiBaseUrl],
+    queryFn: () => fetchAvailableAgentVersions(apiBaseUrl, currentToken, authContext),
+    enabled: isStaffHelpOpen && Boolean(currentToken),
+    staleTime: 30000,
+  });
 
   const kpiUsersQuery = useQuery({
     queryKey: ['admin-kpi-users', apiBaseUrl],
@@ -1076,6 +1091,116 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
 
               {clientTab === 'help' && (
                 <div className="w-full space-y-6">
+                  {/* Agent Installer Download Card */}
+                  <div className={`rounded-3xl border p-6 sm:p-8 space-y-5 shadow-2xl backdrop-blur-xl ${
+                    isDark ? 'border-white/5 bg-[#1e1d1a]/85 shadow-black/80' : 'border-stone-200/90 bg-white/95 shadow-stone-200/60'
+                  }`}>
+                    <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-4 ${isDark ? 'border-white/5' : 'border-stone-200'}`}>
+                      <div>
+                        <h3 className={`text-lg font-bold flex items-center gap-2 ${isDark ? 'text-stone-100' : 'text-stone-900'}`}>
+                          <Download className="h-5 w-5 text-amber-400" />
+                          <span>{lang === 'th' ? 'ดาวน์โหลดตัวติดตั้ง MANGO Agent' : 'Download MANGO Agent Installer'}</span>
+                        </h3>
+                        <p className={`text-xs mt-1 ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
+                          {lang === 'th'
+                            ? 'เลือกตัวติดตั้งเวอร์ชันล่าสุดให้ตรงกับระบบปฏิบัติการของเครื่องคุณ'
+                            : 'Download the latest active endpoint agent build for your operating system'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {staffAgentVersionsQuery.isLoading ? (
+                      <p className={`text-xs ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
+                        {lang === 'th' ? 'กำลังโหลดรายการตัวติดตั้ง Agent...' : 'Loading available agent installers...'}
+                      </p>
+                    ) : staffAgentVersionsQuery.error ? (
+                      <div
+                        role="alert"
+                        className="rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-xs text-rose-400"
+                      >
+                        {staffAgentVersionsQuery.error instanceof Error
+                          ? staffAgentVersionsQuery.error.message
+                          : 'Failed to load agent installers'}
+                      </div>
+                    ) : (staffAgentVersionsQuery.data?.items.length ?? 0) === 0 ? (
+                      <div className={`rounded-2xl border p-4 text-xs ${isDark ? 'border-white/5 bg-[#141311]/70 text-stone-400' : 'border-stone-200 bg-stone-50 text-stone-600'}`}>
+                        {lang === 'th'
+                          ? 'ยังไม่มีตัวติดตั้ง Agent ที่เผยแพร่ในระบบ กรุณาติดต่อฝ่ายไอที'
+                          : 'No active agent installers published yet. Please contact IT Support.'}
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {staffAgentVersionsQuery.data!.items.map((ver) => (
+                          <div
+                            key={ver.id}
+                            className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl border ${
+                              isDark ? 'border-white/5 bg-[#141311]/70' : 'border-stone-200 bg-stone-50'
+                            }`}
+                          >
+                            <div className="space-y-1.5 min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className={`font-mono font-bold text-sm ${isDark ? 'text-stone-100' : 'text-slate-900'}`}>
+                                  v{ver.version}
+                                </span>
+                                <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-mono border ${
+                                  isDark ? 'border-white/10 bg-white/5 text-stone-300' : 'border-stone-300 bg-white text-slate-700'
+                                }`}>
+                                  {ver.platform}
+                                </span>
+                                {ver.isRequired && (
+                                  <span className="rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 text-[10px] font-semibold text-amber-400">
+                                    {lang === 'th' ? 'บังคับอัปเดต' : 'Required'}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-[11px] font-mono">
+                                <span className={`truncate max-w-[220px] sm:max-w-xs ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
+                                  SHA-256: {ver.sha256Checksum}
+                                </span>
+                                <button
+                                  type="button"
+                                  aria-label={`Copy SHA-256 for ${ver.version}`}
+                                  onClick={() => {
+                                    void navigator.clipboard?.writeText(ver.sha256Checksum);
+                                    setCopiedChecksumId(ver.id);
+                                    setTimeout(() => setCopiedChecksumId((prev) => (prev === ver.id ? null : prev)), 2000);
+                                  }}
+                                  className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 border text-[10px] transition-colors ${
+                                    isDark
+                                      ? 'border-white/10 text-stone-300 hover:border-amber-500/40 hover:text-amber-300'
+                                      : 'border-stone-300 text-slate-700 hover:border-amber-500 hover:text-amber-700'
+                                  }`}
+                                >
+                                  {copiedChecksumId === ver.id ? (
+                                    <>
+                                      <Check className="h-3 w-3 text-emerald-400" />
+                                      <span>{lang === 'th' ? 'คัดลอกแล้ว' : 'Copied'}</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Copy className="h-3 w-3" />
+                                      <span>{lang === 'th' ? 'คัดลอก' : 'Copy'}</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+
+                            <a
+                              href={ver.downloadUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#f59e0b] hover:bg-[#d97706] px-4 py-2.5 text-xs font-bold text-stone-950 shadow-sm transition-colors"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              <span>{lang === 'th' ? 'ดาวน์โหลด' : 'Download'}</span>
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   {/* Help & Troubleshooting Card */}
                   <div className={`rounded-3xl border p-6 sm:p-8 space-y-6 shadow-2xl backdrop-blur-xl ${
                     isDark ? 'border-white/5 bg-[#1e1d1a]/85 shadow-black/80' : 'border-stone-200/90 bg-white/95 shadow-stone-200/60'

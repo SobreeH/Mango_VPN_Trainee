@@ -361,4 +361,58 @@ describe('Portal Auth + TOTP Flow (fetch seam)', () => {
     });
     expect(screen.getByRole('alert')).toHaveTextContent(/refresh token revoked/i);
   });
+
+  it('loads active agent installers in the Staff Help tab from /api/vpn/agent-versions', async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/api/vpn/agent-versions')) {
+        return new Response(
+          JSON.stringify({
+            items: [
+              {
+                id: 'ver-staff-1',
+                version: '1.4.0',
+                platform: 'windows-x64',
+                downloadUrl: 'https://downloads.mango.local/mango-agent-1.4.0.msi',
+                sha256Checksum: 'c'.repeat(64),
+                isActive: true,
+                isRequired: true,
+                releasedAt: '2026-11-26T00:00:00.000Z',
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (url.includes('127.0.0.1:47821')) {
+        return new Response(JSON.stringify({ message: 'Agent offline' }), { status: 503 });
+      }
+      return new Response(JSON.stringify({ message: 'Not found' }), { status: 404 });
+    });
+
+    renderApp({
+      initialSession: {
+        accessToken: 'staff-token',
+        refreshToken: 'staff-refresh',
+        user: {
+          id: 'u-staff',
+          username: 'somchai_staff',
+          email: 'somchai@mango.internal',
+          role: RoleName.STAFF,
+          totpEnabled: true,
+        },
+      },
+      apiBaseUrl: 'http://localhost:4000',
+    });
+
+    fireEvent.click(screen.getByRole('tab', { name: /^Help$/i }));
+
+    expect(await screen.findByText('v1.4.0')).toBeInTheDocument();
+    expect(screen.getByText('windows-x64')).toBeInTheDocument();
+    const downloadLink = screen.getByRole('link', { name: /ดาวน์โหลด|Download/i });
+    expect(downloadLink).toHaveAttribute(
+      'href',
+      'https://downloads.mango.local/mango-agent-1.4.0.msi',
+    );
+  });
 });

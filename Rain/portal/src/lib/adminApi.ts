@@ -353,3 +353,16 @@ export function deleteGateway(
     auth,
   );
 }
+
+export function fetchAvailableAgentVersions(
+  apiBaseUrl: string,
+  accessToken: string,
+  auth?: AuthRefreshContext,
+): Promise<AgentVersionListResponse> {
+  return requestJson<AgentVersionListResponse>(
+    `${apiBaseUrl}/api/vpn/agent-versions`,
+    accessToken,
+    undefined,
+    auth,
+  );
+}
