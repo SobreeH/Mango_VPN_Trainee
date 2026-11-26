@@ -7,26 +7,26 @@ interface BrandLogoProps {
 }
 
 /**
- * Renders the transparent Mango company logo paired with a compact VPN badge
- * and subtle company subtitle—avoiding redundant stacked "MANGO" headings.
+ * Renders the transparent Mango company logo paired with a Leaf Emerald VPN badge
+ * and subtle company subtitle—sized for balanced visual weight across Sidebar, Header, and Hero views.
  */
 export function BrandLogo({ variant = 'sidebar', isDark = true, badgeText }: BrandLogoProps) {
   const logoFilterClass = isDark ? 'invert hue-rotate-180 brightness-110' : '';
   const vpnPillClass = isDark
-    ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
-    : 'bg-amber-500/15 border-amber-600/30 text-amber-700';
+    ? 'bg-emerald-500/15 border-emerald-500/35 text-emerald-400'
+    : 'bg-emerald-500/10 border-emerald-600/30 text-emerald-700';
 
   if (variant === 'header') {
     return (
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3.5">
         <img
           src={mangoLogo}
           alt="Mango Consultant Co., Ltd."
-          className={`h-8 w-auto object-contain select-none shrink-0 transition-all ${logoFilterClass}`}
+          className={`h-9 w-auto object-contain select-none shrink-0 transition-all ${logoFilterClass}`}
         />
         <div className="space-y-0.5">
           <div className="flex items-center gap-1.5">
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-extrabold tracking-wider border ${vpnPillClass}`}>
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-extrabold tracking-wider border ${vpnPillClass}`}>
               VPN
             </span>
             {badgeText && (
@@ -35,7 +35,7 @@ export function BrandLogo({ variant = 'sidebar', isDark = true, badgeText }: Bra
               </span>
             )}
           </div>
-          <p className={`text-[10px] font-medium ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
+          <p className={`text-[11px] font-medium ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
             Mango Consultant Co., Ltd.
           </p>
         </div>
@@ -45,18 +45,18 @@ export function BrandLogo({ variant = 'sidebar', isDark = true, badgeText }: Bra
 
   if (variant === 'hero') {
     return (
-      <div className="space-y-2">
-        <div className="flex items-end gap-2.5">
+      <div className="space-y-2.5">
+        <div className="flex items-end gap-3">
           <img
             src={mangoLogo}
             alt="Mango Consultant Co., Ltd."
-            className={`h-10 w-auto object-contain select-none transition-all ${logoFilterClass}`}
+            className={`h-12 w-auto object-contain select-none transition-all ${logoFilterClass}`}
           />
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-extrabold tracking-wider border mb-1 ${vpnPillClass}`}>
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-extrabold tracking-wider border mb-1.5 ${vpnPillClass}`}>
             VPN
           </span>
         </div>
-        <p className={`text-[11px] font-medium ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
+        <p className={`text-xs font-medium ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
           Mango Consultant Co., Ltd.
         </p>
       </div>
@@ -64,18 +64,18 @@ export function BrandLogo({ variant = 'sidebar', isDark = true, badgeText }: Bra
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-end gap-2">
+    <div className="space-y-2.5">
+      <div className="flex items-end gap-2.5">
         <img
           src={mangoLogo}
           alt="Mango Consultant Co., Ltd."
-          className={`h-8 w-auto object-contain select-none transition-all ${logoFilterClass}`}
+          className={`h-11 w-auto object-contain select-none transition-all ${logoFilterClass}`}
         />
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-extrabold tracking-wider border mb-0.5 ${vpnPillClass}`}>
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-extrabold tracking-wider border mb-1 ${vpnPillClass}`}>
           VPN
         </span>
       </div>
-      <p className={`text-[10px] font-medium tracking-wide ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
+      <p className={`text-[11px] font-medium tracking-wide ${isDark ? 'text-stone-400' : 'text-stone-500'}`}>
         Mango Consultant Co., Ltd.
       </p>
     </div>
