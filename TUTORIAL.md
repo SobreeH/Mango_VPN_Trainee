@@ -32,7 +32,7 @@ flowchart LR
 
 | Component | Local address / port | What it does |
 |---|---|---|
-| Web Portal | `http://localhost:3000` (`:3001` Staff, `:3002` Client with `dev:portal:all`) | Login, TOTP enrollment, VPN controls, and Admin Governance UI. |
+| Web Portal | `http://localhost:3000` | Login, TOTP enrollment, VPN controls, and Admin Governance UI. |
 | Control Plane API | `http://localhost:4000` | Password/TOTP auth, short-lived connect tickets, IP allocation, and gateway coordination. |
 | PostgreSQL 16 | `localhost:15432` (container port `5432`) | Stores users, sessions, policies, devices, and audit history. Track A runs it embedded with `npm run db:start` (data in `.local/postgres`); Tracks B/C run the Docker container `mango-postgres`. |
 | Local Client Agent | `http://127.0.0.1:47821` | `scripts/mock-agent.js` for UI demos (Windows or Linux), or the Go `Sobree/agent-windows` for a real WireGuard tunnel (`wireguard.exe` on Windows, `wg-quick` on Linux). |
@@ -381,31 +381,11 @@ npm run dev:api
 
 **Terminal 5 — Web Portal**
 
-Choose **one** of these commands:
+```bash
+npm run dev:portal
+```
 
-- **Single portal (Admin view on `:3000`):**
-
-  ```bash
-  npm run dev:portal
-  ```
-
-  **What you should see:** Vite prints `http://localhost:3000/`. Leave it running and open that address in your browser.
-
-- **All three role portals (multi-role testing):**
-
-  ```bash
-  npm run dev:portal:all
-  ```
-
-  This runs `scripts/start-all-portals.mjs`, which starts three Vite servers at the same time:
-
-  | Portal | URL | Role badge |
-  |---|---|---|
-  | Admin | `http://localhost:3000` | 🛡️ Admin (`ADMIN`) |
-  | Staff | `http://localhost:3001` | 💼 Staff (`STAFF`) |
-  | Client | `http://localhost:3002` | 🌐 Client (`CLIENT`) |
-
-  The API (`Sobree/api`) and `mock-agent.js` both accept origins on ports `3000`–`3002` by default, so all three portals can talk to the same API and agent. Use this option for [Mission 4](#-mission-4-test-real-time-revocation--non-admin-rbac-staff-login). Press **Ctrl+C** once to stop all three.
+**What you should see:** Vite prints `http://localhost:3000/`. Leave it running and open that address in your browser. All roles (`ADMIN`, `STAFF`, `CLIENT`) sign in through this single portal URL.
 
 ### ⚡ Track B: Sobree's Workflow (Control Plane + Real Go Client Agent + WireGuard Tunnel)
 
@@ -603,7 +583,12 @@ The agent must run on the host itself so the browser can reach `127.0.0.1:47821`
 
 The portal defaults to **Thai (`TH`)**. Use the **language toggle** (`EN` / `TH`) to switch to English, and the theme toggle to switch between light and dark. This tutorial uses English labels.
 
-On the **Admin dashboard**, the **Windows Agent** card sits inside a collapsible VPN panel. The governance tabs are in the sidebar: **Audit Logs**, **Agent Versions**, **Users**, **Devices**, **Sessions**, and **Policies**.
+On the **Admin dashboard**, the left sidebar organizes navigation into three collapsible groups:
+- **VPN & Live Monitoring:** **VPN Connect**, **Sessions**
+- **Management:** **Users**, **Devices**, **Policies**, **Gateways**
+- **Audit & System:** **Audit Logs**, **Agent Versions**
+
+Above the active tab, four overview KPI cards (**Total Users**, **Devices**, **Active Sessions**, **Security Posture**) summarize system state (hidden on **VPN Connect** for a cleaner layout).
 
 ### 🎯 Mission 1: First Sign-In & TOTP Authenticator Setup
 
@@ -617,21 +602,21 @@ On the **Admin dashboard**, the **Windows Agent** card sits inside a collapsible
 
 3. Enter the current code in **6-Digit Code**, then click **Verify**. If the code rolls over while you type, wait for the next one and enter it promptly.
 
-   **What you should see:** The authenticated dashboard. It shows **Signed in as**, username `admin`, an `ADMIN` badge, a **Windows Agent** card (the client agent card; it works the same with the Linux agent), and the six-tab **Admin Governance** console. **Audit Logs** is selected by default.
+   **What you should see:** The authenticated Admin dashboard. The sidebar footer shows your username (`admin`) and `ADMIN` role, the overview KPI cards appear at the top, and **Audit Logs** is selected by default.
 
 ### 🎯 Mission 2: Pair the Local Agent & Connect to the VPN
 
-1. In the **Windows Agent** card, check that the agent is reachable. For the mock it should say **Agent Reachable (Unpaired)** and show version `v2.0.0`. Paste the copied mock `PairingToken` (or your chosen Go-agent token) into **Agent Pairing Token**, in the field with placeholder **Paste X-Mango-Agent-Token**, then click **Pair Agent**.
+1. Click **VPN Connect** in the sidebar under **VPN & Live Monitoring**. In the agent card, check that the agent is reachable. For the mock it should say **Agent Reachable (Unpaired)** and show version `v2.0.0`. Paste the copied mock `PairingToken` (or your chosen Go-agent token) into **Agent Pairing Token**, in the field with placeholder **Paste X-Mango-Agent-Token**, then click **Pair Agent**.
 
-   **What you should see:** **Agent Paired & Ready**, `Tunnel State: disconnected`, and a **Connect VPN** button. If pairing fails, make sure the token exactly matches the currently running agent.
+   **What you should see:** **Agent Paired & Ready**, `Tunnel State: disconnected`, a **VPN Provider** selector (defaulting to `WireGuard (Default)`, with a refresh button to load registered gateways), and a **Connect VPN** button. If pairing fails, make sure the token exactly matches the currently running agent.
 
 2. Click **Connect VPN**. In the background, the portal requests a single-use ticket valid for 60 seconds. The agent creates a fresh Curve25519 keypair in memory and presents the ticket and public key to the API. The API allocates the first available IP (normally `10.13.13.2`), then asks the gateway to add the peer and role `nftables` policy rules. With the Go agent, it then activates WireGuard (`wireguard.exe` on Windows, `wg-quick` on Linux); the mock only simulates the agent state and does not bring up a tunnel.
 
-   **What you should see:** For the mock demo, the card reports green **connected**, `Connected Role: ADMIN`, `Assigned VPN IP: 10.13.13.2`, `Gateway Endpoint: 127.0.0.1:51820`, `Permitted Networks` (normally `10.13.13.0/24` if no ALLOW policy exists for ADMIN), `Curve25519 Key`, and **Disconnect VPN**. For Track B, you should also see the real `mango0` interface on your host: a WireGuard tunnel service on Windows, or `wg show mango0` on Linux. The displayed mock state/counters are not proof of real WireGuard traffic.
+   **What you should see:** For the mock demo, the card reports green **connected**, an interactive 3-hop **Network Topology** inspector, **Assigned VPN IP** (`10.13.13.2`), **Active Role** (`ADMIN`), **Protocol Status** (`WireGuard`), live **Data Usage** counters, **Permitted Networks** (click **Technical Details** to view the `Curve25519 Key` and `Protocol`), and a **Disconnect** button. For Track B, you should also see the real `mango0` interface on your host: a WireGuard tunnel service on Windows, or `wg show mango0` on Linux. The displayed mock state/counters are not proof of real WireGuard traffic.
 
-### 🎯 Mission 3: Test Every Admin Governance Tab (All 6 Tabs)
+### 🎯 Mission 3: Test Every Admin Governance Tab (All 7 Governance Tabs)
 
-The Admin Governance tab order is **Audit Logs**, **Agent Versions**, **Users**, **Devices**, **Sessions**, **Policies**. Since **Audit Logs** is active by default, follow the numbered order below to create data first, then inspect the audit history at the end.
+Since **Audit Logs** is active by default, follow the numbered order below to create data across the management tabs first, then inspect the audit history at the end.
 
 #### 1. Users
 
@@ -671,9 +656,15 @@ The Admin Governance tab order is **Audit Logs**, **Agent Versions**, **Users**,
 
    Click **Create Policy**. A port range is only supported for TCP or UDP, so leave it blank for `ANY`.
 
-**What you should see:** Both policies appear in the list with the correct role, CIDR, action, protocol, and priority. Optional: create a throwaway policy and click its **Delete** button; confirm it disappears without an error.
+**What you should see:** Both policies appear in the list with the correct role, CIDR, action, protocol, and priority. You can also test the **Search** box and **Role** / **Action** filters. Optional: create a throwaway policy and click its **Delete** button; confirm it disappears without an error.
 
-#### 3. Agent Versions
+#### 3. Gateways
+
+Click **Gateways** under **Management**.
+
+**What you should see:** The seeded `Primary WireGuard Gateway` (`WIREGUARD`, `10.13.13.0/24`, `API_MANAGED`, `Default`) appears in the list. Optional: test registering an additional gateway (`WIREGUARD`, `FORTINET`, or `CISCO`), filtering by provider or search term, toggling enable/disable, or deleting a test gateway.
+
+#### 4. Agent Versions
 
 1. Click **Agent Versions**. Under **Publish Agent Version**, enter:
 
@@ -694,19 +685,19 @@ The Admin Governance tab order is **Audit Logs**, **Agent Versions**, **Users**,
 
    **What you should see:** The API rejects the agent's `2.0.0` version with HTTP `426` and `AGENT_VERSION_OUTDATED`. In Agent Versions, click **Mark Optional** on `2.1.0` (the button appears for a required version). The `2.0.0` agent can connect again. Alternatively, **Deactivate** on the `2.1.0` record blocks that exact version, so do not deactivate `2.0.0` by mistake.
 
-#### 4. Devices
+#### 5. Devices
 
 Click **Devices**.
 
-**What you should see:** Your connected machine appears with its hostname, device fingerprint, user `admin`, and status `ACTIVE`. The mock fingerprint is generated from its hostname unless you set `AGENT_DEVICE_FINGERPRINT`.
+**What you should see:** A summary strip (**Total**, **Active**, **Revoked**), search/status filters, **Refresh**, and **Export CSV**. Your connected machine appears with an OS icon, hostname, device fingerprint, user `admin`, last-seen timestamp, and status `ACTIVE`. Click **Inspect** to view device details. The mock fingerprint is generated from its hostname unless you set `AGENT_DEVICE_FINGERPRINT`.
 
-#### 5. Sessions
+#### 6. Sessions
 
 Click **Sessions**.
 
-**What you should see:** A live `ACTIVE` session for `admin`, with assigned IP normally `10.13.13.2`. The table also shows the device hostname and has a **Disconnect** action.
+**What you should see:** A live `ACTIVE` session for `admin`, with assigned IP normally `10.13.13.2`. The view includes an **Auto 5s** auto-refresh toggle, **Refresh**, **Export CSV**, search and status filters (`ALL`, `ACTIVE`, `DISCONNECTED`, `EXPIRED`), a per-row **Disconnect** action, and an emergency **Terminate All Active** button.
 
-#### 6. Audit Logs
+#### 7. Audit Logs
 
 Click **Audit Logs**. Look for security events from the actions above, such as `VPN_TICKET_ISSUED`, `VPN_CONNECTED`, `USER_CREATED`, `POLICY_CREATED`, and an agent-version creation event (shown by the API as `agent_version.create`). Try the **Action filter**, **Target type filter**, and **Search** boxes; for example, search for `admin` or filter by `USER_CREATED`.
 
@@ -714,7 +705,7 @@ Click **Audit Logs**. Look for security events from the actions above, such as `
 
 ### 🎯 Mission 4: Test Real-Time Revocation & Non-Admin RBAC (`STAFF` Login)
 
-Before you start, the simplest setup is a single portal (`npm run dev:portal`). For a cleaner multi-user test, use `npm run dev:portal:all` (Terminal 5 in Step A3) so each role has its own URL. You can also use the same portal for both roles by signing out and back in.
+You can test every role (`ADMIN`, `STAFF`, `CLIENT`) on the **single portal URL (`http://localhost:3000`)** by signing out and back in: in dev, the portal sends `X-Mango-Dev-User` and `scripts/mock-agent.js` isolates each user's agent session state and device fingerprint (`-<username>`), so different accounts do not collide on one device.
 
 1. As `admin`, click **Sessions** and click **Disconnect** on the active session.
 
@@ -738,13 +729,13 @@ Before you start, the simplest setup is a single portal (`npm run dev:portal`). 
 
    **What you should see:** A new mock startup box with a new `PairingToken:`. Pair using that new token. The new fingerprint is a distinct device identity. If you revoked `mock-device-02` earlier, choose another unused fingerprint. Remember to clear the variable afterwards (`Remove-Item Env:AGENT_DEVICE_FINGERPRINT` in PowerShell, `unset AGENT_DEVICE_FINGERPRINT` in Bash).
 
-   **Per-port fingerprint isolation (mock agent):** `scripts/mock-agent.js` builds the device fingerprint from the base value (`AGENT_DEVICE_FINGERPRINT`, or a hash of the hostname) and **appends `-<port>`** based on the browser's origin port. A connection from `http://localhost:3000` is therefore a different device from `http://localhost:3001` or `:3002`. This is what lets `admin`, `staff01`, and `client01` each have their own device identity when you use `npm run dev:portal:all`, even with one mock agent. The Devices tab lists them as separate entries, for example `…-3000`, `…-3001`, and `…-3002`. The Go agent does **not** add this suffix; with the Go agent, set a different `AGENT_DEVICE_FINGERPRINT` per user instead (see step 4).
+   **Per-user fingerprint isolation (mock agent):** `scripts/mock-agent.js` builds the device fingerprint from the base value (`AGENT_DEVICE_FINGERPRINT`, or a hash of the hostname) and **appends `-<username>`** when the portal sends `X-Mango-Dev-User`. This lets `admin`, `staff01`, and `client01` each have their own isolated agent state and device identity on `http://localhost:3000` (for example `…-admin`, `…-staff01`, and `…-client01`). The Go agent does **not** add this suffix; with the Go agent, set a different `AGENT_DEVICE_FINGERPRINT` per user instead (see step 4).
 
 3. Before switching users, disconnect the local agent if it still shows connected. Click **Log Out**, then sign in as `staff01` with `StaffTestPass#2026`. First-time `staff01` sign-in will have its own TOTP enrollment: scan its QR code (or enter its Base32 key), type the current **6-Digit Code**, and click **Verify**.
 
-   **What you should see:** The dashboard shows `staff01` and a `STAFF` badge. Staff users do not see the six **Admin Governance** tabs.
+   **What you should see:** The Staff sidebar dashboard showing `staff01 · STAFF`, with three tabs: **Connection**, **Profile & Security**, and **Help**. Staff users do not see the **Admin Governance** tabs. Click **Help** to verify the **Download MANGO Agent Installer** card loads active releases from `GET /api/vpn/agent-versions` (including the `2.0.0` release you published in Mission 3, with its SHA-256 copy button and download link). (If you also sign in as `client01` on `http://localhost:3000`, you will see a focused **CLIENT PORTAL** view with just the VPN connection card.)
 
-4. Pair the local agent again using its current token. With the **mock agent**, connecting from the Staff portal (`http://localhost:3001` with `dev:portal:all`) already gives `staff01` its own fingerprint suffix. With a single portal, you can instead set a fresh base fingerprint such as `mock-device-staff01` before restarting the mock:
+4. With the **mock agent**, `staff01` already gets its own isolated agent state and fingerprint suffix (`-staff01`) on `http://localhost:3000`, and the pairing token is persisted in `localStorage` (so you may only need to click **Connect VPN**, or pair again if you restarted the mock). If you want to test with an explicit custom fingerprint (or are using the **Go agent**, which does not add a suffix), set `AGENT_DEVICE_FINGERPRINT` before restarting the agent:
 
    **Windows (PowerShell):**
 
@@ -870,11 +861,11 @@ Pop-Location
 |---|---|---|
 | `502 Bad Gateway` during Connect, Policy creation/sync, or revocation | The API cannot reach the gateway daemon, or the daemon secret differs. | **Track A:** confirm `npm run mock:daemon` is running and listening on `http://127.0.0.1:50051`, and that `DAEMON_SHARED_SECRET` in `.env` is at least 32 characters (the simulator refuses to start otherwise). **Track B/C:** run `docker compose ps vpn-gateway` and wait for `healthy`, and check that `DAEMON_SHARED_SECRET` in root `.env` matches the Compose/API configuration. If you run `Sobree/vpn-daemon` natively on Linux, make sure the Docker `vpn-gateway` is stopped so that port `50051` is free. The host-run API uses `http://127.0.0.1:50051`; the API container uses `http://vpn-gateway:50051`. |
 | Agent reports `401 Unauthorized` / `INVALID_PAIRING_TOKEN` | The token is missing, mistyped, or changed when the agent restarted. | Copy the newest mock `PairingToken:` or use the exact `AGENT_PAIRING_TOKEN` set before starting the Go agent. Pair again. |
-| `403 FORBIDDEN_ORIGIN` | The portal's browser origin is not on the local agent allowlist. | Open the portal at `http://localhost:3000` (or `:3001` / `:3002` with `dev:portal:all`), or use the matching `http://127.0.0.1:300x` origin. For the Go agent, set `AGENT_ALLOWED_ORIGINS` to include the exact origin, then restart the agent. Do not use a wildcard origin. |
+| `403 FORBIDDEN_ORIGIN` | The portal's browser origin is not on the local agent allowlist. | Open the portal at `http://localhost:3000` (or `http://127.0.0.1:3000`). For the Go agent, set `AGENT_ALLOWED_ORIGINS` to include the exact origin, then restart the agent. Do not use a wildcard origin. |
 | `426 AGENT_VERSION_OUTDATED` or `AGENT_VERSION_INACTIVE` | A required version is newer than the agent, or this exact version has been deactivated. | In **Agent Versions**, make the required version optional with **Mark Optional**, or activate the correct release. Do not deactivate the version you are testing. |
 | Agent version rejected for your platform | The **Platform** value in **Agent Versions** does not match the host OS. | Publish with `windows-x64` on Windows or `linux-x64` on Linux, or set `AGENT_PLATFORM` explicitly for both the mock and Go agent. |
 | `Device has been revoked` | The agent is trying to reconnect with a permanently revoked device fingerprint. | Use a new, unused fingerprint for a new device identity. **PowerShell:** `$env:AGENT_DEVICE_FINGERPRINT="mock-device-02"`, then `npm run mock:agent`. **Bash:** `export AGENT_DEVICE_FINGERPRINT="mock-device-02"`, then `npm run mock:agent`. Pair again with the newly printed token. |
-| Devices list shows unexpected `-3000`/`-3001`/`-3002` suffixes | This is the mock agent's per-port fingerprint isolation working as designed. | It is expected when you connect through `dev:portal:all`. Each portal URL is its own device identity. To reset, set `AGENT_DEVICE_FINGERPRINT` (PowerShell `$env:...`, Bash `export ...`) to a new base value and restart the mock. |
+| Devices list shows `-<username>` suffixes | This is the mock agent's per-user fingerprint isolation working as designed. | It is expected when you test multiple accounts on `http://localhost:3000`. Each user gets its own isolated device identity. To reset, set `AGENT_DEVICE_FINGERPRINT` (PowerShell `$env:...`, Bash `export ...`) to a new base value and restart the mock. |
 | `RoleName` does not exist or `connect_tickets` table is missing | The database still has a v1 schema or old migrations. Resetting removes local database data. | If you can safely discard the local database, run `npx prisma migrate reset --force --schema=Sobree/api/prisma/schema.prisma`, then `npm run db:seed` with your admin environment variables. This reset is destructive to the local database. |
 | `docker info` says `error during connect` (Windows) or `Cannot connect to the Docker daemon` (Linux) (Track B/C only) | Docker Desktop's engine is stopped or still starting (Windows), or the Docker Engine service is not running (Linux). | **Windows:** open **Docker Desktop** and wait until its bottom-left bar says **Engine running**, then retry. **Linux:** run `sudo systemctl start docker`. If you see `permission denied`, run `sudo usermod -aG docker "$USER"`, log out and back in, then retry `docker info`. |
 | `wireguard.exe` not found or `wireguard.exe install failed` (Windows) | WireGuard for Windows is not installed, is not on `PATH`, or the agent was not started from an elevated window. | Install WireGuard for Windows, reopen an **Administrator PowerShell**, and rerun `go run .`. Read the exact error printed by the agent. |
@@ -886,7 +877,7 @@ Pop-Location
 
 ### Clean shutdown
 
-1. In each terminal running `npm run mock:agent`, `npm run mock:daemon`, `npm run dev:api`, `npm run dev:portal`, `npm run dev:portal:all`, `go run .`, or `npm run db:start`, press **Ctrl+C** once. If the Go tunnel was active, click **Disconnect VPN** first when possible so the API and gateway remove the peer cleanly. Ctrl+C in `db:start` stops embedded PostgreSQL. Run `npm run db:reset-local` only after it has stopped, because it deletes `.local/postgres` and all local database data.
+1. In each terminal running `npm run mock:agent`, `npm run mock:daemon`, `npm run dev:api`, `npm run dev:portal`, `go run .`, or `npm run db:start`, press **Ctrl+C** once. If the Go tunnel was active, click **Disconnect** first when possible so the API and gateway remove the peer cleanly. Ctrl+C in `db:start` stops embedded PostgreSQL. Run `npm run db:reset-local` only after it has stopped, because it deletes `.local/postgres` and all local database data.
 
    **What you should see:** Each foreground process stops and your terminal returns to its prompt. For Track B, the tunnel should be removed when the agent disconnects successfully: WireGuard's tunnel service is removed on Windows, and `mango0` disappears from `ip link` on Linux.
 

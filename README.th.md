@@ -52,7 +52,7 @@ Mango_VPN_Trainee/
 │   │   ├── src/App.tsx                # Flow หลัก: Login -> Setup/Verify TOTP -> แดชบอร์ดตาม Role
 │   │   ├── src/api/auth.ts            # ฟังก์ชันเรียก API Login, Verify OTP, Refresh, Logout
 │   │   ├── src/api/agent.ts           # ฟังก์ชันคุยกับ Agent บนเครื่อง (127.0.0.1:47821)
-│   │   ├── src/components/            # UI Components (การ์ด VPN, แท็บจัดการ Users, Devices, Sessions, Policies, Logs)
+│   │   ├── src/components/            # UI Components (AgentStatusCard, NetworkTopology, Toast, แท็บ Users, Devices, Sessions, Policies, Gateways, Audit Logs, Agent Versions)
 │   │   └── src/lib/adminApi.ts        # ฟังก์ชันเรียก API หลังบ้านสำหรับจัดการระบบ
 │   └── admin/                         # @mango/rain-admin (Fastify Plugin หลังบ้านส่วนแอดมิน)
 │       ├── src/index.ts               # Entrypoint ของปลั๊กอิน (มี Guard สิทธิ์ Admin)
@@ -60,6 +60,8 @@ Mango_VPN_Trainee/
 │       ├── src/devices.ts             # จัดการอุปกรณ์และสั่งเพิกถอน (/api/devices)
 │       ├── src/sessions.ts            # ตรวจสอบและสั่งตัดเซสชัน (/api/sessions)
 │       ├── src/policies.ts            # กำหนดกฎ Zero-Trust Network Policy (/api/policies)
+│       ├── src/gateways.ts            # จัดการ VPN Gateways (/api/gateways: WIREGUARD, FORTINET, CISCO)
+│       ├── src/agent-versions.ts      # จัดการเวอร์ชัน Agent (/api/agent-versions)
 │       ├── src/revocation.ts          # สั่งเตะ Peer และลบกฎ Firewall บน Daemon แบบ Real-time
 │       └── src/seed.ts                # สคริปต์สร้าง Role และ User เริ่มต้นลงฐานข้อมูล
 │
@@ -81,6 +83,7 @@ Mango_VPN_Trainee/
 │   ├── mock-agent.js                  # 🧪 ตัวจำลอง Client Agent สำหรับใช้รันทดสอบหน้าเว็บในเครื่อง (ใน dev จะเติมพอร์ตต้นทางต่อท้าย device fingerprint)
 │   ├── mock-daemon.js                 # 🧪 ตัวจำลอง VPN Gateway Daemon สำหรับการพัฒนาเท่านั้น (127.0.0.1:50051, ไม่บังคับใช้ wg/nftables)
 │   ├── start-all-portals.mjs          # เปิด Vite dev ทั้ง 3 พอร์ทัลพร้อมกัน (Admin :3000, Staff :3001, Client :3002) ผ่าน `npm run dev:portal:all`
+│   ├── dev-demo.mjs                   # เปิด mock-agent.js พร้อมทั้ง 3 พอร์ทัลใน Terminal เดียว (`npm run dev:demo`)
 │   ├── dev-db.mjs                     # ตัวรัน PostgreSQL 16 แบบฝังตัวโดยไม่ใช้ Docker (`npm run db:start` / `db:reset-local` ข้อมูลอยู่ที่ `.local/postgres`)
 │   ├── check-guardrails.mjs           # เครื่องมือตรวจจับ Secret หลุด และตรวจห้ามใช้ Mock ใน Production
 │   ├── check-environment.mjs          # ตรวจความพร้อมของเครื่องมือบน Linux, macOS และ Windows (`npm run check:env`)
@@ -215,7 +218,7 @@ npm run dev:portal:client            # Client UI บน :3002
 - **สร้าง `.env` ข้ามแพลตฟอร์ม**: `npm run env:init` (`scripts/init-env.mjs`) จะสร้าง `POSTGRES_PASSWORD`, `DATABASE_URL`, `JWT_SECRET`, `REFRESH_SECRET`, `DAEMON_SHARED_SECRET`, `TOTP_ENCRYPTION_KEY` และคู่กุญแจ X25519 `WG_PRIVATE_KEY` / `WG_SERVER_PUBLIC_KEY` ใช้ได้เหมือนกันบน Windows, Linux และ macOS เขียนไฟล์เป็น UTF-8 ไม่มี BOM และจะไม่แก้ `.env` ที่มีค่าครบแล้ว เว้นแต่สั่ง `npm run env:init -- --force` (หรือ `-- --wg-only` เพื่อสร้างเฉพาะกุญแจ WireGuard ใหม่) วิธีเดิมแบบ `copy`/`cp` + `openssl` ก็ยังใช้ได้
 - **ไม่ต้องใช้ Docker**: `npm run mock:daemon` ช่วยไม่ให้เจอ `502 Bad Gateway` ตอน Connect, สร้าง Policy และเพิกถอน แต่ **ไม่ได้ตั้งค่า WireGuard หรือ `nftables` จริง** ใช้ Docker Compose เฉพาะเมื่อต้องการรันระบบเต็มรูปแบบ (Sobree / Track B และ C)
 - **พอร์ทัลหลายบทบาท**: `npm run dev:portal:all` (`scripts/start-all-portals.mjs`) จะเปิด Admin บน `:3000`, Staff บน `:3001` และ Client บน `:3002` พร้อมกัน โดยมี Log นำหน้าด้วยสีตามบทบาท
-- **CORS และ Fingerprint แยกตามพอร์ต**: ในโหมด dev `Sobree/api` ยอมรับ `http://localhost:3000`–`http://localhost:3002` (และ `127.0.0.1` ที่เทียบเท่า) ส่วน `scripts/mock-agent.js` จะเติมพอร์ตของ Origin ต่อท้าย device fingerprint และ hostname ที่รายงาน (เช่น `mock-<hash>-3001`) การเปิด Admin, Staff และ Client พร้อมกันจึงได้อุปกรณ์ 3 รายการแยกกัน ไม่ชน fingerprint กัน
+- **CORS และ Fingerprint แยกตามผู้ใช้ (Single-Link Demo)**: สามารถทดสอบทุกบทบาท (`ADMIN`, `STAFF`, `CLIENT`) บนลิงก์เดียว `http://localhost:3000` ได้เลย โดยพอร์ทัลจะส่ง `X-Mango-Dev-User` และ `scripts/mock-agent.js` จะแยกสถานะเซสชันและ Device Fingerprint ตามชื่อผู้ใช้ (`mock-<hash>-<username>`) และในโหมด dev `Sobree/api` ยังรองรับ `http://localhost:3000`–`http://localhost:3002` (และ `127.0.0.1`) สำหรับกรณีเปิดแยกพอร์ตด้วย `dev:portal:all`
 > [!TIP]
 > เมื่อรัน `npm run mock:agent` ตัวจำลองจะพิมพ์ **PairingToken** ออกมา ให้นำโทเคนดังกล่าวไปใส่ในช่องเชื่อมต่อบนหน้าเว็บ Portal เพื่อทำการจับคู่ (Pairing)
 
@@ -273,6 +276,7 @@ sudo -E go run .
 | `npm run dev:portal:staff` | เริ่ม Staff Portal บนพอร์ต `:3001` |
 | `npm run dev:portal:client` | เริ่ม Client Portal บนพอร์ต `:3002` |
 | `npm run dev:portal:all` | เปิดทั้ง 3 พอร์ทัลพร้อมกัน (Admin `:3000`, Staff `:3001`, Client `:3002`) ผ่าน `scripts/start-all-portals.mjs` |
+| `npm run dev:demo` | เปิด `mock-agent.js` พร้อมทั้ง 3 พอร์ทัล (Admin `:3000`, Staff `:3001`, Client `:3002`) ใน Terminal เดียว |
 | `npm run dev:api` | เริ่มรันเซิร์ฟเวอร์ API (`@mango/api` พร้อม mount `@mango/rain-admin`) |
 | `npm run mock:agent` | รันตัวจำลอง Client Agent บน `http://127.0.0.1:47821` (ใน dev จะแยก device fingerprint ตามพอร์ตของ Origin) |
 | `npm run mock:daemon` | รันตัวจำลอง VPN Gateway Daemon (`scripts/mock-daemon.js`) บน `http://127.0.0.1:50051` สำหรับการพัฒนาเท่านั้น จะพิมพ์ `[DEV MOCK DAEMON – no wg/nftables enforcement]` และไม่ได้ตั้งค่า WireGuard หรือ `nftables` จริง |

@@ -43,7 +43,7 @@ Mango_VPN_Trainee/
 │   │   ├── src/App.tsx                # Login -> TOTP step -> role-based dashboard
 │   │   ├── src/api/auth.ts            # Login, verify-otp, refresh, logout calls
 │   │   ├── src/api/agent.ts           # Client agent loopback client (/health, /status, /connect, /disconnect)
-│   │   ├── src/components/            # AgentStatusCard and admin tabs (users, devices, sessions, policies, audit logs, agent versions)
+│   │   ├── src/components/            # AgentStatusCard, NetworkTopology, Toast, ConfirmModal, and admin tabs (users, devices, sessions, policies, gateways, audit logs, agent versions)
 │   │   ├── src/lib/env.ts             # API and agent base URL resolution
 │   │   ├── public/env-config.js       # Dev placeholder for window.__MANGO_ENV__
 │   │   ├── nginx.conf                 # Nginx SPA + /env-config.js no-store config (:3000)
@@ -55,6 +55,7 @@ Mango_VPN_Trainee/
 │       ├── src/devices.ts             # /devices, /devices/:id/revoke
 │       ├── src/sessions.ts            # /sessions, /sessions/:id/disconnect
 │       ├── src/policies.ts            # /policies
+│       ├── src/gateways.ts            # /gateways (WIREGUARD, FORTINET, CISCO)
 │       ├── src/agent-versions.ts      # /agent-versions
 │       ├── src/audit.ts               # Audit log writer helpers
 │       ├── src/revocation.ts          # Removes peers from the VPN daemon before revoke/disconnect is saved
@@ -90,6 +91,7 @@ Mango_VPN_Trainee/
 │   ├── mock-agent.js                  # 🧪 Node loopback simulator of the client agent (127.0.0.1:47821); in dev it suffixes device fingerprints per origin port
 │   ├── mock-daemon.js                 # 🧪 Dev-only simulator of the VPN gateway daemon API (127.0.0.1:50051, no wg/nftables enforcement)
 │   ├── start-all-portals.mjs          # Launches Admin :3000, Staff :3001, and Client :3002 Vite dev servers together (npm run dev:portal:all)
+│   ├── dev-demo.mjs                   # Launches mock-agent.js + all three role portals together in one terminal (npm run dev:demo)
 │   ├── dev-db.mjs                     # Docker-free embedded PostgreSQL 16 runner (npm run db:start / db:reset-local; data in .local/postgres)
 │   ├── check-guardrails.mjs           # Scanner for hardcoded secret fallbacks, MOCK_* data, wildcard agent CORS, SYS_MODULE
 │   ├── check-environment.mjs          # Tool readiness check for Linux, macOS, and Windows (npm run check:env; use -- --role Rain for Docker-free Rain)
@@ -159,7 +161,7 @@ npm run dev:portal:client            # Client UI on :3002
 - **Docker is not required** for this workflow. `npm run mock:daemon` avoids `502 Bad Gateway` on connect, policy, and revocation calls without Docker, but it does not program WireGuard or `nftables`. Use Docker Compose only for the full stack (Sobree / Track B and C).
 - **Multi-role portal dev**: `npm run dev:portal:all` (`scripts/start-all-portals.mjs`) starts the Admin portal on `:3000`, the Staff portal on `:3001`, and the Client portal on `:3002` at the same time with color-coded prefixed logs. `npm run dev:portal:admin`, `npm run dev:portal:staff`, and `npm run dev:portal:client` start a single role on its port. `npm run dev:portal` keeps the default Admin `:3000`.
 - **Portal UI**: Vite is configured in `Rain/portal/vite.config.ts` to run on `http://localhost:3000`, matching `CORS_ORIGIN` and `AGENT_ALLOWED_ORIGINS`. In dev, `Sobree/api` allows `http://localhost:3000`–`http://localhost:3002` (and the `127.0.0.1` equivalents) so the Staff and Client portals can call the API without extra CORS configuration.
-- **Per-port fingerprint isolation**: In dev, `scripts/mock-agent.js` appends the browser origin port to the device fingerprint and hostname it reports (for example `mock-<hash>-3001`). Opening the Admin, Staff, and Client portals against the same mock agent therefore creates three distinct devices instead of colliding on one fingerprint.
+- **Single-link & per-user isolation**: You can test all roles (`ADMIN`, `STAFF`, `CLIENT`) on the single `http://localhost:3000` portal—the portal sends `X-Mango-Dev-User`, and `scripts/mock-agent.js` isolates agent session state and device fingerprints per username (`mock-<hash>-<username>`). When using `dev:portal:all` without a user hint, it falls back to `-<port>`.
 - **Root `.env` auto-loading**: `npm run dev:api` and `npm run db:seed` automatically load `.env` from the monorepo root when present (without overriding shell environment variables).
 - **Agent pairing**: Paste the mock agent's PairingToken into the portal's "Paste X-Mango-Agent-Token" field.
 - **Admin CRUD**: Edit the modules in `Rain/admin/src/` (`index.ts` mounts them).
@@ -257,6 +259,7 @@ Run `go vet ./...` and `go test ./...` in each Go module before you push.
 | `npm run dev:portal:staff` | Starts the Staff portal Vite dev server on `:3001` |
 | `npm run dev:portal:client` | Starts the Client portal Vite dev server on `:3002` |
 | `npm run dev:portal:all` | Runs `scripts/start-all-portals.mjs`: launches Admin `:3000`, Staff `:3001`, and Client `:3002` together with prefixed logs |
+| `npm run dev:demo` | Runs `scripts/dev-demo.mjs`: launches `mock-agent.js` + Admin `:3000`, Staff `:3001`, and Client `:3002` together |
 | `npm run dev:api` | Starts the Fastify API in watch mode (`@mango/api`, which mounts `@mango/rain-admin`) |
 | `npm run mock:agent` | Runs the zero-dependency client agent simulator (mirrors `Sobree/agent-windows`) on `http://127.0.0.1:47821` |
 | `npm run mock:daemon` | Runs the dev-only gateway daemon simulator (`scripts/mock-daemon.js`) on `http://127.0.0.1:50051`. Prints `[DEV MOCK DAEMON – no wg/nftables enforcement]`; it does not program WireGuard or `nftables` |
@@ -426,7 +429,7 @@ npm test
   1. **Password Login & TOTP Enrollment**: Sign in with the seeded `ADMIN` user -> scan the QR code (`MFA_SETUP_REQUIRED` -> `otpauthUri`) into an authenticator app -> submit the 6-digit code (`POST /api/auth/verify-otp`).
   2. **Pair Local Agent**: Paste the `PairingToken` into the Portal's agent token field (`X-Mango-Agent-Token`).
   3. **Connect VPN**: Click **Connect VPN** -> Portal requests a 60s single-use ticket (`POST /api/vpn/ticket`) -> agent generates an in-memory Curve25519 keypair and calls `POST /api/vpn/connect` -> API allocates `10.13.13.x` and registers the peer + role policies in `vpn-gateway` *(requires `vpn-gateway` reachable at `VPN_DAEMON_URL`, otherwise API returns `502`)* -> agent activates `mango0`.
-  4. **Admin CRUD & Real-Time Revocation**: Manage **Users**, **Devices**, **Sessions**, **Policies**, **Audit Logs**, and **Agent Versions**. Revoking a device, disconnecting a session, or deactivating a user tears down the WireGuard peer on `vpn-gateway` first before committing the DB update.
+  4. **Admin CRUD, Staff Help & Real-Time Revocation**: Manage **Users**, **Devices**, **Sessions** (including **Terminate All Active**), **Policies**, **Gateways**, **Audit Logs**, and **Agent Versions**. Revoking a device, disconnecting a session, or deactivating a user tears down the VPN peer on `vpn-gateway` first before committing the DB update. Non-admin `STAFF` users see **Connection**, **Profile & Security**, and **Help** (which fetches active agent installers from `GET /api/vpn/agent-versions`); `CLIENT` users see a focused VPN-only portal.
 
 ---
 

@@ -233,6 +233,7 @@ npm run dev:api
 # Terminal 5: portal dev server. Pick one of the following:
 npm run dev:portal                   # Admin UI on :3000 (default)
 npm run dev:portal:all               # Admin :3000, Staff :3001, and Client :3002 together
+npm run dev:demo                     # Shortcut: mock-agent + all 3 portals in one terminal (skip Terminal 3)
 npm run dev:portal:admin             # Admin UI on :3000
 npm run dev:portal:staff             # Staff UI on :3001
 npm run dev:portal:client            # Client UI on :3002
@@ -240,7 +241,7 @@ npm run dev:portal:client            # Client UI on :3002
 
 These commands are plain `npm run` calls, so they work unchanged in Bash on Linux and macOS.
 
-The API's default `CORS_ORIGIN` and the agent's default allowed origin are `http://localhost:3000`, and `Rain/portal/vite.config.ts` pins Vite to port `3000` automatically so `npm run dev:portal` works directly without extra flags. In dev, `Sobree/api` also accepts `http://localhost:3000`–`http://localhost:3002` (and the `127.0.0.1` equivalents) so the Staff and Client portals can call the API without extra CORS configuration. `scripts/mock-agent.js` appends the browser origin port to the device fingerprint and hostname it reports (for example `mock-<hash>-3001`), so opening all three portals against the same mock agent creates three distinct devices instead of colliding on one fingerprint. `npm run dev:api` and `npm run db:seed` also automatically fall back to loading the monorepo root `.env`.
+The API's default `CORS_ORIGIN` and the agent's default allowed origin are `http://localhost:3000`, and `Rain/portal/vite.config.ts` pins Vite to port `3000` automatically so `npm run dev:portal` works directly without extra flags. You can test all roles (`ADMIN`, `STAFF`, `CLIENT`) on this single `http://localhost:3000` URL: the portal sends `X-Mango-Dev-User` and `scripts/mock-agent.js` isolates agent session state and device fingerprints per username (`mock-<hash>-<username>`). In dev, `Sobree/api` also accepts `http://localhost:3000`–`http://localhost:3002` (and the `127.0.0.1` equivalents) if you use `dev:portal:all`. `npm run dev:api` and `npm run db:seed` also automatically fall back to loading the monorepo root `.env`.
 
 Paste the PairingToken printed by the mock agent into the portal's pairing-token field. The portal sends it as the `X-Mango-Agent-Token` header.
 
@@ -378,8 +379,8 @@ cd Sobree/vpn-daemon; go vet ./...; go test ./...; cd ../..
 2. **Sign in (`http://localhost:3000`)**: Enter your seeded `ADMIN` username/password (`POST /api/auth/login`).
 3. **Complete TOTP MFA**: On first login (`MFA_SETUP_REQUIRED`), scan the QR code (`otpauthUri`) in an authenticator app and enter the 6-digit code (`POST /api/auth/verify-otp`).
 4. **Pair the local agent**: Paste the `PairingToken` into the Portal's pairing-token field (`X-Mango-Agent-Token`).
-5. **Connect VPN**: Click **Connect VPN** -> Portal requests a 60s single-use ticket (`POST /api/vpn/ticket`) -> agent generates an in-memory Curve25519 keypair -> `POST /api/vpn/connect` allocates a `10.13.13.0/24` IP and programs `wg0` + `nftables` -> `AgentStatusCard` displays **Connected**. *(Note: `POST /api/vpn/connect` requires `vpn-gateway` reachable at `VPN_DAEMON_URL`, otherwise it marks the session disconnected and returns `502`.)*
-6. **Test Admin Console & Real-Time Revocation**: Exercise **Users**, **Devices**, **Sessions**, **Policies**, **Audit Logs**, and **Agent Versions**, then trigger **Revoke Device** or **Disconnect Session** and confirm immediate peer removal.
+5. **Connect VPN**: Open **VPN Connect** in the sidebar and click **Connect VPN** -> Portal requests a 60s single-use ticket (`POST /api/vpn/ticket`) -> agent generates an in-memory Curve25519 keypair -> `POST /api/vpn/connect` allocates a `10.13.13.0/24` IP and programs `wg0` + `nftables` -> `AgentStatusCard` displays **Connected**. *(Note: `POST /api/vpn/connect` requires `vpn-gateway` reachable at `VPN_DAEMON_URL`, otherwise it marks the session disconnected and returns `502`.)*
+6. **Test Admin Console & Real-Time Revocation**: Exercise **Users**, **Devices**, **Sessions** (including **Terminate All Active**), **Policies**, **Gateways**, **Audit Logs**, and **Agent Versions**, then trigger **Revoke Device** or **Disconnect Session** and confirm immediate peer removal. (In the `STAFF` portal, check **Help** to view/download active installers from `GET /api/vpn/agent-versions`.)
 
 ---
 

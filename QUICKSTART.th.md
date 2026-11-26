@@ -229,6 +229,7 @@ npm run dev:api
 # Terminal 5: เซิร์ฟเวอร์ Dev ของ Portal เลือกได้ดังนี้:
 npm run dev:portal                   # Admin UI บน :3000 (ค่าเริ่มต้น)
 npm run dev:portal:all               # เปิด Admin :3000, Staff :3001 และ Client :3002 พร้อมกัน
+npm run dev:demo                     # ทางลัด: เปิด mock-agent พร้อมทั้ง 3 พอร์ทัลใน Terminal เดียว (ข้าม Terminal 3 ได้)
 npm run dev:portal:admin             # Admin UI บน :3000
 npm run dev:portal:staff             # Staff UI บน :3001
 npm run dev:portal:client            # Client UI บน :3002
@@ -236,7 +237,7 @@ npm run dev:portal:client            # Client UI บน :3002
 
 คำสั่งเหล่านี้เป็น `npm run` ธรรมดา จึงใช้ได้เหมือนกันใน Bash บน Linux และ macOS
 
-ค่าเริ่มต้น `CORS_ORIGIN` ของ API และ Allowed Origin ของ Agent ตั้งไว้ที่ `http://localhost:3000` และ `Rain/portal/vite.config.ts` ล็อกพอร์ตของ Vite ไว้ที่ `3000` ให้โดยอัตโนมัติ ดังนั้น `npm run dev:portal` ใช้งานได้ทันทีโดยไม่ต้องใส่ Flag เพิ่ม ในโหมด dev `Sobree/api` ยังยอมรับ `http://localhost:3000`–`http://localhost:3002` (และ `127.0.0.1` ที่เทียบเท่า) เพื่อให้ Staff และ Client Portal เรียก API ได้โดยไม่ต้องตั้งค่า CORS เพิ่ม และ `scripts/mock-agent.js` จะเติมพอร์ตของ Origin ต่อท้าย device fingerprint และ hostname ที่รายงาน (เช่น `mock-<hash>-3001`) การเปิดทั้ง 3 พอร์ทัลพร้อมกันจึงได้อุปกรณ์ 3 รายการแยกกัน ไม่ชน fingerprint กัน
+ค่าเริ่มต้น `CORS_ORIGIN` ของ API และ Allowed Origin ของ Agent ตั้งไว้ที่ `http://localhost:3000` และ `Rain/portal/vite.config.ts` ล็อกพอร์ตของ Vite ไว้ที่ `3000` ให้โดยอัตโนมัติ ดังนั้น `npm run dev:portal` ใช้งานได้ทันทีโดยไม่ต้องใส่ Flag เพิ่ม คุณสามารถทดสอบทุกบทบาท (`ADMIN`, `STAFF`, `CLIENT`) บนลิงก์เดียว `http://localhost:3000` ได้เลย เพราะพอร์ทัลจะส่ง `X-Mango-Dev-User` และ `scripts/mock-agent.js` จะแยกสถานะ Agent และ Device Fingerprint ตามชื่อผู้ใช้ (`mock-<hash>-<username>`) ให้อัตโนมัติ (ในโหมด dev `Sobree/api` ยังรองรับ `http://localhost:3000`–`http://localhost:3002` และ `127.0.0.1` เผื่อกรณีใช้ `dev:portal:all`)
 
 นำค่า PairingToken ที่แสดงบน Terminal ของ Mock Agent ไปวางในช่อง "Paste X-Mango-Agent-Token" บนหน้าเว็บ เพื่อให้หน้าเว็บส่ง Header `X-Mango-Agent-Token` ไปยัง Agent ได้อย่างถูกต้อง
 
@@ -374,8 +375,8 @@ cd Sobree/vpn-daemon; go vet ./...; go test ./...; cd ../..
 2. **เข้าสู่ระบบ (`http://localhost:3000`)**: ใส่ Username/Password ของ `ADMIN` ที่ Seed ไว้ (`POST /api/auth/login`)
 3. **ยืนยันตัวตนด้วย TOTP MFA**: ในการล็อกอินครั้งแรก (`MFA_SETUP_REQUIRED`) ให้สแกน QR Code (`otpauthUri`) ด้วยแอป Authenticator แล้วกรอกรหัส 6 หลัก (`POST /api/auth/verify-otp`)
 4. **จับคู่ Agent ในเครื่อง**: วางค่า `PairingToken` ในช่อง pairing-token ของ Portal (`X-Mango-Agent-Token`)
-5. **เชื่อมต่อ VPN**: กด **Connect VPN** -> Portal ขอตั๋วใช้ครั้งเดียว 60 วินาที (`POST /api/vpn/ticket`) -> Agent สร้างคู่กุญแจ Curve25519 ในหน่วยความจำ -> `POST /api/vpn/connect` จัดสรรหมายเลข IP ในช่วง `10.13.13.0/24` และตั้งค่า `wg0` + `nftables` -> การ์ด `AgentStatusCard` แสดงสถานะ **Connected** *(หมายเหตุ: `POST /api/vpn/connect` ต้องเข้าถึง `vpn-gateway` ได้ที่ `VPN_DAEMON_URL` มิฉะนั้นจะทำเครื่องหมายเซสชันเป็นตัดการเชื่อมต่อและคืนค่า `502`)*
-6. **ทดสอบ Admin Console และการเพิกถอนแบบเรียลไทม์**: ลองใช้งาน **Users**, **Devices**, **Sessions**, **Policies**, **Audit Logs** และ **Agent Versions** จากนั้นกด **Revoke Device** หรือ **Disconnect Session** และยืนยันว่า Peer ถูกถอดออกทันที
+5. **เชื่อมต่อ VPN**: เปิดแท็บ **VPN Connect** ใน Sidebar แล้วกด **Connect VPN** -> Portal ขอตั๋วใช้ครั้งเดียว 60 วินาที (`POST /api/vpn/ticket`) -> Agent สร้างคู่กุญแจ Curve25519 ในหน่วยความจำ -> `POST /api/vpn/connect` จัดสรรหมายเลข IP ในช่วง `10.13.13.0/24` และตั้งค่า `wg0` + `nftables` -> การ์ด `AgentStatusCard` แสดงสถานะ **Connected** *(หมายเหตุ: `POST /api/vpn/connect` ต้องเข้าถึง `vpn-gateway` ได้ที่ `VPN_DAEMON_URL` มิฉะนั้นจะทำเครื่องหมายเซสชันเป็นตัดการเชื่อมต่อและคืนค่า `502`)*
+6. **ทดสอบ Admin Console และการเพิกถอนแบบเรียลไทม์**: ลองใช้งาน **Users**, **Devices**, **Sessions** (รวมถึง **Terminate All Active**), **Policies**, **Gateways**, **Audit Logs** และ **Agent Versions** จากนั้นกด **Revoke Device** หรือ **Disconnect Session** และยืนยันว่า Peer ถูกถอดออกทันที (ในพอร์ทัล `STAFF` ลองเปิดแท็บ **Help** เพื่อดู/ดาวน์โหลดตัวติดตั้ง Agent จาก `GET /api/vpn/agent-versions`)
 
 ---
 

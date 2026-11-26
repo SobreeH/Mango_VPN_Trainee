@@ -14,7 +14,7 @@ MANGO VPN ให้ผู้ใช้ล็อกอินด้วยรหั�
 
 ```mermaid
 flowchart LR
-    Browser["Web Portal - เว็บพอร์ทัล (localhost:3000/3001/3002)"] -->|HTTP API| API["Control Plane API (localhost:4000)"]
+    Browser["Web Portal - เว็บพอร์ทัล (localhost:3000)"] -->|HTTP API| API["Control Plane API (localhost:4000)"]
     API -->|SQL| DB[("PostgreSQL 16 (localhost:15432)")]
     Browser -->|"Loopback + โทเคนจับคู่"| Agent["Local Agent (Windows/Linux Host, 127.0.0.1:47821 - mock หรือ Go)"]
     Agent -->|"แลกตั๋ว + คีย์สาธารณะ"| API
@@ -25,7 +25,7 @@ flowchart LR
 
 | ส่วนประกอบ | Address / พอร์ตในเครื่อง | หน้าที่ |
 |---|---|---|
-| Web Portal (เว็บพอร์ทัล) | `http://localhost:3000` (หรือ `:3001` / `:3002`) | หน้าล็อกอิน การลงทะเบียน TOTP การควบคุม VPN และหน้าจัดการสำหรับผู้ดูแล (Admin Governance UI) พอร์ต `3000/3001/3002` เป็น Admin/Staff/Client ตามลำดับ |
+| Web Portal (เว็บพอร์ทัล) | `http://localhost:3000` | หน้าล็อกอิน การลงทะเบียน TOTP การควบคุม VPN และหน้าจัดการตามบทบาท (`ADMIN`, `STAFF`, `CLIENT`) |
 | Control Plane API (API ควบคุมระบบ) | `http://localhost:4000` | ยืนยันตัวตนด้วยรหัสผ่านและ TOTP, ออกตั๋วเชื่อมต่อที่มีอายุสั้น, จัดสรร IP และประสานงานกับ Gateway |
 | PostgreSQL 16 | `localhost:15432` (พอร์ตในคอนเทนเนอร์ `5432`) | เก็บข้อมูลผู้ใช้ เซสชัน นโยบาย อุปกรณ์ และประวัติการตรวจสอบ (Audit) รัน Track A แบบฝังตัวด้วย `npm run db:start` (ข้อมูลอยู่ที่ `.local/postgres`) หรือรันเป็นคอนเทนเนอร์ Docker ชื่อ `mango-postgres` สำหรับ Track B/C |
 | Local Agent (Agent บนเครื่อง Host) | `http://127.0.0.1:47821` | `scripts/mock-agent.js` สำหรับเดโม UI หรือ Go ใน `Sobree/agent-windows` สำหรับ WireGuard จริง: Windows ใช้ `wireguard.exe /installtunnelservice` และ Linux ใช้ `wg-quick up` |
@@ -324,9 +324,7 @@ npm run dev:api
 npm run dev:portal
 ```
 
-คำสั่งนี้เปิด Portal เดียวที่ `:3000` หากต้องการทดสอบทั้งสามบทบาทพร้อมกัน ให้ใช้ `npm run dev:portal:all` ซึ่งรัน `scripts/start-all-portals.mjs` เปิด Admin `:3000`, Staff `:3001` และ Client `:3002` ใน Terminal เดียว
-
-**สิ่งที่ควรเห็น:** Vite แสดง `http://localhost:3000/` (หรือแสดง URL ของทั้งสามพอร์ตเมื่อใช้ `dev:portal:all`) เปิด URL ที่ต้องการในเบราว์เซอร์
+**สิ่งที่ควรเห็น:** Vite แสดง `http://localhost:3000/` เปิด URL นี้ในเบราว์เซอร์ ทุกบทบาท (`ADMIN`, `STAFF`, `CLIENT`) ใช้งานผ่านลิงก์เดียวกันนี้ได้ทั้งหมด
 
 ### ⚡ Track B: ขั้นตอนของ Sobree (Control Plane + Go Agent จริง + อุโมงค์ WireGuard)
 
@@ -420,7 +418,7 @@ npm run dev:portal
 
 ```powershell
 $env:AGENT_LISTEN_ADDR="127.0.0.1:47821"
-$env:AGENT_ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:3002,http://127.0.0.1:3002"
+$env:AGENT_ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:3000"
 $env:AGENT_PAIRING_TOKEN="my-local-dev-pairing-token-01"
 $env:API_URL="http://localhost:4000"
 cd Sobree/agent-windows
@@ -431,7 +429,7 @@ go run .
 
 ```bash
 export AGENT_LISTEN_ADDR="127.0.0.1:47821"
-export AGENT_ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:3002,http://127.0.0.1:3002"
+export AGENT_ALLOWED_ORIGINS="http://localhost:3000,http://127.0.0.1:3000"
 export AGENT_PAIRING_TOKEN="my-local-dev-pairing-token-01"
 export API_URL="http://localhost:4000"
 cd Sobree/agent-windows && sudo -E go run .
@@ -501,7 +499,14 @@ unset SEED_ADMIN_PASSWORD
 
 ## ระยะที่ 4: คู่มือทดสอบแบบโต้ตอบทีละขั้นตอน ("ต้องทำอะไรบ้างเพื่อทดสอบ")
 
-พอร์ทัลรองรับภาษาไทย/อังกฤษ (TH/EN) และธีม Dark/Light โดยเปลี่ยนได้จากหน้าเว็บ ในหน้า Admin การ์ด Agent อยู่ในแผง VPN แบบพับเก็บได้ ให้เปิดแผง VPN หากยังไม่เห็นการ์ด
+พอร์ทัลรองรับภาษาไทย/อังกฤษ (TH/EN) และธีม Dark/Light โดยเปลี่ยนได้จากหน้าเว็บ (คู่มือนี้อ้างอิงชื่อป้ายภาษาอังกฤษควบคู่กับภาษาไทย)
+
+บน **แดชบอร์ด Admin** แถบด้านซ้าย (Sidebar) จัดหมวดหมู่เป็น 3 กลุ่มแบบพับเก็บได้:
+- **VPN & Live Monitoring (การเชื่อมต่อ & ติดตามสด):** **VPN Connect**, **Sessions**
+- **Management (จัดการสิทธิ์ & เครือข่าย):** **Users**, **Devices**, **Policies**, **Gateways**
+- **Audit & System (ตรวจสอบ & ระบบ):** **Audit Logs**, **Agent Versions**
+
+ด้านบนของแท็บที่เลือกจะมี KPI Summary Cards 4 ใบ (**Total Users**, **Devices**, **Active Sessions**, **Security Posture**) ซึ่งจะซ่อนอัตโนมัติเมื่ออยู่ในแท็บ **VPN Connect**
 
 ### 🎯 ภารกิจที่ 1: ล็อกอินครั้งแรกและตั้งค่า TOTP Authenticator
 
@@ -515,21 +520,21 @@ unset SEED_ADMIN_PASSWORD
 
 3. กรอกรหัสปัจจุบันในช่อง **6-Digit Code** (รหัส 6 หลัก) แล้วคลิกปุ่ม **Verify** (ยืนยัน) หากรหัสเปลี่ยนระหว่างที่คุณพิมพ์ ให้รอรหัสถัดไปแล้วกรอกอย่างรวดเร็ว
 
-    **สิ่งที่ควรเห็น:** แดชบอร์ดหลังล็อกอิน แสดง **Signed in as** (ลงชื่อเข้าใช้เป็น) ชื่อผู้ใช้ `admin`, ป้าย `ADMIN` และคอนโซล **Admin Governance** ที่มีหกแท็บ โดยค่าเริ่มต้นจะเลือก **Audit Logs** การ์ด Agent อยู่ในแผง VPN แบบพับเก็บได้
+    **สิ่งที่ควรเห็น:** แดชบอร์ด Admin แสดงชื่อผู้ใช้ `admin · ADMIN` ที่ด้านล่าง Sidebar, KPI Cards 4 ใบด้านบน และเลือก **Audit Logs** เป็นค่าเริ่มต้น
 
 ### 🎯 ภารกิจที่ 2: จับคู่ Agent บนเครื่องและเชื่อมต่อ VPN
 
-1. ในการ์ด **Windows Agent** ให้ตรวจสอบว่าเข้าถึง Agent ได้ สำหรับ Mock ควรแสดง **Agent Reachable (Unpaired)** (เข้าถึง Agent ได้ แต่ยังไม่จับคู่) และแสดงเวอร์ชัน `v2.0.0` วาง `PairingToken` ของ Mock ที่คัดลอกไว้ (หรือ Token ของ Go Agent ที่คุณเลือก) ลงในช่อง **Agent Pairing Token** ซึ่งเป็นช่องที่มี Placeholder ว่า **Paste X-Mango-Agent-Token** จากนั้นคลิกปุ่ม **Pair Agent** (จับคู่ Agent)
+1. คลิก **VPN Connect** ใน Sidebar ใต้กลุ่ม **VPN & Live Monitoring** แล้วตรวจสอบว่าเข้าถึง Agent ได้ สำหรับ Mock ควรแสดง **Agent Reachable (Unpaired)** (เข้าถึง Agent ได้ แต่ยังไม่จับคู่) และแสดงเวอร์ชัน `v2.0.0` วาง `PairingToken` ของ Mock ที่คัดลอกไว้ (หรือ Token ของ Go Agent ที่คุณเลือก) ลงในช่อง **Agent Pairing Token** ซึ่งเป็นช่องที่มี Placeholder ว่า **Paste X-Mango-Agent-Token** จากนั้นคลิกปุ่ม **Pair Agent** (จับคู่ Agent)
 
-   **สิ่งที่ควรเห็น:** **Agent Paired & Ready** (จับคู่แล้วและพร้อมใช้งาน), `Tunnel State: disconnected` (สถานะอุโมงค์: ยังไม่เชื่อมต่อ) และปุ่ม **Connect VPN** (เชื่อมต่อ VPN) หากจับคู่ไม่สำเร็จ ให้ตรวจสอบว่า Token ตรงกับ Agent ที่กำลังทำงานอยู่ทุกตัวอักษร
+   **สิ่งที่ควรเห็น:** **Agent Paired & Ready** (จับคู่แล้วและพร้อมใช้งาน), `Tunnel State: disconnected` (สถานะอุโมงค์: ยังไม่เชื่อมต่อ), ตัวเลือก **VPN Provider** (ค่าเริ่มต้น `WireGuard (Default)` พร้อมปุ่มรีเฟรชเพื่อโหลด Gateway ที่ลงทะเบียนไว้) และปุ่ม **Connect VPN** (เชื่อมต่อ VPN) หากจับคู่ไม่สำเร็จ ให้ตรวจสอบว่า Token ตรงกับ Agent ที่กำลังทำงานอยู่ทุกตัวอักษร
 
 2. คลิกปุ่ม **Connect VPN** เบื้องหลัง พอร์ทัลจะขอตั๋วแบบใช้ครั้งเดียวที่มีอายุ 60 วินาที Agent จะสร้างคู่กุญแจ Curve25519 ใหม่ในหน่วยความจำ และส่งตั๋วพร้อมคีย์สาธารณะให้ API API จะจัดสรร IP ที่ว่างตัวแรก (ปกติคือ `10.13.13.2`) จากนั้นขอให้ `vpn-gateway` เพิ่ม Peer และเพิ่มกฎ `nftables` ตามนโยบาย Role สำหรับ Go Agent มันจะเปิดใช้งาน WireGuard ต่อ ส่วน Mock จะจำลองสถานะของ Agent เท่านั้นและไม่ได้เปิดอุโมงค์ใดๆ
 
-   **สิ่งที่ควรเห็น:** สำหรับเดโม Mock การ์ดจะแสดงสถานะ **connected** เป็นสีเขียว พร้อม `Connected Role: ADMIN`, `Assigned VPN IP: 10.13.13.2`, `Gateway Endpoint: 127.0.0.1:51820`, `Permitted Networks` (ปกติคือ `10.13.13.0/24` หากไม่มีนโยบาย ALLOW สำหรับ ADMIN), `Curve25519 Key` และปุ่ม **Disconnect VPN** (ตัดการเชื่อมต่อ VPN) สำหรับ Track B คุณควรเห็นอุโมงค์ `mango0` จริง: WireGuard for Windows บน Windows หรืออินเทอร์เฟซ `mango0` บน Linux สถานะและตัวนับของ Mock ไม่ใช่หลักฐานว่ามีทราฟฟิก WireGuard จริง
+   **สิ่งที่ควรเห็น:** สำหรับเดโม Mock การ์ดจะแสดงสถานะ **connected** เป็นสีเขียว พร้อมแผนภาพ **Network Topology** แบบ 3-hop, **Assigned VPN IP** (`10.13.13.2`), **Active Role** (`ADMIN`), **Protocol Status** (`WireGuard`), ตัวนับ **Data Usage** แบบสด, **Permitted Networks** (คลิก **Technical Details** เพื่อดู `Curve25519 Key` และ `Protocol`) และปุ่ม **Disconnect** (ตัดการเชื่อมต่อ) สำหรับ Track B คุณควรเห็นอุโมงค์ `mango0` จริง: WireGuard for Windows บน Windows หรืออินเทอร์เฟซ `mango0` บน Linux สถานะและตัวนับของ Mock ไม่ใช่หลักฐานว่ามีทราฟฟิก WireGuard จริง
 
-### 🎯 ภารกิจที่ 3: ทดสอบทุกแท็บของ Admin Governance (ครบทั้งหกแท็บ)
+### 🎯 ภารกิจที่ 3: ทดสอบทุกแท็บของ Admin Governance (ครบทั้ง 7 แท็บจัดการ)
 
-ลำดับแท็บของ Admin Governance คือ **Audit Logs**, **Agent Versions**, **Users**, **Devices**, **Sessions**, **Policies** เนื่องจาก **Audit Logs** ถูกเลือกเป็นค่าเริ่มต้น ให้ทำตามลำดับที่มีหมายเลขด้านล่างเพื่อสร้างข้อมูลก่อน แล้วค่อยตรวจสอบประวัติการตรวจสอบในตอนท้าย
+เนื่องจาก **Audit Logs** ถูกเลือกเป็นค่าเริ่มต้น ให้ทำตามลำดับที่มีหมายเลขด้านล่างเพื่อสร้างข้อมูลก่อน แล้วค่อยตรวจสอบประวัติการตรวจสอบในตอนท้าย
 
 #### 1. Users (ผู้ใช้)
 
@@ -569,9 +574,15 @@ unset SEED_ADMIN_PASSWORD
 
    คลิก **Create Policy** ช่วงพอร์ตรองรับเฉพาะ TCP หรือ UDP ดังนั้นเมื่อเลือก `ANY` ให้เว้นว่างไว้
 
-**สิ่งที่ควรเห็น:** นโยบายทั้งสองปรากฏในรายการพร้อม Role, CIDR, Action, Protocol และ Priority ที่ถูกต้อง ตัวเลือกเพิ่มเติม: สร้างนโยบายทดลองที่ใช้แล้วทิ้ง แล้วคลิกปุ่ม **Delete** (ลบ) ของมัน ยืนยันว่ามันหายไปโดยไม่มี Error
+**สิ่งที่ควรเห็น:** นโยบายทั้งสองปรากฏในรายการพร้อม Role, CIDR, Action, Protocol และ Priority ที่ถูกต้อง สามารถทดสอบช่องค้นหาและตัวกรอง Role/Action ได้ด้วย ตัวเลือกเพิ่มเติม: สร้างนโยบายทดลองที่ใช้แล้วทิ้ง แล้วคลิกปุ่ม **Delete** (ลบ) ของมัน ยืนยันว่ามันหายไปโดยไม่มี Error
 
-#### 3. Agent Versions (เวอร์ชันของ Agent)
+#### 3. Gateways (เกตเวย์)
+
+คลิก **Gateways** ใต้หมวด **Management**
+
+**สิ่งที่ควรเห็น:** เกตเวย์เริ่มต้น `Primary WireGuard Gateway` (`WIREGUARD`, `10.13.13.0/24`, `API_MANAGED`, `Default`) ปรากฏในรายการ (สามารถทดสอบลงทะเบียนเกตเวย์เพิ่ม เช่น `WIREGUARD`, `FORTINET`, `CISCO` กรองตามผู้ให้บริการ หรือเปิด/ปิดใช้งานได้)
+
+#### 4. Agent Versions (เวอร์ชันของ Agent)
 
 1. คลิก **Agent Versions** ภายใต้ **Publish Agent Version** (เผยแพร่เวอร์ชัน Agent) ให้กรอก:
 
@@ -590,19 +601,19 @@ unset SEED_ADMIN_PASSWORD
 
    **สิ่งที่ควรเห็น:** API จะปฏิเสธ Agent เวอร์ชัน `2.0.0` ด้วย HTTP `426` และ `AGENT_VERSION_OUTDATED` ใน Agent Versions ให้คลิก **Mark Optional** ที่เวอร์ชัน `2.1.0` (ปุ่มนี้ปรากฏเมื่อเวอร์ชันนั้นเป็น Required) หรือ Deactivate เรคคอร์ด `2.1.0` ระวังอย่าปิดใช้งาน `2.0.0` โดยไม่ตั้งใจ Go Agent และ `mock-agent.js` ตรวจจับ OS/สถาปัตยกรรมเพื่อกำหนด Platform โดยอัตโนมัติ เว้นแต่ตั้ง `AGENT_PLATFORM` เอง
 
-#### 4. Devices (อุปกรณ์)
+#### 5. Devices (อุปกรณ์)
 
 คลิก **Devices**
 
-**สิ่งที่ควรเห็น:** เครื่องที่เชื่อมต่ออยู่ของคุณปรากฏพร้อมชื่อโฮสต์ (Hostname), ลายนิ้วมืออุปกรณ์ (Device Fingerprint), ผู้ใช้ `admin` และสถานะ `ACTIVE` ลายนิ้วมือของ Mock สร้างจากชื่อโฮสต์ เว้นแต่คุณจะตั้งค่า `AGENT_DEVICE_FINGERPRINT`
+**สิ่งที่ควรเห็น:** แถบสรุป (**Total**, **Active**, **Revoked**), ช่องค้นหาและตัวกรองสถานะ, ปุ่ม **Refresh** และ **Export CSV** เครื่องที่เชื่อมต่ออยู่ของคุณปรากฏพร้อมไอคอน OS, ชื่อโฮสต์ (Hostname), ลายนิ้วมืออุปกรณ์ (Device Fingerprint), ผู้ใช้ `admin`, เวลาที่เห็นล่าสุด และสถานะ `ACTIVE` คลิก **Inspect** เพื่อดูรายละเอียดเพิ่มเติม ลายนิ้วมือของ Mock สร้างจากชื่อโฮสต์ เว้นแต่คุณจะตั้งค่า `AGENT_DEVICE_FINGERPRINT`
 
-#### 5. Sessions (เซสชัน)
+#### 6. Sessions (เซสชัน)
 
 คลิก **Sessions**
 
-**สิ่งที่ควรเห็น:** เซสชันแบบสด `ACTIVE` ของ `admin` โดย IP ที่กำหนดปกติคือ `10.13.13.2` ตารางยังแสดงชื่อโฮสต์ของอุปกรณ์และมีการดำเนินการ **Disconnect** (ตัดการเชื่อมต่อ)
+**สิ่งที่ควรเห็น:** เซสชันแบบสด `ACTIVE` ของ `admin` โดย IP ที่กำหนดปกติคือ `10.13.13.2` มีปุ่ม **Auto 5s** (รีเฟรชอัตโนมัติ), **Refresh**, **Export CSV**, ช่องค้นหาและตัวกรองสถานะ (`ALL`, `ACTIVE`, `DISCONNECTED`, `EXPIRED`), ปุ่ม **Disconnect** รายแถว และปุ่มฉุกเฉิน **Terminate All Active** สำหรับตัดการเชื่อมต่อทั้งหมด
 
-#### 6. Audit Logs (ประวัติการตรวจสอบ)
+#### 7. Audit Logs (ประวัติการตรวจสอบ)
 
 คลิก **Audit Logs** มองหาเหตุการณ์ด้านความปลอดภัยจากการกระทำข้างต้น เช่น `VPN_TICKET_ISSUED`, `VPN_CONNECTED`, `USER_CREATED`, `POLICY_CREATED` และเหตุการณ์การสร้างเวอร์ชัน Agent (ซึ่ง API แสดงเป็น `agent_version.create`) ลองใช้กล่อง **Action filter** (ตัวกรองการกระทำ), **Target type filter** (ตัวกรองประเภทเป้าหมาย) และ **Search** (ค้นหา) เช่น ค้นหา `admin` หรือกรองด้วย `USER_CREATED`
 
@@ -610,7 +621,7 @@ unset SEED_ADMIN_PASSWORD
 
 ### 🎯 ภารกิจที่ 4: ทดสอบการเพิกถอนแบบเรียลไทม์และ RBAC ของผู้ที่ไม่ใช่แอดมิน (ล็อกอินเป็น `STAFF`)
 
-หากรัน `npm run dev:portal:all` พอร์ทัลจะอยู่ที่ `:3000` (Admin), `:3001` (Staff) และ `:3002` (Client) `scripts/mock-agent.js` จะต่อท้าย Device Fingerprint ด้วย `-<port>` ตามพอร์ตของ Origin ที่เริ่มการเชื่อมต่อโดยอัตโนมัติ จึงแยกอุปกรณ์ของแต่ละพอร์ทัลออกจากกัน หากต้องการกำหนด Fingerprint เอง ให้ตั้ง `AGENT_DEVICE_FINGERPRINT` ก่อนเริ่ม Mock:
+คุณสามารถทดสอบทุกบทบาท (`ADMIN`, `STAFF`, `CLIENT`) บน **ลิงก์พอร์ทัลเดียว (`http://localhost:3000`)** ได้เลยด้วยการออกจากระบบแล้วเข้าสู่ระบบใหม่: พอร์ทัลจะส่ง `X-Mango-Dev-User` และ `scripts/mock-agent.js` จะแยกสถานะเซสชันและ Device Fingerprint ตามชื่อผู้ใช้ (`-<username>`) ให้อัตโนมัติจึงไม่ชนกัน หากต้องการกำหนด Fingerprint เอง ให้ตั้ง `AGENT_DEVICE_FINGERPRINT` ก่อนเริ่ม Mock:
 
 ```powershell
 $env:AGENT_DEVICE_FINGERPRINT="mock-device-staff01"
@@ -622,7 +633,7 @@ export AGENT_DEVICE_FINGERPRINT="mock-device-staff01"
 npm run mock:agent
 ```
 
-ตัวแปรที่กำหนดเองจะแทน Fingerprint ตั้งต้น ส่วน suffix พอร์ตจะยังช่วยแยกการเชื่อมต่อแต่ละพอร์ต
+ตัวแปรที่กำหนดเองจะแทน Fingerprint ตั้งต้น ส่วน suffix ชื่อผู้ใช้จะยังช่วยแยกการเชื่อมต่อแต่ละบัญชีออกจากกัน
 
 1. ในฐานะ `admin` คลิก **Sessions** แล้วคลิก **Disconnect** ที่เซสชันที่ใช้งานอยู่
 
@@ -646,9 +657,9 @@ npm run mock:agent
 
 3. ก่อนสลับผู้ใช้ ให้ตัดการเชื่อมต่อ Agent บนเครื่องหากยังแสดงว่าเชื่อมต่ออยู่ คลิก **Log Out** (ออกจากระบบ) จากนั้นล็อกอินเป็น `staff01` ด้วยรหัสผ่าน `StaffTestPass#2026` การล็อกอินครั้งแรกของ `staff01` จะต้องลงทะเบียน TOTP ของตนเอง: สแกน QR Code (หรือกรอก Base32 Key) พิมพ์ **6-Digit Code** ปัจจุบัน แล้วคลิก **Verify**
 
-   **สิ่งที่ควรเห็น:** แดชบอร์ดแสดง `staff01` และป้าย `STAFF` ผู้ใช้ Staff จะไม่เห็นหกแท็บของ **Admin Governance**
+   **สิ่งที่ควรเห็น:** แดชบอร์ด Staff พร้อม Sidebar ที่มี 3 แท็บคือ **Connection**, **Profile & Security** และ **Help** (และแสดง `staff01 · STAFF` โดยไม่มีแท็บ **Admin Governance**) ลองคลิกแท็บ **Help** จะเห็นการ์ด **ดาวน์โหลดตัวติดตั้ง MANGO Agent** ที่ดึงรายการเวอร์ชันที่เปิดใช้งานจาก `GET /api/vpn/agent-versions` (รวมถึงเวอร์ชัน `2.0.0` ที่เผยแพร่ในภารกิจที่ 3 พร้อมปุ่มคัดลอก SHA-256 และปุ่มดาวน์โหลด) (หากล็อกอินเป็น `client01` บน `http://localhost:3000` จะเห็นหน้า **CLIENT PORTAL** แบบเรียบง่ายที่มีเฉพาะการ์ดเชื่อมต่อ VPN)
 
-4. จับคู่ Agent บนเครื่องอีกครั้งด้วย Token ปัจจุบัน สำหรับพอร์ทัลพอร์ตต่างกัน Mock จะแยก Fingerprint ด้วย suffix พอร์ตให้อัตโนมัติ; หากต้องการระบุตัวตน Agent เอง ให้หยุด Mock แล้วตั้ง `$env:AGENT_DEVICE_FINGERPRINT="mock-device-staff01"` ใน PowerShell หรือ `export AGENT_DEVICE_FINGERPRINT="mock-device-staff01"` ใน Bash ก่อนเริ่ม `npm run mock:agent` ใหม่ วาง Token ปัจจุบัน แล้วคลิก **Pair Agent** และ **Connect VPN**
+4. สำหรับ **Mock Agent** บัญชี `staff01` จะได้สถานะ Agent และ suffix ของ Fingerprint (`-staff01`) แยกต่างหากบน `http://localhost:3000` อัตโนมัติ และระบบจะจำ Pairing Token ไว้ใน `localStorage` (จึงกด **Connect VPN** ได้เลย หรือจับคู่ใหม่หากเพิ่งรีสตาร์ท Mock) หากต้องการกำหนดตัวตน Agent เอง (หรือใช้ **Go Agent** ซึ่งไม่ได้เติม suffix ให้อัตโนมัติ) ให้ตั้ง `$env:AGENT_DEVICE_FINGERPRINT="mock-device-staff01"` ใน PowerShell หรือ `export AGENT_DEVICE_FINGERPRINT="mock-device-staff01"` ใน Bash ก่อนเริ่ม Agent ใหม่ แล้ววาง Token ปัจจุบัน กด **Pair Agent** และ **Connect VPN**
 
    **สิ่งที่ควรเห็น:** `staff01` เชื่อมต่อในฐานะ `STAFF` เนื่องจากภารกิจที่ 3 สร้างนโยบาย `ALLOW` ให้ `STAFF` ไว้ **Permitted Networks** จึงรวม `10.20.0.0/16` และอาจรวมเครือข่ายที่อนุญาตอื่นตาม Policy แท็บ Admin Governance ยังคงซ่อนอยู่ สำหรับ Track B Go Agent ให้ใช้ Fingerprint ที่ไม่เคยถูกผูกกับผู้ใช้อื่น โดยตั้ง `AGENT_DEVICE_FINGERPRINT` ใน PowerShell หรือ Bash ก่อนรัน Agent หากจำเป็น
 
@@ -765,7 +776,7 @@ Linux/macOS (Bash):
 
 ### การปิดระบบอย่างถูกต้อง
 
-1. ในแต่ละ Terminal ที่รัน `npm run mock:agent`, `npm run mock:daemon`, `npm run dev:api`, `npm run dev:portal`, `go run .` หรือ `npm run db:start` ให้กด **Ctrl+C** หนึ่งครั้ง หากอุโมงค์ Go ยังทำงานอยู่ ให้คลิก **Disconnect VPN** ก่อนเมื่อทำได้ เพื่อให้ API และ Gateway ลบ Peer ออกอย่างเรียบร้อย Ctrl+C ใน `db:start` จะหยุด PostgreSQL แบบฝังตัว หากต้องการลบข้อมูลในเครื่อง ให้รัน `npm run db:reset-local` หลังจากหยุดแล้วเท่านั้น เพราะคำสั่งนี้จะลบ `.local/postgres`
+1. ในแต่ละ Terminal ที่รัน `npm run mock:agent`, `npm run mock:daemon`, `npm run dev:api`, `npm run dev:portal`, `go run .` หรือ `npm run db:start` ให้กด **Ctrl+C** หนึ่งครั้ง หากอุโมงค์ Go ยังทำงานอยู่ ให้คลิก **Disconnect** ก่อนเมื่อทำได้ เพื่อให้ API และ Gateway ลบ Peer ออกอย่างเรียบร้อย Ctrl+C ใน `db:start` จะหยุด PostgreSQL แบบฝังตัว หากต้องการลบข้อมูลในเครื่อง ให้รัน `npm run db:reset-local` หลังจากหยุดแล้วเท่านั้น เพราะคำสั่งนี้จะลบ `.local/postgres`
 
     **สิ่งที่ควรเห็น:** โปรเซสที่ทำงานอยู่หน้าจอจะหยุด และ PowerShell/Bash กลับมาที่บรรทัดคำสั่ง สำหรับ Track B บริการ/อุโมงค์ WireGuard ควรถูกปิดเมื่อ Agent ตัดการเชื่อมต่อสำเร็จ
 
