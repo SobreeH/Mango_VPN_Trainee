@@ -12,7 +12,7 @@ import {
   Laptop,
   Eye,
   EyeOff,
-  Power,
+  ChevronDown,
   ShieldCheck,
   Activity,
   HelpCircle,
@@ -50,7 +50,8 @@ type AdminTab =
   | 'devices'
   | 'sessions'
   | 'policies'
-  | 'gateways';
+  | 'gateways'
+  | 'vpn-connect';
 
 const loginSchema = z.object({
   username: z.string().trim().min(1, 'Username is required'),
@@ -140,7 +141,15 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showSetupKey, setShowSetupKey] = useState(false);
-  const [showVpnPanel, setShowVpnPanel] = useState(false);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    monitoring: true,
+    management: true,
+    audit: true,
+  });
+
+  const toggleSidebarGroup = (groupKey: string) => {
+    setOpenGroups((prev) => ({ ...prev, [groupKey]: !prev[groupKey] }));
+  };
 
   useEffect(() => {
     try {
@@ -333,110 +342,92 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                   </div>
                 </div>
 
-                {/* Navigation Groups */}
-                <nav role="tablist" aria-label="Admin Governance" className="space-y-6">
-                  {/* Group 1: Management (จัดการ) */}
-                  <div className="space-y-1">
-                    <p className={`text-xs font-semibold px-3 pb-1 tracking-wide ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
-                      {lang === 'th' ? 'จัดการ' : 'Management'}
-                    </p>
-                    {[
-                      { id: 'users', labelTh: 'ผู้ใช้', labelEn: 'Users' },
-                      { id: 'devices', labelTh: 'อุปกรณ์', labelEn: 'Devices' },
-                      { id: 'policies', labelTh: 'นโยบาย', labelEn: 'Policies' },
-                      { id: 'gateways', labelTh: 'เกตเวย์', labelEn: 'Gateways' },
-                    ].map((item) => {
-                      const isActive = activeTab === item.id;
-                      return (
+                {/* Collapsible & Ordered Navigation Groups */}
+                <nav role="tablist" aria-label="Admin Governance" className="space-y-4">
+                  {[
+                    {
+                      key: 'monitoring',
+                      titleTh: 'การเชื่อมต่อ & ติดตามสด',
+                      titleEn: 'VPN & Live Monitoring',
+                      items: [
+                        { id: 'vpn-connect', labelTh: 'เชื่อมต่อ VPN', labelEn: 'VPN Connect' },
+                        { id: 'sessions', labelTh: 'เซสชัน', labelEn: 'Sessions' },
+                      ],
+                    },
+                    {
+                      key: 'management',
+                      titleTh: 'จัดการสิทธิ์ & เครือข่าย',
+                      titleEn: 'Management',
+                      items: [
+                        { id: 'users', labelTh: 'ผู้ใช้', labelEn: 'Users' },
+                        { id: 'devices', labelTh: 'อุปกรณ์', labelEn: 'Devices' },
+                        { id: 'policies', labelTh: 'นโยบาย', labelEn: 'Policies' },
+                        { id: 'gateways', labelTh: 'เกตเวย์', labelEn: 'Gateways' },
+                      ],
+                    },
+                    {
+                      key: 'audit',
+                      titleTh: 'ตรวจสอบ & ระบบ',
+                      titleEn: 'Audit & System',
+                      items: [
+                        { id: 'audit-logs', labelTh: 'บันทึกการใช้งาน', labelEn: 'Audit Logs' },
+                        { id: 'agent-versions', labelTh: 'เวอร์ชัน Agent', labelEn: 'Agent Versions' },
+                      ],
+                    },
+                  ].map((group) => {
+                    const isOpen = openGroups[group.key] ?? true;
+                    return (
+                      <div key={group.key} className="space-y-1">
                         <button
-                          key={item.id}
                           type="button"
-                          role="tab"
-                          aria-label={item.labelEn}
-                          aria-selected={isActive}
-                          onClick={() => setActiveTab(item.id as AdminTab)}
-                          className={`w-full flex items-center px-4 py-2.5 rounded-xl text-xs sm:text-sm transition-all text-left ${
-                            isActive
-                              ? isDark
-                                ? 'bg-[#7a4918]/85 text-amber-100 font-semibold shadow-sm'
-                                : 'bg-[#f59e0b] text-stone-950 font-semibold shadow-sm'
-                              : isDark
-                                ? 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40 font-medium'
-                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium'
+                          aria-expanded={isOpen}
+                          aria-label={group.titleEn}
+                          onClick={() => toggleSidebarGroup(group.key)}
+                          className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
+                            isDark
+                              ? 'text-stone-400 hover:text-stone-200 hover:bg-white/5'
+                              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
                           }`}
                         >
-                          <span>{lang === 'th' ? item.labelTh : item.labelEn}</span>
+                          <span>{lang === 'th' ? group.titleTh : group.titleEn}</span>
+                          <ChevronDown
+                            className={`h-3.5 w-3.5 transition-transform duration-200 ${
+                              isOpen ? 'rotate-0' : '-rotate-90'
+                            }`}
+                          />
                         </button>
-                      );
-                    })}
-                  </div>
 
-                  {/* Group 2: Live Monitoring (ติดตามสด) */}
-                  <div className="space-y-1">
-                    <p className={`text-xs font-semibold px-3 pb-1 tracking-wide ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
-                      {lang === 'th' ? 'ติดตามสด' : 'Live Monitoring'}
-                    </p>
-                    {[
-                      { id: 'sessions', labelTh: 'เซสชัน', labelEn: 'Sessions' },
-                    ].map((item) => {
-                      const isActive = activeTab === item.id;
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          role="tab"
-                          aria-label={item.labelEn}
-                          aria-selected={isActive}
-                          onClick={() => setActiveTab(item.id as AdminTab)}
-                          className={`w-full flex items-center px-4 py-2.5 rounded-xl text-xs sm:text-sm transition-all text-left ${
-                            isActive
-                              ? isDark
-                                ? 'bg-[#7a4918]/85 text-amber-100 font-semibold shadow-sm'
-                                : 'bg-[#f59e0b] text-stone-950 font-semibold shadow-sm'
-                              : isDark
-                                ? 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40 font-medium'
-                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium'
-                          }`}
-                        >
-                          <span>{lang === 'th' ? item.labelTh : item.labelEn}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Group 3: Audit & System (ตรวจสอบ) */}
-                  <div className="space-y-1">
-                    <p className={`text-xs font-semibold px-3 pb-1 tracking-wide ${isDark ? 'text-stone-400' : 'text-slate-500'}`}>
-                      {lang === 'th' ? 'ตรวจสอบ' : 'Audit & System'}
-                    </p>
-                    {[
-                      { id: 'audit-logs', labelTh: 'บันทึกการใช้งาน', labelEn: 'Audit Logs' },
-                      { id: 'agent-versions', labelTh: 'เวอร์ชัน Agent', labelEn: 'Agent Versions' },
-                    ].map((item) => {
-                      const isActive = activeTab === item.id;
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          role="tab"
-                          aria-label={item.labelEn}
-                          aria-selected={isActive}
-                          onClick={() => setActiveTab(item.id as AdminTab)}
-                          className={`w-full flex items-center px-4 py-2.5 rounded-xl text-xs sm:text-sm transition-all text-left ${
-                            isActive
-                              ? isDark
-                                ? 'bg-[#7a4918]/85 text-amber-100 font-semibold shadow-sm'
-                                : 'bg-[#f59e0b] text-stone-950 font-semibold shadow-sm'
-                              : isDark
-                                ? 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40 font-medium'
-                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium'
-                          }`}
-                        >
-                          <span>{lang === 'th' ? item.labelTh : item.labelEn}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                        {isOpen && (
+                          <div className="space-y-1 pl-1">
+                            {group.items.map((item) => {
+                              const isActive = activeTab === item.id;
+                              return (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  role="tab"
+                                  aria-label={item.labelEn}
+                                  aria-selected={isActive}
+                                  onClick={() => setActiveTab(item.id as AdminTab)}
+                                  className={`w-full flex items-center px-4 py-2.5 rounded-xl text-xs sm:text-sm transition-all text-left ${
+                                    isActive
+                                      ? isDark
+                                        ? 'bg-[#7a4918]/85 text-amber-100 font-semibold shadow-sm'
+                                        : 'bg-[#f59e0b] text-stone-950 font-semibold shadow-sm'
+                                      : isDark
+                                        ? 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40 font-medium'
+                                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium'
+                                  }`}
+                                >
+                                  <span>{lang === 'th' ? item.labelTh : item.labelEn}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </nav>
               </div>
 
@@ -472,6 +463,7 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                     {activeTab === 'policies' && (lang === 'th' ? 'นโยบาย' : 'Policies')}
                     {activeTab === 'gateways' && (lang === 'th' ? 'เกตเวย์' : 'Gateways')}
                     {activeTab === 'sessions' && (lang === 'th' ? 'เซสชัน' : 'Sessions')}
+                    {activeTab === 'vpn-connect' && (lang === 'th' ? 'เชื่อมต่อ VPN' : 'VPN Connect')}
                     {activeTab === 'audit-logs' && (lang === 'th' ? 'บันทึกการใช้งาน' : 'Audit Logs')}
                     {activeTab === 'agent-versions' && (lang === 'th' ? 'เวอร์ชัน Agent' : 'Agent Versions')}
                   </h2>
@@ -479,23 +471,6 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
 
                 {/* Top Right Utility Controls matching Reference Mockup */}
                 <div className="flex items-center gap-3">
-                  {/* Collapsible VPN Toggle Button */}
-                  <button
-                    type="button"
-                    onClick={() => setShowVpnPanel(!showVpnPanel)}
-                    title={lang === 'th' ? 'แผงควบคุม VPN' : 'VPN Control Panel'}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold border transition-all ${
-                      showVpnPanel
-                        ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
-                        : isDark
-                          ? 'border-white/5 bg-[#262420]/70 text-stone-400 hover:text-stone-200'
-                          : 'border-stone-300 bg-stone-100 text-stone-700 hover:bg-stone-200'
-                    }`}
-                  >
-                    <Power className="h-3 w-3 text-amber-400" />
-                    <span className="hidden sm:inline">{lang === 'th' ? 'VPN' : 'VPN'}</span>
-                  </button>
-
                   {/* Language Switcher Pills */}
                   <div className={`flex items-center rounded-full p-1 text-xs font-semibold shadow-inner border transition-colors ${
                     isDark ? 'bg-[#1e1d1a]/85 border-white/5' : 'bg-white border-stone-200'
@@ -560,7 +535,8 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                 </div>
               </header>
 
-              {/* Admin Overview KPI Summary Cards */}
+              {/* Admin Overview KPI Summary Cards (hidden on VPN Connect tab for clean layout) */}
+              {activeTab !== 'vpn-connect' && (
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
                 {/* Total Users */}
                 <div className={`p-4 rounded-3xl border transition-all ${
@@ -654,19 +630,20 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                   </p>
                 </div>
               </div>
-
-              {/* Collapsible VPN Agent Status Card for Admin */}
-              <div className={`transition-all duration-300 ${showVpnPanel ? 'block pb-2' : 'hidden'}`}>
-                <AgentStatusCard
-                  accessToken={step.session.accessToken}
-                  userRole={step.session.user.role}
-                  username={step.session.user.username}
-                  auth={authContext}
-                />
-              </div>
+              )}
 
               {/* Active Tab View */}
               <div>
+                {activeTab === 'vpn-connect' && (
+                  <AgentStatusCard
+                    accessToken={step.session.accessToken}
+                    userRole={step.session.user.role}
+                    username={step.session.user.username}
+                    auth={authContext}
+                    lang={lang}
+                    isDark={isDark}
+                  />
+                )}
                 {activeTab === 'audit-logs' && (
                   <AuditLogsTab
                     apiBaseUrl={apiBaseUrl}
@@ -859,6 +836,8 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                 userRole={step.session.user.role}
                 username={step.session.user.username}
                 auth={authContext}
+                lang={lang}
+                isDark={isDark}
               />
             </div>
           </div>
@@ -1030,6 +1009,8 @@ function AppPortal({ initialSession = null, apiBaseUrl = DEFAULT_API_URL }: AppP
                     userRole={step.session.user.role}
                     username={step.session.user.username}
                     auth={authContext}
+                    lang={lang}
+                    isDark={isDark}
                   />
                 </div>
               )}
