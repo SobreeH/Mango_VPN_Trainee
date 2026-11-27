@@ -1,16 +1,46 @@
 [
-  {"ParameterKey":"AllowedWebCidr","ParameterValue":"<YOUR_PUBLIC_IP>/32"},
-  {"ParameterKey":"AllowedWireGuardCidr","ParameterValue":"<YOUR_PUBLIC_IP>/32"},
-  {"ParameterKey":"CertificateArn","ParameterValue":""},
-  {"ParameterKey":"CustomDomainName","ParameterValue":""},
-  {"ParameterKey":"EnableNatGateway","ParameterValue":"true"},
-  {"ParameterKey":"ApiDesiredCount","ParameterValue":"0"},
-  {"ParameterKey":"PortalDesiredCount","ParameterValue":"0"},
-  {"ParameterKey":"ApiImageTag","ParameterValue":"latest"},
-  {"ParameterKey":"PortalImageTag","ParameterValue":"latest"},
-  {"ParameterKey":"DaemonImageTag","ParameterValue":"latest"},
-  {"ParameterKey":"DBInstanceClass","ParameterValue":"db.t4g.micro"},
-  {"ParameterKey":"GatewayInstanceType","ParameterValue":"t4g.micro"},
-  {"ParameterKey":"UbuntuAmiId","ParameterValue":"/aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id"},
-  {"ParameterKey":"WgListenPort","ParameterValue":"51820"}
+  {
+    "ParameterKey": "Environment",
+    "ParameterValue": "prod"
+  },
+  {
+    "ParameterKey": "AllowedWebCidr",
+    "ParameterValue": "203.0.113.5/32"
+  },
+  {
+    "ParameterKey": "AllowedWireGuardCidr",
+    "ParameterValue": "203.0.113.0/24"
+  },
+  {
+    "ParameterKey": "CertificateArn",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "ApiDesiredCount",
+    "ParameterValue": "0"
+  },
+  {
+    "ParameterKey": "PortalDesiredCount",
+    "ParameterValue": "0"
+  },
+  {
+    "ParameterKey": "DbInstanceClass",
+    "ParameterValue": "db.t4g.micro"
+  },
+  {
+    "ParameterKey": "GatewayInstanceType",
+    "ParameterValue": "t4g.micro"
+  },
+  {
+    "ParameterKey": "UbuntuAmiId",
+    "ParameterValue": "/aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id"
+  },
+  {
+    "ParameterKey": "WgListenPort",
+    "ParameterValue": "51820"
+  },
+  {
+    "ParameterKey": "EnableNatGateway",
+    "ParameterValue": "true"
+  }
 ]

@@ -1,139 +1,337 @@
-# Mango VPN AWS-managed deployment
+# MANGO VPN - AWS Managed Deployment
 
-This template creates a VPC, private RDS PostgreSQL 16, Secrets Manager secrets, ECR repositories (`api`, `portal`, and `vpn-daemon`), private ECS Fargate API and portal services, an internet-facing ALB, and a dedicated EC2 WireGuard gateway. The API and portal services default to zero tasks so the stack creates cleanly before ECR images are pushed.
+This CloudFormation template deploys the MANGO VPN Zero-Trust Remote Access System on AWS with:
+- VPC with public/private subnets across 2 AZs
+- RDS PostgreSQL 16 (private subnet)
+- ECS Fargate for API and Portal
+- Application Load Balancer (HTTP/HTTPS)
+- EC2 WireGuard Gateway in public subnet
 
-## 1. Prerequisites
+## Prerequisites
 
-- AWS CLI v2 configured in the target account and region (and Session Manager plugin installed locally for `aws ssm start-session`).
-- Docker (with `docker buildx` if building cross-architecture images), Node/npm, and the repository checkout.
-- A real public or office IPv4 CIDR (`<YOUR_PUBLIC_IP>/32`). Do not use `203.0.113.0/24` in a live deployment.
-- An ACM certificate ARN + matching `CustomDomainName` (e.g. `vpn.example.com`) for HTTPS. Leave both blank only for temporary HTTP-only dev testing (see `docs/tutorial/03-track-c-cloud-deployment.md` for zero-domain CloudFront/SSM options because Chromium Private Network Access blocks `127.0.0.1:47821` from plain remote `http://` origins).
+1. AWS CLI configured with appropriate credentials
+2. Docker installed for building and pushing images
+3. (Optional) ACM certificate for HTTPS
 
-Copy `parameters.example.json` to `parameters.json` (gitignored or local only) and replace `<YOUR_PUBLIC_IP>/32`.
+## Quick Start
 
-## 2. Validate and create the stack
+### 1. Create Parameter File
+
+Copy the example parameters and customize:
+
+```bash
+cp deploy/aws-managed/parameters.example.json deploy/aws-managed/parameters.json
+```
+
+Edit `parameters.json` with your values:
+- `AllowedWebCidr`: Your public IP CIDR (e.g., `203.0.113.5/32` for single IP)
+- `AllowedWireGuardCidr`: CIDR for WireGuard client connections
+- `CertificateArn`: ACM certificate ARN for HTTPS, or empty string for HTTP-only dev
+
+### 2. Validate Template
 
 ```bash
 aws cloudformation validate-template \
   --template-body file://deploy/aws-managed/template.yaml
-
-aws cloudformation create-stack \
-  --stack-name mango-vpn-managed \
-  --template-body file://deploy/aws-managed/template.yaml \
-  --parameters file://deploy/aws-managed/parameters.json \
-  --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM
-
-aws cloudformation wait stack-create-complete --stack-name mango-vpn-managed
 ```
 
-> Note: `aws cloudformation create-stack` accepts the JSON array format in `parameters.example.json`, whereas `aws cloudformation deploy` takes `Key=Value` overrides.
-
-## 3. Build and push images to ECR
-
-Get the three ECR repository URIs from stack outputs, then push `api`, `portal` (`linux/amd64` for Fargate), and `vpn-daemon` (`linux/arm64` for `t4g.micro`, or `linux/amd64` if using `t3.micro`):
+### 3. Deploy Stack
 
 ```bash
-REGION=$(aws configure get region)
-ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-API_REPO=$(aws cloudformation describe-stacks --stack-name mango-vpn-managed --query 'Stacks[0].Outputs[?OutputKey==`ApiEcrRepository`].OutputValue' --output text)
-PORTAL_REPO=$(aws cloudformation describe-stacks --stack-name mango-vpn-managed --query 'Stacks[0].Outputs[?OutputKey==`PortalEcrRepository`].OutputValue' --output text)
-DAEMON_REPO=$(aws cloudformation describe-stacks --stack-name mango-vpn-managed --query 'Stacks[0].Outputs[?OutputKey==`DaemonEcrRepository`].OutputValue' --output text)
-
-aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com"
-
-docker buildx build --platform linux/amd64 -f Sobree/api/Dockerfile -t "$API_REPO:latest" --push .
-docker buildx build --platform linux/amd64 -f Rain/portal/Dockerfile -t "$PORTAL_REPO:latest" --push .
-docker buildx build --platform linux/arm64 -f Sobree/vpn-daemon/Dockerfile -t "$DAEMON_REPO:latest" --push .
+aws cloudformation deploy \
+  --stack-name mango-vpn-prod \
+  --template-file deploy/aws-managed/template.yaml \
+  --parameter-overrides file://deploy/aws-managed/parameters.json \
+  --capabilities CAPABILITY_IAM
 ```
 
-## 4. Populate runtime secrets & start the WireGuard Gateway
+**Important**: Default `ApiDesiredCount=0` and `PortalDesiredCount=0` allows clean first deploy before ECR images exist.
 
-The stack generates RDS, JWT, refresh, and daemon secrets automatically. Populate the 64-hex-character `TOTP_ENCRYPTION_KEY`:
+### 4. Get Stack Outputs
 
 ```bash
-TOTP_ARN=$(aws cloudformation describe-stacks --stack-name mango-vpn-managed --query 'Stacks[0].Outputs[?OutputKey==`TotpEncryptionSecretArn`].OutputValue' --output text)
+aws cloudformation describe-stacks \
+  --stack-name mango-vpn-prod \
+  --query 'Stacks[0].Outputs'
+```
+
+Save these output values for the next steps.
+
+### 5. Populate Secrets
+
+#### Database URL
+
+Get the RDS endpoint and DB password, then populate the DATABASE_URL secret:
+
+```bash
+# Get RDS endpoint
+RDS_ENDPOINT=$(aws cloudformation describe-stacks \
+  --stack-name mango-vpn-prod \
+  --query 'Stacks[0].Outputs[?OutputKey==`RdsEndpoint`].OutputValue' \
+  --output text)
+
+# Get DB password (temporary - only works immediately after stack creation)
+DB_PASSWORD=$(aws secretsmanager get-secret-value \
+  --secret-id mango-vpn-prod-DbMasterSecret-XXXXX \
+  --query SecretString \
+  --output text | jq -r '.password')
+
+# Update DATABASE_URL secret
+aws secretsmanager put-secret-value \
+  --secret-id mango-vpn-prod-DatabaseUrlSecret-XXXXX \
+  --secret-string "postgresql://mango:${DB_PASSWORD}@${RDS_ENDPOINT}:5432/mangovpn?schema=public"
+```
+
+#### TOTP Encryption Key
+
+Generate a 64-character hex string:
+
+```bash
 TOTP_KEY=$(openssl rand -hex 32)
-aws secretsmanager put-secret-value --secret-id "$TOTP_ARN" --secret-string "$TOTP_KEY"
-unset TOTP_KEY
+
+aws secretsmanager put-secret-value \
+  --secret-id mango-vpn-prod-TotpEncryptionSecret-XXXXX \
+  --secret-string "{\"key\":\"${TOTP_KEY}\"}"
 ```
 
-Connect to the gateway EC2 instance over **AWS Systems Manager Session Manager** (no SSH port 22 needed), generate the WireGuard keypair, save it into Secrets Manager, and start `mango-vpn-daemon`:
+### 6. Build and Push Docker Images
 
 ```bash
-GW_ID=$(aws cloudformation describe-stacks --stack-name mango-vpn-managed --query 'Stacks[0].Outputs[?OutputKey==`WireGuardGatewayInstanceId`].OutputValue' --output text)
-WG_SECRET_ARN=$(aws cloudformation describe-stacks --stack-name mango-vpn-managed --query 'Stacks[0].Outputs[?OutputKey==`WireGuardKeySecretArn`].OutputValue' --output text)
-echo "GW_ID=$GW_ID WG_SECRET_ARN=$WG_SECRET_ARN"
+# Login to ECR
+aws ecr get-login-password --region <region> | docker login --username AWS --password-stdin <account-id>.dkr.ecr.<region>.amazonaws.com
 
-aws ssm start-session --target "$GW_ID"
+# Build and push API
+docker build -f Sobree/api/Dockerfile -t mango-vpn-prod-api .
+docker tag mango-vpn-prod-api:latest <account-id>.dkr.ecr.<region>.amazonaws.com/mango-vpn-prod-api:latest
+docker push <account-id>.dkr.ecr.<region>.amazonaws.com/mango-vpn-prod-api:latest
+
+# Build and push Portal
+docker build -f Rain/portal/Dockerfile -t mango-vpn-prod-portal .
+docker tag mango-vpn-prod-portal:latest <account-id>.dkr.ecr.<region>.amazonaws.com/mango-vpn-prod-portal:latest
+docker push <account-id>.dkr.ecr.<region>.amazonaws.com/mango-vpn-prod-portal:latest
 ```
 
-Inside the SSM session on the gateway EC2 instance:
+### 7. Setup WireGuard Gateway
+
+Connect via SSM Session Manager:
 
 ```bash
-PRIVATE_KEY=$(wg genkey)
-PUBLIC_KEY=$(printf '%s' "$PRIVATE_KEY" | wg pubkey)
-aws secretsmanager put-secret-value --region "<AWS_REGION>" --secret-id "<WG_SECRET_ARN>" \
-  --secret-string "$(jq -cn --arg privateKey "$PRIVATE_KEY" --arg publicKey "$PUBLIC_KEY" '{privateKey:$privateKey,publicKey:$publicKey}')"
-unset PRIVATE_KEY
-sudo /usr/local/bin/mango-gateway-start.sh
-docker ps && sudo wg show
+aws ssm start-session --target <instance-id>
 ```
 
-## 5. Start ECS services & seed the first ADMIN
-
-Scale both ECS services to `1`:
+On the gateway instance:
 
 ```bash
-aws cloudformation update-stack \
-  --stack-name mango-vpn-managed \
-  --use-previous-template \
-  --parameters \
-    ParameterKey=AllowedWebCidr,UsePreviousValue=true \
-    ParameterKey=AllowedWireGuardCidr,UsePreviousValue=true \
-    ParameterKey=CertificateArn,UsePreviousValue=true \
-    ParameterKey=CustomDomainName,UsePreviousValue=true \
-    ParameterKey=EnableNatGateway,UsePreviousValue=true \
-    ParameterKey=ApiDesiredCount,ParameterValue=1 \
-    ParameterKey=PortalDesiredCount,ParameterValue=1 \
-    ParameterKey=ApiImageTag,UsePreviousValue=true \
-    ParameterKey=PortalImageTag,UsePreviousValue=true \
-    ParameterKey=DaemonImageTag,UsePreviousValue=true \
-    ParameterKey=DBInstanceClass,UsePreviousValue=true \
-    ParameterKey=GatewayInstanceType,UsePreviousValue=true \
-    ParameterKey=UbuntuAmiId,UsePreviousValue=true \
-    ParameterKey=WgListenPort,UsePreviousValue=true \
-  --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM
+# Generate WireGuard keypair
+wg genkey | tee /etc/wireguard/privatekey | wg pubkey > /etc/wireguard/publickey
 
-aws ecs wait services-stable --cluster mango-vpn-managed-ecs --services mango-vpn-managed-api mango-vpn-managed-portal
+# Get private key for storage
+WG_PRIVATE=$(cat /etc/wireguard/privatekey)
+
+# Store private key in Secrets Manager (run from your local machine after)
 ```
 
-Once `ApiService` is running, seed the initial `ADMIN` user via **ECS Exec** (no public DB port needed):
+Update the WireGuardKeySecret:
 
 ```bash
-TASK_ARN=$(aws ecs list-tasks --cluster mango-vpn-managed-ecs --service-name mango-vpn-managed-api --query 'taskArns[0]' --output text)
-aws ecs execute-command --cluster mango-vpn-managed-ecs --task "$TASK_ARN" --container api --interactive --command "/bin/sh"
+WG_PRIVATE=$(ssh-to-instance cat /etc/wireguard/privatekey)
+
+aws secretsmanager put-secret-value \
+  --secret-id mango-vpn-prod-WireGuardKeySecret-XXXXX \
+  --secret-string "{\"privateKey\":\"${WG_PRIVATE}\"}"
 ```
 
-Inside the ECS container shell:
+Configure WireGuard interface `/etc/wireguard/wg0.conf`:
 
-```sh
-export DATABASE_URL="postgresql://mango:${DB_PASSWORD}@${DB_HOST}:5432/mangovpn?schema=public"
-SEED_ADMIN_USERNAME=admin SEED_ADMIN_PASSWORD='<Choose-12+-Char-Password>' node Rain/admin/dist/seed.js
+```ini
+[Interface]
+Address = 10.13.13.1/24
+ListenPort = 51820
+PrivateKey = <private-key-from-file>
+
+[Peer]
+# Allow all clients; API will add specific peers
+AllowedIPs = 10.13.13.0/24
 ```
 
-## 6. Cost and security notes
-
-- NAT Gateway, RDS PostgreSQL, Fargate tasks, the gateway EC2 instance, EIPs, CloudWatch Logs, and ECR storage all incur ongoing AWS charges.
-- RDS is encrypted, private (`PubliclyAccessible: false`), and reachable only from `EcsApiSecurityGroup`. No SSH ingress is created; gateway administration uses SSM.
-- Stateful RDS, ECR repositories, and CloudWatch log groups use `DeletionPolicy: Retain` / `Snapshot` and survive stack deletion.
-
-## 7. Teardown
+Start WireGuard:
 
 ```bash
-aws cloudformation delete-stack --stack-name mango-vpn-managed
-aws cloudformation wait stack-delete-complete --stack-name mango-vpn-managed
-# Optionally clean retained ECR repos, log groups, and RDS snapshots once verified:
-aws ecr delete-repository --repository-name "$API_REPO_NAME" --force
-aws ecr delete-repository --repository-name "$PORTAL_REPO_NAME" --force
-aws ecr delete-repository --repository-name "$DAEMON_REPO_NAME" --force
+wg-quick up wg0
+systemctl enable wg-quick@wg0
 ```
+
+### 8. Scale ECS Services
+
+After secrets and images are ready:
+
+```bash
+# Scale API to 1 task
+aws ecs update-service \
+  --cluster mango-vpn-prod-cluster \
+  --service mango-vpn-prod-api \
+  --desired-count 1
+
+# Scale Portal to 1 task
+aws ecs update-service \
+  --cluster mango-vpn-prod-cluster \
+  --service mango-vpn-prod-portal \
+  --desired-count 1
+```
+
+Or update stack with new parameters:
+
+```bash
+aws cloudformation deploy \
+  --stack-name mango-vpn-prod \
+  --template-file deploy/aws-managed/template.yaml \
+  --parameter-overrides \
+    ApiDesiredCount=1 \
+    PortalDesiredCount=1 \
+    AllowedWebCidr="203.0.113.5/32" \
+    AllowedWireGuardCidr="203.0.113.0/24"
+```
+
+## Architecture
+
+```
+                    +---------------------------+
+                    |      Internet Users      |
+                    +-------------+-------------+
+                                  |
+                          +-------+-------+
+                          |    ALB/HTTPS  |
+                          +-------+-------+
+                                  |
+              +-------------------+-------------------+
+              |                                       |
+      +-------v-------+                       +-------v-------+
+      |  Portal (3000)|                       |  API (4000)   |
+      +-------+-------+                       +-------+-------+
+              |                                       |
+              |    +----------------------------------+
+              |    |
+      +-------v----v-------+
+      |     ECS Fargate     |
+      +----------+----------+
+                 |
+          +------v------+
+          |    RDS      |
+          | PostgreSQL  |
+          +-------------+
+
+                    +---------------------------+
+                    |   WireGuard Gateway       |
+                    |   (EC2 Public Subnet)     |
+                    +-------------+-------------+
+                                  |
+                          UDP 51820
+                                  |
+                    +-------------v-------------+
+                    |   VPN Clients            |
+                    +---------------------------+
+```
+
+## Cost Considerations
+
+Estimated monthly costs (us-east-1):
+
+| Resource | Type | Monthly Cost |
+|----------|------|--------------|
+| NAT Gateway | $0.045/hour + data | ~$35 + data |
+| RDS | db.t4g.micro | ~$15 |
+| ECS Fargate | 2 tasks @ 256 CPU | ~$25 |
+| ALB | LCU hours | ~$20 |
+| EIP | 2 addresses | ~$5 |
+| **Total** | | **~$100/month** |
+
+**Cost optimization**:
+- Set `EnableNatGateway=false` to save ~$35/month (requires VPC endpoints for ECR/Secrets Manager)
+- Use `db.t4g.micro` for development
+- Scale ECS tasks to 0 when not in use
+- Use Spot capacity for non-production
+
+## Cleanup and Stack Deletion
+
+### Pre-deletion Steps
+
+1. Delete CloudWatch Log Groups:
+
+```bash
+aws logs delete-log-group --log-group-name /ecs/mango-vpn-prod/api
+aws logs delete-log-group --log-group-name /ecs/mango-vpn-prod/portal
+```
+
+2. Empty ECR repositories:
+
+```bash
+aws ecr batch-delete-image \
+  --repository-name mango-vpn-prod-api \
+  --image-ids "$(aws ecr list-images --repository-name mango-vpn-prod-api --query 'imageIds[*]' --output json)"
+
+aws ecr batch-delete-image \
+  --repository-name mango-vpn-prod-portal \
+  --image-ids "$(aws ecr list-images --repository-name mango-vpn-prod-portal --query 'imageIds[*]' --output json)"
+```
+
+### Delete Stack
+
+```bash
+aws cloudformation delete-stack --stack-name mango-vpn-prod
+```
+
+**Note**: RDS snapshot will be retained due to `DeletionPolicy: Snapshot`. Delete manually if desired:
+
+```bash
+aws rds describe-db-snapshots --query 'DBSnapshots[?contains(DBSnapshotIdentifier, `mango-vpn`)].DBSnapshotIdentifier'
+aws rds delete-db-snapshot --db-snapshot-identifier <snapshot-id>
+```
+
+## Troubleshooting
+
+### ECS Tasks Failing to Start
+
+Check task logs:
+
+```bash
+aws logs tail /ecs/mango-vpn-prod/api --since 1h
+```
+
+Common issues:
+- Missing secrets: Ensure all secrets are populated
+- ECR image not found: Push images to ECR
+- Database unreachable: Check security group rules
+
+### WireGuard Not Working
+
+On gateway instance:
+
+```bash
+# Check WireGuard status
+wg show
+
+# Check IP forwarding
+sysctl net.ipv4.ip_forward
+
+# Check nftables rules
+nft list ruleset
+```
+
+### ALB Health Checks Failing
+
+Check target health:
+
+```bash
+aws elbv2 describe-target-health \
+  --target-group-arn <target-group-arn>
+```
+
+## Security Notes
+
+- All secrets stored in Secrets Manager with auto-rotation capability
+- No hardcoded secrets in template or parameters
+- Security groups scoped to specific CIDRs (no 0.0.0.0/0)
+- RDS not publicly accessible
+- IMDSv2 required on EC2 instances
+- EBS volumes encrypted
+- RDS storage encrypted
