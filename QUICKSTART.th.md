@@ -3,7 +3,7 @@
 คู่มือฉบับนี้รวบรวม **เครื่องมือ, สภาพแวดล้อมการทำงาน (Runtimes) และการตั้งค่าคอนฟิก** ที่จำเป็นสำหรับการรันระบบ MANGO VPN v2 ในเครื่องของคุณ (Local Environment) พร้อมวิธีตรวจสอบความพร้อมของเครื่องก่อนเริ่มใช้งาน
 
 > [!TIP]
-> **เพิ่งเคยรันหรือทดสอบ MANGO VPN เป็นครั้งแรกใช่ไหม?** แนะนำให้อ่านคู่มือฉบับจับมือทำที่อธิบายละเอียดทุกขั้นตอน พร้อมสคริปต์สร้าง `.env` อัตโนมัติและภารกิจทดสอบทีละคลิก: **[🇹🇭 ภาษาไทย (`TUTORIAL.th.md`)](TUTORIAL.th.md)** | **[🇬🇧 English (`TUTORIAL.md`)](TUTORIAL.md)**
+> **เพิ่งเคยรันหรือทดสอบ MANGO VPN เป็นครั้งแรกใช่ไหม?** แนะนำให้อ่านคู่มือฉบับจับมือทำที่อธิบายละเอียดทุกขั้นตอน พร้อมสคริปต์สร้าง `.env` อัตโนมัติและภารกิจทดสอบทีละคลิก: **[🇹🇭 ภาษาไทย (`TUTORIAL.th.md`)](TUTORIAL.th.md)** | **[🇬🇧 English (`TUTORIAL.md`)](TUTORIAL.md)** คู่มือแบบแบ่งบทอยู่ใน [`docs/tutorial/th/`](docs/tutorial/th/00-overview-and-setup.md)
 
 > [!IMPORTANT]
 > **หากคุณใช้งาน AI ผู้ช่วย (AI Assistant)?** โปรดสั่งให้ AI ของคุณอ่าน [`AGENTS.md`](AGENTS.md) (หรือ [`AGENTS.th.md`](AGENTS.th.md)) ก่อนเริ่มต้นทำงานใดๆ เสมอ เอกสารดังกล่าวระบุขอบเขตของโปรเจกต์ กฎการทำงานร่วมกันข้ามโฟลเดอร์ (`Rain/`, `Sobree/`, `packages/shared/`) และปราการป้องกันการใส่ Mock หลอก
@@ -276,7 +276,7 @@ sudo -E go run .
 
 ### ตัวเลือกเสริม: เป้าหมายทดสอบการบังคับใช้สิทธิ์ของ Track B
 
-เริ่มเป้าหมายเว็บแบบคงที่และหน้า Role Harness บน localhost ขั้นตอนการตั้งค่าและเมทริกซ์สิทธิ์ที่คาดหวังอยู่ใน [`TUTORIAL.th.md`](TUTORIAL.th.md) ขั้นตอน B4
+เริ่มเป้าหมายเว็บแบบคงที่และหน้า Role Harness บน localhost ขั้นตอนการตั้งค่าและเมทริกซ์สิทธิ์ที่คาดหวังอยู่ใน [`docs/tutorial/th/06-appendix-local-docker-smoke-test.md`](docs/tutorial/th/06-appendix-local-docker-smoke-test.md)
 
 ```bash
 npm run docker:test-targets:up     # postgres, vpn-gateway, เป้าหมาย 3 เครื่อง, target-routes, test-harness

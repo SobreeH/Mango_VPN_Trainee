@@ -1,0 +1,947 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: MANGO VPN Zero-Trust Remote Access System - VPC, RDS PostgreSQL, ECS Fargate (API/Portal), ALB, WireGuard Gateway EC2
+
+Metadata:
+  AWSToolsMetrics:
+    AWSAgentToolkit: aws-cloudformation@3
+
+Parameters:
+  Environment:
+    Type: String
+    Default: prod
+    AllowedValues: [dev, staging, prod]
+    Description: Deployment environment name
+  AllowedWebCidr:
+    Type: String
+    AllowedPattern: "^([0-9]{1,3}\\.){3}[0-9]{1,3}/[0-9]{1,2}$"
+    Description: CIDR block allowed to access ALB (e.g. 203.0.113.5/32)
+  AllowedWireGuardCidr:
+    Type: String
+    AllowedPattern: "^([0-9]{1,3}\\.){3}[0-9]{1,3}/[0-9]{1,2}$"
+    Description: CIDR block allowed for WireGuard UDP (e.g. 203.0.113.0/24)
+  CertificateArn:
+    Type: String
+    Default: ""
+    Description: ACM certificate ARN for HTTPS. Leave empty for HTTP-only dev.
+  ApiDesiredCount:
+    Type: Number
+    Default: 0
+    MinValue: 0
+    MaxValue: 10
+    Description: Initial API task count (0 for clean first deploy)
+  PortalDesiredCount:
+    Type: Number
+    Default: 0
+    MinValue: 0
+    MaxValue: 10
+    Description: Initial Portal task count (0 for clean first deploy)
+  DbInstanceClass:
+    Type: String
+    Default: db.t4g.micro
+    AllowedValues: [db.t4g.micro, db.t4g.small, db.t3.micro, db.t3.small]
+    Description: RDS PostgreSQL instance class
+  GatewayInstanceType:
+    Type: String
+    Default: t4g.micro
+    AllowedValues: [t4g.micro, t4g.small, t3.micro, t3.small]
+    Description: WireGuard Gateway EC2 instance type
+  UbuntuAmiId:
+    Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+    Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id
+    Description: Ubuntu 24.04 AMI SSM parameter path
+  WgListenPort:
+    Type: Number
+    Default: 51820
+    MinValue: 1024
+    MaxValue: 65535
+    Description: WireGuard UDP listen port
+  EnableNatGateway:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: Enable NAT Gateway for private subnet egress (recommended for ECR/Secrets Manager)
+
+Conditions:
+  HasCertificateArn: !Not [!Equals [!Ref CertificateArn, ""]]
+  NoCertificateArn: !Equals [!Ref CertificateArn, ""]
+  CreateNatGateway: !Equals [!Ref EnableNatGateway, "true"]
+
+Resources:
+  # VPC and Networking
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.50.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-vpc"
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Isolated network for VPN control plane and gateway
+        must: 10.50.0.0/16 must not overlap with WireGuard 10.13.13.0/24
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-igw"
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Allows public subnet resources to reach internet
+
+  VpcGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Attaches IGW to VPC for public routing
+
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.50.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-public-a"
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Hosts ALB and WireGuard Gateway
+
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.50.2.0/24
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-public-b"
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Second AZ for ALB high availability
+
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.50.10.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-private-a"
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Hosts RDS and ECS tasks (no direct internet ingress)
+
+  PrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.50.20.0/24
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-private-b"
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Second AZ for RDS Multi-AZ if enabled
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-public-rt"
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Routes public subnet traffic to IGW
+
+  PublicDefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Default route to internet via IGW
+
+  PublicSubnetARouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnetBRouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetB
+      RouteTableId: !Ref PublicRouteTable
+
+  NatEip:
+    Type: AWS::EC2::EIP
+    Condition: CreateNatGateway
+    Properties:
+      Domain: vpc
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Static IP for NAT Gateway egress
+
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Condition: CreateNatGateway
+    Properties:
+      AllocationId: !GetAtt NatEip.AllocationId
+      SubnetId: !Ref PublicSubnetA
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-nat"
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Allows private subnets to reach ECR and Secrets Manager
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-private-rt"
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Routes private subnet traffic via NAT and WireGuard return path
+
+  PrivateDefaultRoute:
+    Type: AWS::EC2::Route
+    Condition: CreateNatGateway
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Default egress for private subnets via NAT
+
+  VpnReturnRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 10.13.13.0/24
+      InstanceId: !Ref WireGuardGatewayInstance
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Routes WireGuard VPN client return traffic through gateway
+        must: Requires WireGuardGatewayInstance SourceDestCheck disabled
+
+  PrivateSubnetARouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetA
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnetBRouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetB
+      RouteTableId: !Ref PrivateRouteTable
+
+  # Secrets Manager
+  DbMasterSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: !Sub "${AWS::StackName} PostgreSQL master password"
+      GenerateSecretString:
+        SecretStringTemplate: '{"username":"mango"}'
+        GenerateStringKey: password
+        PasswordLength: 28
+        ExcludeCharacters: '"@/\\'
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Auto-generated DB password; never stored in template
+        must: ExcludeCharacters prevents URL injection in DATABASE_URL
+
+  JwtSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: !Sub "${AWS::StackName} JWT signing secret"
+      GenerateSecretString:
+        SecretStringTemplate: '{"key":"placeholder"}'
+        GenerateStringKey: key
+        PasswordLength: 48
+        ExcludeCharacters: '"\\'
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Cryptographic secret for JWT token signing
+
+  RefreshSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: !Sub "${AWS::StackName} Refresh token secret"
+      GenerateSecretString:
+        SecretStringTemplate: '{"key":"placeholder"}'
+        GenerateStringKey: key
+        PasswordLength: 48
+        ExcludeCharacters: '"\\'
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Cryptographic secret for refresh token validation
+
+  DaemonSharedSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: !Sub "${AWS::StackName} VPN Daemon shared secret"
+      GenerateSecretString:
+        SecretStringTemplate: '{"key":"placeholder"}'
+        GenerateStringKey: key
+        PasswordLength: 48
+        ExcludeCharacters: '"\\'
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Shared secret for API-to-Daemon authentication
+
+  TotpEncryptionSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: !Sub "${AWS::StackName} TOTP encryption key (populate with 64 hex chars)"
+      SecretString: '{"key":"replace-with-64-hex-chars"}'
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: AES-256 encryption key for TOTP secrets
+        must: Must be 64 hex characters (32 bytes). Populate post-deploy.
+
+  DatabaseUrlSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: !Sub "${AWS::StackName} PostgreSQL connection URL"
+      SecretString: '{"url":"postgresql://mango:REPLACE_PASSWORD@REPLACE_HOST:5432/mangovpn?schema=public"}'
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Full DATABASE_URL for Prisma migrations
+        must: Populate post-deploy with RDS endpoint and DbMasterSecret password
+
+  WireGuardKeySecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: !Sub "${AWS::StackName} WireGuard private key"
+      SecretString: '{"privateKey":"replace-with-wg-genkey-output"}'
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: WireGuard gateway private key
+        must: Populate with `wg genkey` output during gateway setup
+
+  # RDS PostgreSQL
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: !Sub "${AWS::StackName} DB subnet group"
+      SubnetIds: [!Ref PrivateSubnetA, !Ref PrivateSubnetB]
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: RDS requires subnets in at least 2 AZs
+
+  DbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${AWS::StackName} PostgreSQL access"
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref EcsApiSecurityGroup
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Allows API tasks to connect to PostgreSQL
+        must: No 0.0.0.0/0 ingress - scoped to ECS security group only
+
+  RdsInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      Engine: postgres
+      EngineVersion: "16"
+      DBName: mangovpn
+      MasterUsername: mango
+      MasterUserPassword: !Sub "{{resolve:secretsmanager:${DbMasterSecret}:SecretString:password}}"
+      DBInstanceClass: !Ref DbInstanceClass
+      AllocatedStorage: 20
+      StorageType: gp3
+      StorageEncrypted: true
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      VPCSecurityGroups: [!Ref DbSecurityGroup]
+      PubliclyAccessible: false
+      BackupRetentionPeriod: 7
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Retain
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Persistent PostgreSQL 16 database for VPN control plane
+        must: StorageEncrypted true. DeletionPolicy Snapshot prevents data loss.
+
+  # ECR Repositories
+  ApiEcrRepo:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${AWS::StackName}-api"
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {"rules":[{"rulePriority":1,"description":"Keep last 5 images","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":5},"action":{"type":"expire"}}]}
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Container registry for API Docker images
+
+  PortalEcrRepo:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub "${AWS::StackName}-portal"
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: |
+          {"rules":[{"rulePriority":1,"description":"Keep last 5 images","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":5},"action":{"type":"expire"}}]}
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Container registry for Portal Docker images
+
+  # ECS Cluster and IAM Roles
+  EcsCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "${AWS::StackName}-cluster"
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Logical grouping for ECS Fargate services
+
+  ApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/${AWS::StackName}/api"
+      RetentionInDays: 14
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: CloudWatch Logs for API task stdout/stderr
+
+  PortalLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/${AWS::StackName}/portal"
+      RetentionInDays: 14
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: CloudWatch Logs for Portal task stdout/stderr
+
+  EcsTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: SecretsManagerAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource:
+                  - !Ref JwtSecret
+                  - !Ref RefreshSecret
+                  - !Ref DaemonSharedSecret
+                  - !Ref TotpEncryptionSecret
+                  - !Ref DatabaseUrlSecret
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Allows ECS to pull images from ECR and inject secrets
+        must: Secrets access scoped to specific secret ARNs only
+
+  EcsTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Minimal runtime role for ECS tasks (no extra permissions)
+
+  # Security Groups
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${AWS::StackName} ALB security group"
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Ref AllowedWebCidr
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref AllowedWebCidr
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Controls ingress to ALB from allowed CIDR only
+        must: No 0.0.0.0/0 - must use scoped AllowedWebCidr parameter
+
+  EcsApiSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${AWS::StackName} API tasks security group"
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 4000
+          ToPort: 4000
+          SourceSecurityGroupId: !Ref AlbSecurityGroup
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Allows ALB to reach API containers on port 4000
+
+  EcsPortalSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${AWS::StackName} Portal tasks security group"
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          SourceSecurityGroupId: !Ref AlbSecurityGroup
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Allows ALB to reach Portal containers on port 3000
+
+  # Application Load Balancer
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub "${AWS::StackName}-alb"
+      Subnets: [!Ref PublicSubnetA, !Ref PublicSubnetB]
+      SecurityGroups: [!Ref AlbSecurityGroup]
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Public entry point for API and Portal
+
+  ApiTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${AWS::StackName}-api-tg"
+      Port: 4000
+      Protocol: HTTP
+      VpcId: !Ref Vpc
+      TargetType: ip
+      HealthCheckPath: /health
+      HealthCheckIntervalSeconds: 15
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Targets API tasks; health check matches Dockerfile HEALTHCHECK
+
+  PortalTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${AWS::StackName}-portal-tg"
+      Port: 3000
+      Protocol: HTTP
+      VpcId: !Ref Vpc
+      TargetType: ip
+      HealthCheckPath: /
+      HealthCheckIntervalSeconds: 15
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Targets Portal tasks; health check matches nginx root
+
+  AlbHttpsListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Condition: HasCertificateArn
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      Certificates:
+        - CertificateArn: !Ref CertificateArn
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref PortalTargetGroup
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: HTTPS listener when ACM certificate provided
+
+  AlbHttpsApiRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Condition: HasCertificateArn
+    Properties:
+      ListenerArn: !Ref AlbHttpsListener
+      Priority: 10
+      Conditions:
+        - Field: path-pattern
+          Values: ["/api/*", "/health"]
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref ApiTargetGroup
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Routes /api/* and /health to API target group
+
+  AlbHttpRedirectListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Condition: HasCertificateArn
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: redirect
+          RedirectConfig:
+            Protocol: HTTPS
+            Port: 443
+            StatusCode: HTTP_301
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Redirects HTTP to HTTPS when certificate present
+
+  AlbHttpDevListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Condition: NoCertificateArn
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref PortalTargetGroup
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: HTTP-only listener for dev when no certificate
+
+  AlbHttpDevApiRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Condition: NoCertificateArn
+    Properties:
+      ListenerArn: !Ref AlbHttpDevListener
+      Priority: 10
+      Conditions:
+        - Field: path-pattern
+          Values: ["/api/*", "/health"]
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref ApiTargetGroup
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Routes /api/* and /health to API in HTTP-only mode
+
+  # ECS Task Definitions and Services
+  ApiTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${AWS::StackName}-api"
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      Cpu: "256"
+      Memory: "512"
+      ExecutionRoleArn: !Ref EcsTaskExecutionRole
+      TaskRoleArn: !Ref EcsTaskRole
+      ContainerDefinitions:
+        - Name: api
+          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${AWS::StackName}-api:latest"
+          Essential: true
+          PortMappings:
+            - ContainerPort: 4000
+              Protocol: tcp
+          Secrets:
+            - Name: DATABASE_URL
+              ValueFrom: !Ref DatabaseUrlSecret
+            - Name: JWT_SECRET
+              ValueFrom: !Sub "${JwtSecret}:SecretString:key"
+            - Name: REFRESH_SECRET
+              ValueFrom: !Sub "${RefreshSecret}:SecretString:key"
+            - Name: DAEMON_SHARED_SECRET
+              ValueFrom: !Sub "${DaemonSharedSecret}:SecretString:key"
+            - Name: TOTP_ENCRYPTION_KEY
+              ValueFrom: !Sub "${TotpEncryptionSecret}:SecretString:key"
+          Environment:
+            - Name: NODE_ENV
+              Value: production
+            - Name: VPN_DAEMON_URL
+              Value: !Sub "http://${WireGuardGatewayInstance.PrivateIpAddress}:50051"
+            - Name: WG_SERVER_ENDPOINT
+              Value: !Sub "${WireGuardGatewayEip.AllocationId}:${WgListenPort}"
+            - Name: CORS_ORIGIN
+              Value: !Sub "http${If[HasCertificateArn, 's', '']}://${ApplicationLoadBalancer.DNSName}"
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref ApiLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Defines API container with secrets injection from Secrets Manager
+        must: Secrets must be populated before scaling to 1
+
+  ApiService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub "${AWS::StackName}-api"
+      Cluster: !Ref EcsCluster
+      TaskDefinition: !Ref ApiTaskDefinition
+      DesiredCount: !Ref ApiDesiredCount
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets: [!Ref PrivateSubnetA, !Ref PrivateSubnetB]
+          SecurityGroups: [!Ref EcsApiSecurityGroup]
+      LoadBalancers:
+        - ContainerName: api
+          ContainerPort: 4000
+          TargetGroupArn: !Ref ApiTargetGroup
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Runs API tasks behind ALB
+        must: DesiredCount 0 allows clean first deploy before ECR push
+
+  PortalTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${AWS::StackName}-portal"
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      Cpu: "256"
+      Memory: "512"
+      ExecutionRoleArn: !Ref EcsTaskExecutionRole
+      TaskRoleArn: !Ref EcsTaskRole
+      ContainerDefinitions:
+        - Name: portal
+          Image: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${AWS::StackName}-portal:latest"
+          Essential: true
+          PortMappings:
+            - ContainerPort: 3000
+              Protocol: tcp
+          Environment:
+            - Name: VITE_API_URL
+              Value: !Sub "http${If[HasCertificateArn, 's', '']}://${ApplicationLoadBalancer.DNSName}/api"
+            - Name: VITE_AGENT_URL
+              Value: "http://127.0.0.1:47821"
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref PortalLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ecs
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Defines Portal container with runtime env vars for API URL
+
+  PortalService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub "${AWS::StackName}-portal"
+      Cluster: !Ref EcsCluster
+      TaskDefinition: !Ref PortalTaskDefinition
+      DesiredCount: !Ref PortalDesiredCount
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets: [!Ref PrivateSubnetA, !Ref PrivateSubnetB]
+          SecurityGroups: [!Ref EcsPortalSecurityGroup]
+      LoadBalancers:
+        - ContainerName: portal
+          ContainerPort: 3000
+          TargetGroupArn: !Ref PortalTargetGroup
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Runs Portal tasks behind ALB
+
+  # WireGuard Gateway EC2
+  WireGuardGatewaySecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${AWS::StackName} WireGuard Gateway"
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: udp
+          FromPort: !Ref WgListenPort
+          ToPort: !Ref WgListenPort
+          CidrIp: !Ref AllowedWireGuardCidr
+        - IpProtocol: tcp
+          FromPort: 50051
+          ToPort: 50051
+          SourceSecurityGroupId: !Ref EcsApiSecurityGroup
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Allows WireGuard UDP from client CIDR and daemon TCP from API
+        must: No SSH port 22. Daemon port scoped to ECS security group.
+
+  WireGuardGatewayRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: SecretsManagerAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:PutSecretValue
+                Resource:
+                  - !Ref DaemonSharedSecret
+                  - !Ref WireGuardKeySecret
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Allows SSM Session Manager and scoped Secrets Manager access
+
+  WireGuardGatewayProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref WireGuardGatewayRole]
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Attaches role to EC2 instance
+
+  WireGuardGatewayLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub "${AWS::StackName}-wg-gateway"
+      LaunchTemplateData:
+        ImageId: !Ref UbuntuAmiId
+        InstanceType: !Ref GatewayInstanceType
+        IamInstanceProfile:
+          Arn: !GetAtt WireGuardGatewayProfile.Arn
+        MetadataOptions:
+          HttpTokens: required
+          HttpPutResponseHopLimit: 2
+        BlockDeviceMappings:
+          - DeviceName: /dev/sda1
+            Ebs:
+              VolumeType: gp3
+              VolumeSize: 8
+              Encrypted: true
+        SecurityGroupIds: [!Ref WireGuardGatewaySecurityGroup]
+        UserData: !Base64 |
+          #!/bin/bash
+          set -eu
+          sysctl -w net.ipv4.ip_forward=1
+          echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+          apt-get update
+          apt-get install -y wireguard-tools nftables iproute2 awscli docker.io
+          systemctl enable docker
+          systemctl start docker
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Ubuntu 24.04 with WireGuard, nftables, Docker, and IP forwarding
+        must: IMDSv2 required. IP forwarding enabled for VPN routing.
+
+  WireGuardGatewayInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      LaunchTemplate:
+        LaunchTemplateId: !Ref WireGuardGatewayLaunchTemplate
+        Version: !GetAtt WireGuardGatewayLaunchTemplate.LatestVersionNumber
+      SourceDestCheck: false
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-wg-gateway"
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: EC2 instance running WireGuard gateway and VPN daemon
+        must: SourceDestCheck false allows VPN routing
+
+  WireGuardGatewayEip:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Static public IP for WireGuard endpoint
+
+  WireGuardGatewayEipAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId: !GetAtt WireGuardGatewayEip.AllocationId
+      InstanceId: !Ref WireGuardGatewayInstance
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Associates EIP with WireGuard Gateway instance
+
+Outputs:
+  AlbDnsName:
+    Description: Application Load Balancer DNS name
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+  ApiEcrRepoUri:
+    Description: ECR repository URI for API images
+    Value: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${AWS::StackName}-api"
+  PortalEcrRepoUri:
+    Description: ECR repository URI for Portal images
+    Value: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${AWS::StackName}-portal"
+  RdsEndpoint:
+    Description: RDS PostgreSQL endpoint address
+    Value: !GetAtt RdsInstance.Endpoint.Address
+  WireGuardGatewayEip:
+    Description: WireGuard Gateway Elastic IP (use as WG_SERVER_ENDPOINT)
+    Value: !Ref WireGuardGatewayEip
+  JwtSecretArn:
+    Description: JWT signing secret ARN
+    Value: !Ref JwtSecret
+  RefreshSecretArn:
+    Description: Refresh token secret ARN
+    Value: !Ref RefreshSecret
+  DaemonSharedSecretArn:
+    Description: VPN Daemon shared secret ARN
+    Value: !Ref DaemonSharedSecret
+  TotpEncryptionSecretArn:
+    Description: TOTP encryption key secret ARN (populate with 64 hex chars)
+    Value: !Ref TotpEncryptionSecret
+  DatabaseUrlSecretArn:
+    Description: DATABASE_URL secret ARN (populate post-deploy)
+    Value: !Ref DatabaseUrlSecret
+  WireGuardKeySecretArn:
+    Description: WireGuard private key secret ARN (populate post-deploy)
+    Value: !Ref WireGuardKeySecret
+  ApiServiceName:
+    Description: API ECS service name
+    Value: !Ref ApiService
+  PortalServiceName:
+    Description: Portal ECS service name
+    Value: !Ref PortalService
+  EcsClusterName:
+    Description: ECS cluster name
+    Value: !Ref EcsCluster

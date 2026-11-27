@@ -10,8 +10,10 @@ dist-ssr/
 
 # Environment variables & local secrets
 .env
+.env.cloud
 .env.local
 .env.*.local
+deploy/aws-managed/parameters.json
 *.key
 *.pem
 *.crt

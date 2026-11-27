@@ -3,7 +3,7 @@
 This guide lists the **tools, runtimes, and configuration** needed to run MANGO VPN v2 locally, and how to check that your machine is ready.
 
 > [!TIP]
-> **First time running or testing MANGO VPN?** Follow our beginner-friendly, step-by-step manual with automatic `.env` setup and click-by-click testing missions: **[🎓 English (`TUTORIAL.md`)](TUTORIAL.md)** | **[🇹🇭 ภาษาไทย (`TUTORIAL.th.md`)](TUTORIAL.th.md)**.
+> **First time running or testing MANGO VPN?** Follow our beginner-friendly, step-by-step manual with automatic `.env` setup and click-by-click testing missions: **[🎓 English (`TUTORIAL.md`)](TUTORIAL.md)** | **[🇹🇭 ภาษาไทย (`TUTORIAL.th.md`)](TUTORIAL.th.md)**. The chapter handbook is in [`docs/tutorial/`](docs/tutorial/00-overview-and-setup.md).
 
 > [!IMPORTANT]
 > **Using an AI Assistant?** Instruct your AI to read [`AGENTS.md`](AGENTS.md) before starting any task. It defines project scope, cross-boundary collaboration rules (`Rain/`, `Sobree/`, `packages/shared/`), and the anti-mock guardrails.
@@ -280,7 +280,7 @@ The `vpn-gateway` service needs `NET_ADMIN` and `wg`/`nft` on Linux. Run the dae
 
 ### Optional: Track B role-enforcement test targets
 
-Start the optional static target sites and the localhost role harness. Setup steps and the expected access matrix are in [`TUTORIAL.md`](TUTORIAL.md) Step B4.
+Start the optional static target sites and the localhost role harness. Setup steps and the expected access matrix are in [`docs/tutorial/06-appendix-local-docker-smoke-test.md`](docs/tutorial/06-appendix-local-docker-smoke-test.md).
 
 ```bash
 npm run docker:test-targets:up     # postgres, vpn-gateway, 3 target sites, target-routes, test-harness

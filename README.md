@@ -8,7 +8,7 @@ MANGO VPN removes manual `.conf` file handling for corporate VPN users. Users si
 
 ## 📚 Documentation
 
-- **[🎓 First-Time Beginner Tutorial & Testing Manual (`TUTORIAL.md`)](TUTORIAL.md)** *(หรือฉบับภาษาไทย [TUTORIAL.th.md](TUTORIAL.th.md))*: **Start here if it is your first time** — step-by-step setup for both Rain and Sobree, automatic `.env` generation, 3 run tracks, and click-by-click testing missions.
+- **[🎓 First-Time Beginner Tutorial & Testing Manual (`TUTORIAL.md`)](TUTORIAL.md)** *(หรือฉบับภาษาไทย [TUTORIAL.th.md](TUTORIAL.th.md))*: **Start here if it is your first time**. The index links to the chapter handbook in [`docs/tutorial/`](docs/tutorial/00-overview-and-setup.md): Track A (Docker-free local dev), Track B (GNS3 mock cloud lab), and Track C (single cloud VM or managed AWS stack), plus automatic `.env` generation and click-by-click testing missions.
 - **[🤖 AI Development & Project Scoping Guide (`AGENTS.md`)](AGENTS.md)**: **Mandatory reading for all AI coding assistants**: scope rules, cross-boundary collaboration, protected paths, and anti-hallucination guardrails.
 - **[🚀 Quick Start & Environment Readiness Guide (`QUICKSTART.md`)](QUICKSTART.md)**: Tool prerequisites, `.env` setup, port map, first-time setup, interactive walkthrough, debugging, and shipping checklist.
 - **[📊 Project Progress & Ship Tracker (`PROGRESS.md`)](PROGRESS.md)**: Current v2 verification status, completed tickets (`#5`–`#13`), component readiness matrix, and remaining pre-ship action items.
@@ -99,16 +99,18 @@ Mango_VPN_Trainee/
 │   └── check-environment.ps1          # Windows PowerShell wrapper that delegates to check-environment.mjs
 │
 ├── docs/agents/                      # Agent skill configuration (issue tracker, triage labels, domain docs)
+├── docs/tutorial/                    # Chapter-based tutorial handbook (00–06); English and ภาษาไทย (th/)
+├── deploy/                           # Track B and C assets: gns3/, cloud-vm/, aws-managed/ (CloudFormation template)
 ├── .github/                           # CI workflow (ci.yml) and CODEOWNERS
 ├── docker-compose.yml                 # postgres, vpn-gateway, api, portal
-├── docker-compose.test-targets.yml     # Optional Track B overlay: VPN target sites, target-routes, localhost role harness (TUTORIAL.md Step B4)
+├── docker-compose.test-targets.yml     # Optional Track B overlay: VPN target sites, target-routes, localhost role harness (see docs/tutorial/06-appendix-local-docker-smoke-test.md)
 ├── test-targets/                         # Static target sites (sites/), role harness (harness/), nginx templates (nginx/)
 ├── .env.example                       # Environment template (copy to .env)
 ├── package.json                       # npm workspaces root
 └── tsconfig.base.json                 # Root TypeScript compiler options
 ```
 
-> **Optional Track B role-enforcement tests:** `docker-compose.test-targets.yml` and `test-targets/` add three VPN-isolated static target sites (`10.99.0.10`, `10.20.0.10`, `10.30.0.10`) and a localhost role harness at `http://localhost:3090`. Use them to check role-based `nftables` enforcement across `ADMIN`, `STAFF`, and `CLIENT`. See [`TUTORIAL.md`](TUTORIAL.md) Step B4.
+> **Optional Track B role-enforcement tests:** `docker-compose.test-targets.yml` and `test-targets/` add three VPN-isolated static target sites (`10.99.0.10`, `10.20.0.10`, `10.30.0.10`) and a localhost role harness at `http://localhost:3090`. Use them to check role-based `nftables` enforcement across `ADMIN`, `STAFF`, and `CLIENT`. See [`docs/tutorial/06-appendix-local-docker-smoke-test.md`](docs/tutorial/06-appendix-local-docker-smoke-test.md).
 
 ---
 

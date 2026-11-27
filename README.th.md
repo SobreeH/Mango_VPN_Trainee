@@ -14,7 +14,7 @@ MANGO VPN ออกแบบมาเพื่อ **"ขจัดความย
 ## 📚 เอกสารประกอบโปรเจกต์ (Documentation)
 
 - **[🎓 คู่มือเริ่มต้นใช้งานและทดสอบระบบฉบับจับมือทำ (`TUTORIAL.th.md`)](TUTORIAL.th.md)** *(หรือฉบับภาษาอังกฤษ [TUTORIAL.md](TUTORIAL.md))*:  
-  **แนะนำให้อ่านก่อนหากเริ่มใช้งานครั้งแรก**: สอนตั้งค่าตั้งแต่ศูนย์สำหรับทั้ง Rain และ Sobree, สคริปต์สร้าง `.env` อัตโนมัติ, วิธีรันทั้ง 3 แบบ และภารกิจทดสอบทีละคลิก
+  **แนะนำให้อ่านก่อนหากเริ่มใช้งานครั้งแรก**: สารบัญที่ลิงก์ไปยังคู่มือแบบแบ่งบทใน [`docs/tutorial/th/`](docs/tutorial/th/00-overview-and-setup.md): Track A (พัฒนาในเครื่องแบบไม่ใช้ Docker), Track B (ห้องแล็บ GNS3 จำลองคลาวด์) และ Track C (VM คลาวด์เครื่องเดียวหรือสแตก AWS แบบ Managed) พร้อมการสร้าง `.env` อัตโนมัติและภารกิจทดสอบทีละคลิก
 - **[🤖 คู่มือการพัฒนาด้วย AI และการกำหนดขอบเขต (`AGENTS.th.md`)](AGENTS.th.md)** *(หรือฉบับภาษาอังกฤษ [AGENTS.md](AGENTS.md))*:  
   **เอกสารบังคับอ่านสำหรับ AI ทุกตัว**: อธิบายขอบเขตงาน, การทำงานร่วมกันข้ามโฟลเดอร์ (`Rain/`, `Sobree/`, `packages/shared/`), และปราการป้องกันการทำ Mock หลอก
 - **[🚀 คู่มือเริ่มต้นใช้งานด่วน & เตรียมความพร้อมเครื่องมือ (`QUICKSTART.th.md`)](QUICKSTART.th.md)** *(หรือฉบับภาษาอังกฤษ [QUICKSTART.md](QUICKSTART.md))*:  
@@ -90,14 +90,16 @@ Mango_VPN_Trainee/
 │   ├── check-environment.mjs          # ตรวจความพร้อมของเครื่องมือบน Linux, macOS และ Windows (`npm run check:env`)
 │   └── check-environment.ps1          # Wrapper สำหรับ Windows PowerShell ที่เรียกใช้ check-environment.mjs
 │
+├── docs/tutorial/                      # คู่มือแบบแบ่งบท (00–06) ภาษาอังกฤษ และภาษาไทยที่โฟลเดอร์ th/
+├── deploy/                             # ไฟล์ของ Track B และ C: gns3/, cloud-vm/, aws-managed/ (CloudFormation template)
 ├── docker-compose.yml                 # คอนฟิกรัน postgres, vpn-gateway, api, portal
-├── docker-compose.test-targets.yml     # ตัวเลือกเสริม Track B: เป้าหมาย VPN, target-routes และหน้า Role Harness บน localhost (TUTORIAL.th.md ขั้นตอน B4)
+├── docker-compose.test-targets.yml     # ตัวเลือกเสริม Track B: เป้าหมาย VPN, target-routes และหน้า Role Harness บน localhost (ดู docs/tutorial/th/06-appendix-local-docker-smoke-test.md)
 ├── test-targets/                         # เว็บเป้าหมายแบบคงที่ (sites/), Role Harness (harness/) และเทมเพลต nginx (nginx/)
 ├── .env.example                       # เทมเพลตตัวแปรสภาพแวดล้อม
 └── package.json                       # Root workspaces configuration
 ```
 
-> **การทดสอบ Track B แบบเลือกใช้ (Role Enforcement):** `docker-compose.test-targets.yml` และ `test-targets/` เพิ่มเป้าหมายเว็บแบบคงที่ 3 เครื่องที่แยกจาก VPN (`10.99.0.10`, `10.20.0.10`, `10.30.0.10`) และหน้า Role Harness บน localhost ที่ `http://localhost:3090` ใช้ตรวจการบังคับใช้กฎ `nftables` ตาม Role ของ `ADMIN`, `STAFF` และ `CLIENT` ดูรายละเอียดได้ที่ [`TUTORIAL.th.md`](TUTORIAL.th.md) ขั้นตอน B4
+> **การทดสอบ Track B แบบเลือกใช้ (Role Enforcement):** `docker-compose.test-targets.yml` และ `test-targets/` เพิ่มเป้าหมายเว็บแบบคงที่ 3 เครื่องที่แยกจาก VPN (`10.99.0.10`, `10.20.0.10`, `10.30.0.10`) และหน้า Role Harness บน localhost ที่ `http://localhost:3090` ใช้ตรวจการบังคับใช้กฎ `nftables` ตาม Role ของ `ADMIN`, `STAFF` และ `CLIENT` ดูรายละเอียดได้ที่ [`docs/tutorial/th/06-appendix-local-docker-smoke-test.md`](docs/tutorial/th/06-appendix-local-docker-smoke-test.md)
 
 ---
 
