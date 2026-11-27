@@ -71,3 +71,10 @@ bin/
 # Local Learning & Trainee Notes
 Sobree/LEARNING_RESOURCES.md
 
+# GNS3 generated lab artifacts
+deploy/gns3/.local/
+*.iso
+
+# Python bytecode
+__pycache__/
+*.py[cod]
