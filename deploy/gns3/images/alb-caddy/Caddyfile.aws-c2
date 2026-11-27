@@ -1,0 +1,10 @@
+vpn.mango.lab {
+  tls internal
+  @api path /api/* /health
+  handle @api {
+    reverse_proxy 10.50.10.11:4000
+  }
+  handle {
+    reverse_proxy 10.50.10.12:3000
+  }
+}

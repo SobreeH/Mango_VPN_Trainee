@@ -1,0 +1,19 @@
+$ORIGIN mango.lab.
+$TTL 300
+@ IN SOA ns1.mango.lab. hostmaster.mango.lab. (
+  2026112701 3600 600 86400 300
+)
+  IN NS ns1.mango.lab.
+vpn IN A 203.0.113.10
+harness IN A 192.168.50.20
+admin IN A 10.99.0.10
+kuma.admin IN A 10.99.0.20
+openbao.admin IN A 10.99.0.25
+win2025.admin IN A 10.99.0.30
+staff IN A 10.20.0.10
+gitea.staff IN A 10.20.0.20
+win2022.staff IN A 10.20.0.30
+client IN A 10.30.0.10
+fortigate IN A 172.28.0.21
+cisco IN A 172.28.0.22
+ns1 IN A 203.0.113.53

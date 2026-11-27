@@ -1,0 +1,13 @@
+$ORIGIN aws.lab.
+$TTL 300
+@ IN SOA ns1.aws.lab. hostmaster.aws.lab. (
+  2026112701 3600 600 86400 300
+)
+  IN NS ns1.aws.lab.
+localstack IN A 10.50.30.10
+ecr IN A 10.50.30.20
+prometheus IN A 10.50.30.30
+loki IN A 10.50.30.31
+grafana IN A 10.50.30.32
+s3 IN A 10.50.30.40
+ns1 IN A 203.0.113.53
