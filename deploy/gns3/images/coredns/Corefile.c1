@@ -1,0 +1,11 @@
+mango.lab:53 {
+  file /etc/coredns/db.mango.lab.c1
+  log
+  errors
+}
+.:53 {
+  template ANY ANY {
+    rcode NXDOMAIN
+  }
+  errors
+}
